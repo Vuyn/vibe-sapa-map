@@ -2,7 +2,8 @@
 // Usage: node test-headless.js <index.html>
 // Checks: script runs, data unpacks, every place is reachable on foot from the church, the route plans use the
 // mountain train and cable car, the walker really makes those trips, nobody stands on water, no trek line runs over a
-// lake or reservoir, a click on the lake goes to the nearest shore, and no Vietnamese is garbled.
+// lake or reservoir, lakes and reservoirs lie on level ground, the dams are there, a click on the lake goes to the
+// nearest shore, and no Vietnamese is garbled.
 // There is no Worker in Node, so the land is built on the main thread here. For how it looks, use shot.ps1.
 const fs=require('fs');
 const html=fs.readFileSync(process.argv[2],'utf8');
@@ -46,6 +47,12 @@ new Function(m[1])();
   for(const t of T.TREKS)for(const ln of t.lines)for(let i=0;i<ln.length-1;i++){const a=ln[i],b=ln[i+1],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*4));
    for(let k=0;k<=n;k++){const x=Math.floor(a[0]+(b[0]-a[0])*k/n),y=Math.floor(a[1]+(b[1]-a[1])*k/n);if(x<0||y<0||x>=T.W||y>=T.H)continue;const j=y*T.W+x;if(T.KINDS[T.kind[j]]==='water'&&pop(T.wMask[j]||0xFFFF)>=8){wet++;if(where.length<3)where.push(t.id+' '+x+','+y);}}}
   console.log('trek line samples on a lake or reservoir',wet,where.join(' | '));if(wet)bad++;}
+ // water lies level: no lake or reservoir tile (half water or more) stands more than 40 m above the lowest ground three
+ // tiles around it. This is what catches hillside shadow that the satellite land cover calls water. The small mapped
+ // reservoir above Thác Bạc sits on steep ground and accounts for 11 such tiles; before the rule there were several hundred.
+ {let high=0;const pop=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;},where=[];
+  for(let y=0;y<T.H;y++)for(let x=0;x<T.W;x++){const j=y*T.W+x;if(T.KINDS[T.kind[j]]!=='water'||(T.flags[j]&4)||pop(T.wMask[j]||0xFFFF)<8)continue;let m=1e9;for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<T.W&&yy<T.H)m=Math.min(m,T.elev[yy*T.W+xx]);}if(T.elev[j]-m>40){high++;if(where.length<4)where.push(x+','+y);}}
+  console.log('wide water tiles on a slope',high,where.join(' | '),'| dam tiles',T.damAt?T.damAt.size:0);if(high>20||!T.damAt||!T.damAt.size)bad++;}
  // a click on the lake walks to the nearest shore instead of refusing
  {const lake=by('lake'),lx=lake.x+1,ly=lake.y+1,wk=T.KINDS[T.kind[ly*T.W+lx]],n=T.nearestOpen(lx,ly);console.log('lake tile',wk,'-> nearest reachable',n&&n.join(','),n?T.KINDS[T.kind[n[1]*T.W+n[0]]]:'');if(!n||!T.reach[n[1]*T.W+n[0]]||T.reach[ly*T.W+lx])bad++;
   T.walkTo(lx,ly);const g=T.goal;console.log('walkTo lake: goal',g&&g.join(','),'path',T.hero.path.length);if(!g||!T.hero.path.length)bad++;T.hero.path.length=0;}

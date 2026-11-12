@@ -11,7 +11,7 @@ node build.js data template.html ..\index.html
 node test-headless.js ..\index.html
 ```
 
-The test runs the page script in Node with a stubbed DOM. It checks that the data unpacks, every landmark is reachable on foot from the church, the mountain train and cable car rides work in both directions, no person, animal or stall stands on water, no trek line runs over a lake or reservoir, a click on the lake walks to the nearest shore, and no Vietnamese text is garbled. There is no worker in Node, so the test builds the land on the main thread. It cannot check how the page looks. Use the screenshot tools for that.
+The test runs the page script in Node with a stubbed DOM. It checks that the data unpacks, every landmark is reachable on foot from the church, the mountain train and cable car rides work in both directions, no person, animal or stall stands on water, no trek line runs over a lake or reservoir, lakes and reservoirs lie on level ground, the dams are there, a click on the lake walks to the nearest shore, and no Vietnamese text is garbled. There is no worker in Node, so the test builds the land on the main thread. It cannot check how the page looks. Use the screenshot tools for that.
 
 ## See what it looks like
 
@@ -58,7 +58,7 @@ To change the area or resolution, edit `frame.json` and run the whole refresh be
 node fetch-data.js                                   # downloads into .\raw; cached files are kept, --force refetches
 node resample.js                                     # elevation, town detail and land-cover grids into .\data
 node parse-osm.js  raw\sapa.json  data\osm-out.json  # roads, streets, rivers, railways, cable car, places to stay, waterfalls, viewpoints, peaks
-node parse-osm2.js raw\sapa2.json data\osm2-out.json # OSM land-cover polygons, lakes with their islands, buildings, shops
+node parse-osm2.js raw\sapa2.json data\osm2-out.json # OSM land-cover polygons, lakes with their islands, dams (from raw\dams.json), buildings, shops
 node build.js data template.html ..\index.html
 node test-headless.js ..\index.html
 ```
@@ -75,7 +75,7 @@ Both parsers clean names through `names.js`: street names typed without accents 
 | `detail.bin` | 192 x 192 grid for the town box at two samples per tile, metres = 1100 + value x 3.5 |
 | `lc.bin` | Sentinel-2 land-cover class per tile: 0 none, 1 water, 2 trees, 3 flooded, 4 crops, 5 built, 6 bare, 7 snow, 8 cloud, 9 rangeland |
 | `osm-out.json` | Simplified roads, town streets, rivers, railways, cable car line, hotel and guest house points, `stays` (named places to stay outside town) and `feat` (waterfalls, viewpoints and peaks with names and heights), in tile coordinates |
-| `osm2-out.json` | OSM land-cover polygons, `water` (lake and reservoir outlines, kept fine) and `holes` (their islands), building centroids with kind, shops and cafés |
+| `osm2-out.json` | OSM land-cover polygons, `water` (lake and reservoir outlines, kept fine) and `holes` (their islands), `dams` (crest lines, with a name where there is one), building centroids with kind, shops and cafés |
 | `fonts/` | Press Start 2P woff2 subsets and their unicode ranges |
 
 ## How the land is classified
@@ -86,12 +86,21 @@ OpenStreetMap wins where it has data: roads, rivers, lakes, buildings, and its f
 
 Water has its own mask of 16 bits per tile, one per art pixel. Lakes and reservoirs are filled from their OpenStreetMap outlines and islands are cut out; a tile keeps its water only if at least six of its sixteen pixels are wet. Rivers are channels one to five art pixels wide: the width at any point follows the length of river above it, tributaries included. A river whose bed falls steeply is flagged as rapids and drawn with white water. A tile with any water is closed to walking unless a road or trail crosses it there (kind `bridge`); a lake is crossed only by a real street. The art pixels a water tile does not cover show the bank beside it.
 
-Some water has no outline in OpenStreetMap and is known only from the satellite class, one whole tile at a time: the edges of the reservoirs, and small ponds. Its shore is rounded on the art grid, so it does not show as square blocks. Four rules keep it honest:
+### Water only the satellite sees
 
+The satellite land cover also marks water, one whole tile at a time. It cannot be taken at its word: it calls the deep shadow on a steep slope water too. Beside the three reservoirs most of its "water" hung on ground up to 200 m above the lake, and it doubled the size of Hồ Séo Mý Tỷ. So OpenStreetMap says where water is, and the satellite only says how wide:
+
+- **It must join mapped water.** A wet tile counts only if it touches a lake outline, a river (not a stream) or a dam from OpenStreetMap, directly or through other accepted tiles.
+- **It must lie at that water's level.** Its ground may be at most 10 m above the level it joins. The level of a lake is the highest ground under its outline, of a river the bed at that spot, of a dam the highest ground along its crest. A level spreads from tile to tile, so a reservoir with no outline fills from the river at its upper end, but nothing climbs a slope.
+- **A tile with a mapped road stays land.** The road runs along the shore, not through the water.
 - **In town it is ignored.** OpenStreetMap has the lake's true outline there, and a stray wet tile beside it would be a pond that does not exist.
-- **At a waterfall it is white water.** On steep ground near a waterfall place it is the falls themselves, so it is flagged as rapids.
 - **Beside a river it is the river.** A trail over a wet tile next to a river channel makes it part of the same footbridge.
-- **A single wet tile with a road or trail through it stays land.** The way is mapped; the pond is smaller than the tile.
+
+What passes has its shore rounded on the art grid, so it does not show as square blocks. The test fails if more than a handful of lake tiles stand over 40 m above the lowest ground near them.
+
+### Dams and reservoir names
+
+Dams are `waterway=dam` ways from OpenStreetMap, fetched into `raw\dams.json` and stored in `osm2-out.json`. Each is drawn as a pale crest two art pixels wide. Hồ Séo Mý Tỷ is a place with a card. Two more reservoirs carry a label only (`LAKES` in the template): Sử Pán 1, named by its dam in OpenStreetMap, and Nậm Củn. The Nậm Củn outline has no name in OpenStreetMap; it is identified from the operator's flood notices in Báo Lào Cai, which place the reservoir in Mường Bo commune with a full level of 385 m, the height of the ground under this outline. Check that name if better data turns up.
 
 Terraces are drawn from the same idea: every art pixel takes the height of the ground under it, in 10 m levels, so the steps follow the real contours.
 
@@ -107,6 +116,7 @@ On screens up to 900 px wide the title and side panel give way to the map: the p
 
 ## Known gotchas
 
+- `raw` is not in the repository. `parse-osm.js` and `parse-osm2.js` reproduced the committed `osm-out.json` and `osm2-out.json` exactly from the saved download on 2026-11-12, before dams were added. A fresh fetch will pick up whatever has changed in OpenStreetMap since.
 - The cached download in `raw` was made before guest houses were added to the query. The missing ones were merged in by hand once; a fresh `node fetch-data.js --force` asks for them itself.
 - Overpass servers are often busy. `fetch-data.js` splits the request into parts, tries three mirrors, and retries three rounds.
 - The built page is about 450 KB, most of it land cover and elevation. `elevStep: 1` in `frame.json` stores elevation for every tile and adds about 350 KB.

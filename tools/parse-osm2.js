@@ -1,5 +1,6 @@
-// OpenStreetMap land-cover polygons (rasterised later in the page), lakes with their islands, building centroids and shops in town.
-// Usage: node parse-osm2.js raw/sapa2.json data/osm2-out.json
+// OpenStreetMap land-cover polygons (rasterised later in the page), lakes with their islands, dams, building centroids and shops in town.
+// Usage: node parse-osm2.js raw/sapa2.json data/osm2-out.json [raw/dams.json]
+// The dams file defaults to dams.json beside the first input.
 const fs=require('fs'),path=require('path'),{cleanShop}=require('./names.js');
 const [,,inPath,outPath]=process.argv;
 const F=JSON.parse(fs.readFileSync(path.join(__dirname,'frame.json'),'utf8'));
@@ -24,6 +25,11 @@ for(const el of data.elements){const t=el.tags;if(!t)continue;const c=el.center|
  if(t.building){const b=t.building;const kind=/church|cathedral|chapel/.test(b)?'church':/hotel/.test(b)||t.tourism==='hotel'?'hotel':/school|college|university/.test(b)?'school':/hospital/.test(b)?'hospital':/industrial|warehouse/.test(b)?'ind':/apartments|commercial|retail|office|public|civic|government/.test(b)?'big':'house';buildings.push([r1(toX(c.lon)),r1(toY(c.lat)),kind]);bcount[kind]=(bcount[kind]||0)+1;}
  if(t.amenity&&POI[t.amenity])pois.push({k:POI[t.amenity],n:cleanShop(t.name||t['name:en']),x:r1(toX(c.lon)),y:r1(toY(c.lat))});
  else if(t.shop)pois.push({k:'shop',n:cleanShop(t.name||t['name:en']),s:t.shop,x:r1(toX(c.lon)),y:r1(toY(c.lat))});}
-fs.writeFileSync(outPath,JSON.stringify({cover:polys,water,holes,buildings,pois}));
-console.log('cover polys',polys.length,'water',water.length,'islands',holes.length,JSON.stringify(counts));
+// dams: the crest line of each waterway=dam way, with its name where OpenStreetMap has one
+const dams=[],damPath=process.argv[4]||path.join(path.dirname(inPath),'dams.json');
+if(fs.existsSync(damPath)){let dr=fs.readFileSync(damPath,'utf8');if(/Ã[\u0080-¿]|Æ°|á»/.test(dr))dr=Buffer.from(dr,'latin1').toString('utf8');
+ for(const el of JSON.parse(dr).elements){if(el.type!=='way'||!el.geometry||!el.tags||el.tags.waterway!=='dam')continue;const pts=dp(el.geometry.map(g=>[toX(g.lon),toY(g.lat)]),0.15);if(pts.some(p=>p[0]<0||p[1]<0||p[0]>=W||p[1]>=H))continue;const d={p:pts.flatMap(p=>[r1(p[0]),r1(p[1])])};if(el.tags.name)d.n=el.tags.name;dams.push(d);}}
+else console.log('no dams file at',damPath,'- run fetch-data.js, or pass its path as the third argument');
+fs.writeFileSync(outPath,JSON.stringify({cover:polys,water,holes,dams,buildings,pois}));
+console.log('cover polys',polys.length,'water',water.length,'islands',holes.length,'dams',dams.length,JSON.stringify(counts));
 console.log('buildings',buildings.length,JSON.stringify(bcount),'| pois',pois.length);

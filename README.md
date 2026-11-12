@@ -13,8 +13,8 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 ## What is on the map
 
 - **The area:** 32.4 by 18.3 km around Sa Pa town, as 840 by 472 tiles of about 39 m. It runs from Fansipan (3,147 m) and the Ô Quy Hồ pass down the Mường Hoa valley to Bản Hồ.
-- **31 places with a card each:** the stone church, the lake, the markets, Fansipan, waterfalls, and the villages of the valley. Each card has a short description, a travel tip, walking and riding times, and a small picture built from the real skyline behind that place.
-- **Real terrain:** rice terraces that follow the contour lines, rivers that widen downstream with rapids where they fall steeply, the true outline of Hồ Sa Pa with its island, and hill shading from the elevation model.
+- **32 places with a card each:** the stone church, the lake, the markets, Fansipan, waterfalls, the villages of the valley, and Hồ Séo Mý Tỷ, the reservoir high on the Hoàng Liên range. Each card has a short description, a travel tip, walking and riding times, and a small picture built from the real skyline behind that place.
+- **Real terrain:** rice terraces that follow the contour lines, rivers that widen downstream with rapids where they fall steeply, the true outline of Hồ Sa Pa with its island, the hydropower reservoirs with their dams, and hill shading from the elevation model.
 - **Town detail:** streets, buildings, hotels, shops and cafés from OpenStreetMap, with street names when you zoom in.
 - **Homestays:** named homestays near the valley villages, as mapped in OpenStreetMap.
 - **Peaks, waterfalls and viewpoints** with their names and heights.

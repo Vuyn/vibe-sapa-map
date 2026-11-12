@@ -305,7 +305,7 @@ const LM=[
   d:{en:'One of the four great passes of the northwest, climbing over the Hoàng Liên Sơn into Lai Châu. The Heaven’s Gate viewpoint at the top sometimes sees snow.',vi:'Một trong tứ đại đỉnh đèo Tây Bắc, vượt Hoàng Liên Sơn sang Lai Châu. Điểm ngắm Cổng Trời trên đỉnh đôi khi có tuyết.'},
   t:{en:'Ride it, do not bus it. Fog can cut visibility to ten metres.',vi:'Đi xe máy, đừng đi xe khách. Sương có thể chỉ còn thấy mười mét.'}},
  {id:'silver',en:'Silver Waterfall',vi:'Thác Bạc',lat:22.36324,lon:103.77683,sp:'falls',major:1,src:'osm',walk:'3.5 h',bike:'25 min',guide:0,
-  f:{en:['200 m fall','1,750 m','Pass road'],vi:['Cao 200 m','1.750 m','Đường đèo']},
+  f:{en:['200 m fall','About 1,800 m','Pass road'],vi:['Cao 200 m','Khoảng 1.800 m','Đường đèo']},
   d:{en:'A 200-metre white ribbon down the mountainside beside the pass road, loudest after summer rain.',vi:'Dải nước trắng 200 m đổ xuống sườn núi cạnh đường đèo, ầm nhất sau mưa hè.'},
   t:{en:'Combine with Love Waterfall and the pass in one motorbike morning.',vi:'Gộp với Thác Tình Yêu và đèo trong một buổi sáng xe máy.'}},
  {id:'love',en:'Love Waterfall',vi:'Thác Tình Yêu',lat:22.34734,lon:103.77243,sp:'falls',src:'osm',walk:'4 h',bike:'32 min',guide:0,
@@ -348,6 +348,10 @@ const LM=[
   f:{en:['Tày people','Warm valley floor','Hot springs'],vi:['Người Tày','Đáy thung lũng ấm','Suối nước nóng']},
   d:{en:'A Tày village far down the valley, about a thousand metres lower and noticeably warmer than Sapa. Stilt houses line the river, with hot springs and a waterfall nearby.',vi:'Bản người Tày cuối thung lũng, thấp hơn Sa Pa khoảng nghìn mét và ấm rõ rệt. Nhà sàn dọc suối, gần đó có suối nước nóng và thác.'},
   t:{en:'The far end of the two-day valley trek. Arrange a car back to town.',vi:'Điểm cuối tuyến trek thung lũng hai ngày. Nên đặt xe về thị xã.'}},
+ {id:'seomyty',en:'Seo My Ty Lake',vi:'Hồ Séo Mý Tỷ',lat:22.25503,lon:103.88706,sp:'tarn',src:'osm',walk:'7 h',bike:'1.5 h',guide:1,
+  f:{en:['Above 1,600 m','Séo Chong Hô dam','Hmong hamlet'],vi:['Trên 1.600 m','Đập Séo Chong Hô','Thôn người Mông']},
+  d:{en:'A reservoir high on the flank of the Hoàng Liên range, held back by the dam of the Séo Chong Hô hydropower plant and often called the highest man-made lake in Vietnam. The Hmong hamlet of Séo Mý Tỷ stands by the water, inside Hoàng Liên National Park.',vi:'Hồ chứa trên sườn dãy Hoàng Liên, do đập thủy điện Séo Chong Hô tạo nên, thường được gọi là hồ nhân tạo cao nhất Việt Nam. Thôn người Mông Séo Mý Tỷ nằm bên hồ, trong Vườn quốc gia Hoàng Liên.'},
+  t:{en:'About 20 km from town by way of Lao Chải and Tả Van. The last stretch above Tả Van is rough: motorbikes and off-road cars only.',vi:'Cách thị xã khoảng 20 km, đi qua Lao Chải và Tả Van. Đoạn cuối từ Tả Van lên rất xấu, chỉ hợp xe máy và xe gầm cao.'}},
  {id:'trungchai',en:'Trung Chai',vi:'Trung Chải',lat:22.3973182,lon:103.8900507,sp:'house',src:'osm',walk:'3.5 h',bike:'25 min',guide:0,
   f:{en:['Hmong and Red Dao','Road to Lào Cai','Móng Sến viaduct'],vi:['Mông và Dao đỏ','Đường về Lào Cai','Cầu Móng Sến']},
   d:{en:'A commune of Hmong and Red Dao hamlets along the main road down to Lào Cai. The Móng Sến viaduct, with some of the tallest piers in Vietnam, crosses the gorge here.',vi:'Xã gồm các thôn người Mông và Dao đỏ dọc quốc lộ xuống Lào Cai. Cầu cạn Móng Sến, một trong những cây cầu có trụ cao nhất Việt Nam, vượt qua hẻm núi ở đây.'},
@@ -372,6 +376,11 @@ const LM=[
 /* a place is 2 tiles wide on the map, the six big ones 3; x,y is its top-left tile */
 LM.forEach(l=>{l.w=l.big?3:2;l.x=Math.round(toX(l.lon)-l.w/2);l.y=Math.round(toY(l.lat)-l.w/2);l.km=km(CH,l);});
 const byId=id=>LM.find(l=>l.id===id);
+/* reservoirs that are labelled but have no card. Sử Pán 1 is named by its dam in OpenStreetMap. The outline of Nậm Củn
+   carries no name there: it is identified from the operator's notices (Mường Bo commune, full level 385 m, which is
+   the height of the ground under this outline) */
+const LAKES=[{en:'Sử Pán 1 reservoir',vi:'Hồ thủy điện Sử Pán 1',lat:22.2949,lon:103.9103},{en:'Nậm Củn reservoir',vi:'Hồ thủy điện Nậm Củn',lat:22.2645,lon:103.9840}];
+LAKES.forEach(k=>{k.x=toX(k.lon);k.y=toY(k.lat);});
 const LL=pts=>pts.map(p=>[toX(p[1]),toY(p[0])]);
 
 /* Trek overlays: where `re` matches the name of an OSM path that path is used; the hand line through verified villages otherwise. */
@@ -454,7 +463,7 @@ function buildTerrain(U,P,HP){
  /* ---- water, on the art grid: one bit per subpixel, 16 per tile ----
     Lakes and reservoirs come from their OpenStreetMap outlines, with islands cut out. Rivers are channels that widen
     downstream: the width at any point follows the length of river above it, tributaries included. */
- const wMask=new Uint16Array(N),lakeT=new Uint8Array(N),riverT=new Uint8Array(N),rapidT=new Uint8Array(N),satT=new Uint8Array(N);
+ const wMask=new Uint16Array(N),lakeT=new Uint8Array(N),riverT=new Uint8Array(N),bigT=new Uint8Array(N),rapidT=new Uint8Array(N),satT=new Uint8Array(N);
  const pop16=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;};
  function fillSub(pts,on){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of pts){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);}
   x0=Math.max(0,Math.floor(x0*4));x1=Math.min(W*4-1,Math.ceil(x1*4));y0=Math.max(0,Math.floor(y0*4));y1=Math.min(H*4-1,Math.ceil(y1*4));
@@ -480,7 +489,7 @@ function buildTerrain(U,P,HP){
    for(let k=0;k<r.pts.length-1;k++){const a=r.pts[k],b=r.pts[k+1],d=r.cum[k+1]-r.cum[k],n=Math.max(1,Math.ceil(d*8));
     for(let j=0;j<=n;j++){const t=j/n,s=r.cum[k]+d*t;let f=s;for(const tr of trib)if(tr[0]<=s)f+=tr[1];
      const w=Math.max(r.river?2:1,widthOf(f)),fl=fall(r,s),rapid=w>=2?fl>3:fl>10,gx=Math.floor((a[0]+(b[0]-a[0])*t)*4)-(w>>1),gy=Math.floor((a[1]+(b[1]-a[1])*t)*4)-(w>>1);
-     for(let dy=0;dy<w;dy++)for(let dx=0;dx<w;dx++){const sx=gx+dx,sy=gy+dy,x=sx>>2,y=sy>>2;if(x<0||y<0||x>=W||y>=H)continue;const ii=y*W+x;wMask[ii]|=1<<((sy&3)*4+(sx&3));riverT[ii]=1;if(rapid)rapidT[ii]=1;}}}
+     for(let dy=0;dy<w;dy++)for(let dx=0;dx<w;dx++){const sx=gx+dx,sy=gy+dy,x=sx>>2,y=sy>>2;if(x<0||y<0||x>=W||y>=H)continue;const ii=y*W+x;wMask[ii]|=1<<((sy&3)*4+(sx&3));riverT[ii]=1;if(r.river)bigT[ii]=1;if(rapid)rapidT[ii]=1;}}}
    paint(r.pts,14*K,(x,y,d)=>{const ii=y*W+x;if(d<dRiver[ii])dRiver[ii]=d;});});}
  const mark=(x,y)=>{trailF[y*W+x]=1;};
  const ways={main:[],minor:[],town:[]};
@@ -493,6 +502,8 @@ function buildTerrain(U,P,HP){
   if(c!=='track'&&pts.some(p=>townDist(p[0],p[1])<TOWN_R+3*K))paint(pts,2.2*K,(x,y,d)=>{const i=y*W+x;if(d<dStreet[i])dStreet[i]=d;});}
  for(const w of OSM.streets){const pts=unpack(w);ways.town.push(pts);paint(pts,2.2*K,(x,y,d)=>{const i=y*W+x;if(d<dStreet[i])dStreet[i]=d;});subTrace(stMask,pts,1,true);}
  for(const w of (OSM.rail||[]))subTrace(railMask,unpack(w),1,false);
+ /* dams from OpenStreetMap: the crest, two art pixels wide. There are only a handful, so they are kept as a short list */
+ const damM={};for(const d of (D.dams||[]))subTrace(damM,unpack(d),2,false);
  /* treks: OSM paths where a name matches, the hand-drawn line otherwise */
  const pathWays=OSM.roads.filter(w=>CLS[w.c]==='path'),trekLines={};
  for(const t of P.treks){let lines=t.lines||[];if(t.re){const re=new RegExp(t.re),found=pathWays.filter(w=>re.test(norm(w.n))).map(unpack);if(found.length)lines=found;}trekLines[t.id]=lines;for(const ln of lines){paint(ln,0.7,mark);trace(ln,mark);}}
@@ -508,10 +519,24 @@ function buildTerrain(U,P,HP){
  for(const b of BUILD){const x=Math.floor(b[0]),y=Math.floor(b[1]);if(x<0||y<0||x>=W||y>=H)continue;const i=y*W+x;bCount[i]=Math.min(9,bCount[i]+1);bKind[i]=Math.max(bKind[i],BK[b[2]]||1);const r=3*K;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H)bNear[yy*W+xx]=1;}}
  const hotelCnt=new Uint8Array(N);for(const p of OSM.hotels){const x=Math.floor(p[0]),y=Math.floor(p[1]);if(x>=0&&y>=0&&x<W&&y<H)hotelCnt[y*W+x]=Math.min(4,hotelCnt[y*W+x]+1);}
  const pass=byId('pass'),passX=pass.x+pass.w/2,passY=pass.y+pass.w/2;
- const SQUARE=P.square,villages=lm.filter(l=>l.sp==='house'||l.sp==='dao'),falls=lm.filter(l=>l.sp==='falls');
+ const SQUARE=P.square,villages=lm.filter(l=>l.sp==='house'||l.sp==='dao');
  /* slope in metres per 77 m, so the thresholds below read the same at any tile size */
  const slopeAt=(x,y)=>Math.max(Math.abs(eAt(x+K,y)-eAt(x-K,y)),Math.abs(eAt(x,y+K)-eAt(x,y-K)))/2;
  const mk=byId('market'),bs=byId('bus');
+ /* Water only the satellite sees. The satellite also calls the deep shadow on a steep slope water: beside the reservoirs
+    most such tiles hang on ground up to 200 m above the lake. So OpenStreetMap says where water is, and the satellite
+    only how wide: a tile counts when it is joined to mapped water (a lake, a river, a dam) and its ground is no more
+    than 10 m above that water's level. The level of a lake is the highest ground under its outline, of a river the bed
+    at that spot, of a dam the highest ground along its crest. A level spreads from tile to tile, so a reservoir with
+    no outline fills from the river at its upper end, but nothing climbs a slope. A tile with a mapped road stays land. */
+ const satOK=new Uint8Array(N);{const ref=new Float32Array(N).fill(-1e9),q=[],seen=new Uint8Array(N);
+  for(let i=0;i<N;i++){if(!lakeT[i]||seen[i])continue;const c=[i];seen[i]=1;let top=-1e9;
+   for(let k=0;k<c.length;k++){const j=c[k],x=j%W,y=(j/W)|0;top=Math.max(top,elev[j]);for(let d=0;d<4;d++){const xx=x+[1,-1,0,0][d],yy=y+[0,0,1,-1][d];if(xx<0||yy<0||xx>=W||yy>=H)continue;const jj=yy*W+xx;if(lakeT[jj]&&!seen[jj]){seen[jj]=1;c.push(jj);}}}
+   for(const j of c){ref[j]=top;q.push(j);}}
+  for(let i=0;i<N;i++)if(bigT[i]&&!lakeT[i]){ref[i]=elev[i];q.push(i);}
+  for(const d of (D.dams||[])){const ts=[];let top=-1e9;trace(unpack(d),(x,y)=>{ts.push(y*W+x);top=Math.max(top,elev[y*W+x]);});for(const j of ts)if(top>ref[j]){ref[j]=top;q.push(j);}}
+  for(let k=0;k<q.length;k++){const j=q[k],x=j%W,y=(j/W)|0,r=ref[j];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const jj=yy*W+xx;
+    if(lcGrid[jj]!==1||stMask[jj]||lakeT[jj]||riverT[jj]||elev[jj]>r+10||ref[jj]>=r)continue;ref[jj]=r;satOK[jj]=1;q.push(jj);}}}
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
   const i=y*W+x,e=elev[i],v=hash(x,y),sl=slopeAt(x,y),td=townDist(x,y),cx=x+.5,cy=y+.5,cv0=cover[i],lc=lcGrid[i];let k,gen=0;
   const inSquare=Math.abs(cx-SQUARE.x)<2.6*K&&Math.abs(cy-SQUARE.y)<1.6*K;
@@ -528,11 +553,10 @@ function buildTerrain(U,P,HP){
   else if(lc===5&&td>=TOWN_R){const c=nz(x/(2.2*K)+7,y/(2.2*K)+3)*0.75+v*0.25;if(sl<50&&c>0.42){k='village';gen=c>0.62?3:c>0.52?2:1;}else k='garden';}
   else if(villages.some(l=>Math.abs(cx-l.x-l.w/2)<3.5*K&&Math.abs(cy-l.y-l.w/2)<3.5*K)&&v<0.2&&sl<35){k='village';gen=1;}
   else if(cv0===6&&dStreet[i]<2*K&&v<0.5){k='town';gen=1;}
-  /* water only the satellite sees. Not in town, where OpenStreetMap has the lake's true outline and a stray wet pixel
-     beside it would be a pond that is not there. On steep ground at a waterfall it is the falls themselves: white water.
-     Right beside a river channel it is the river's own width, so a trail over it is part of the same footbridge.
-     A single wet tile with a road or trail through it stays land: the way is mapped, the pond is smaller than the tile */
-  else if(lc===1&&td>=TOWN_R&&!((stMask[i]||trailF[i])&&lcGrid[i-1]!==1&&lcGrid[i+1]!==1&&lcGrid[i-W]!==1&&lcGrid[i+W]!==1)){k=(trailF[i]&&dRiver[i]<2.5)?'bridge':'water';wMask[i]=0xFFFF;satT[i]=1;if(sl>25&&falls.some(l=>Math.hypot(cx-l.x-l.w/2,cy-l.y-l.w/2)<6*K))rapidT[i]=1;}
+  /* satellite water that passed the test above. Not in town, where OpenStreetMap has the lake's true outline and a
+     stray wet tile beside it would be a pond that is not there. Right beside a river channel it is the river's own
+     width, so a trail over it is part of the same footbridge */
+  else if(satOK[i]&&td>=TOWN_R){k=(trailF[i]&&dRiver[i]<2.5)?'bridge':'water';wMask[i]=0xFFFF;satT[i]=1;}
   else if(cv0===8||e>2500||(sl>95&&e>2000))k='rock';
   else if(cv0===3)k='forest';
   else if(cv0===4)k='scrub';
@@ -562,7 +586,7 @@ function buildTerrain(U,P,HP){
   /* snow, January and February only: 2 the high ridge and the summit, 3 a patchy dusting lower down and around the pass */
   const n2=nz(x/(4*K)+11,y/(4*K)+23),pd=Math.hypot(cx-passX,cy-passY);snow[i]=e>2800?2:(e>2450&&n2>0.5)?3:(pd<8*K&&e>1930&&n2>0.42)?3:0;
   /* flags: 1 trail, 2 main road, 4 rapids (a river whose bed falls steeply) */
-  if(trailF[i])flags[i]=1;if(mainF[i])flags[i]|=2;if(rapidT[i])flags[i]|=4;
+  if(trailF[i])flags[i]=1;if(mainF[i])flags[i]|=2;if(rapidT[i]&&!lakeT[i])flags[i]|=4; /* a drowned river bed under a reservoir is still water */
  }
  /* ponds and reservoirs that only the satellite knows come as whole tiles. Their shore is rounded on the art grid: the
     wet/dry field is smoothed and cut at one half, which leaves a straight shore where it is and trims the corners.
@@ -595,7 +619,7 @@ function buildTerrain(U,P,HP){
  const feat=(OSM.feat||[]).filter(f=>f.x>=0&&f.y>=0&&f.x<W&&f.y<H).map(f=>({k:f.k,n:f.n||'',ne:f.ne||'',x:f.x,y:f.y,e:f.e||Math.round(elev[Math.floor(f.y)*W+Math.floor(f.x)])}));
  const u16=a=>Uint16Array.from(a);
  const out={elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles:u16(water),windowTiles:u16(windows),stTiles:u16(sts),lampPts:u16(lamps),
-  streetLabels,trainLine,cableLine,trekLines,ways,passRoad:longest(/o quy ho|quoc lo 4d/),valleyRoad:longest(/tinh 152|lao chai/),feat,pois:POIS,stays:OSM.stays||[]};
+  streetLabels,trainLine,cableLine,trekLines,ways,passRoad:longest(/o quy ho|quoc lo 4d/),valleyRoad:longest(/tinh 152|lao chai/),feat,pois:POIS,stays:OSM.stays||[],dams:Object.keys(damM).map(k=>[+k,damM[k]])};
  out.transfer=[elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
  return out;
 }
@@ -644,6 +668,7 @@ const passable=(x,y)=>{if(x<0||y<0||x>=W||y>=H)return false;const i=y*W+x,k=kind
 const isPaved=k=>k==='road'||k==='street'||k==='plaza'||k==='busyard'||k==='park'||k==='bridge'||k==='track';
 const pavedT=t=>isPaved(t.k)||t.st===1;
 const isBuilt=k=>k==='town'||k==='village'||k==='market'||k==='hut';
+const damAt=new Map(R.dams||[]);
 const poiAt=new Map();for(const p of POIS){const x=Math.floor(p.x),y=Math.floor(p.y);if(x<0||y<0||x>=W||y>=H)continue;const i=y*W+x;if(!poiAt.has(i))poiAt.set(i,[]);poiAt.get(i).push(p);}
 /* the walkable tile closest to the foot of a landmark sprite, preferring pavement */
 function nearTarget(l){let best=null,bd=1e9;for(let dy=-l.w;dy<=l.w*2+2;dy++)for(let dx=-l.w;dx<=l.w*2;dx++){const x=l.x+dx,y=l.y+dy;if(!passable(x,y))continue;const d=Math.hypot(dx-(l.w/2-0.5),dy-(l.w+0.5))+(pavedT(at(x,y))?-0.8:0);if(d<bd){bd=d;best=[x,y];}}return best||[l.x+1,l.y+l.w];}
@@ -672,6 +697,8 @@ const SPR={
  stalls:['Y.Y.Y.Y.','RRRRRRRR','OWOWOWOW','B.B.B.B.','B.B.B.B.','........','........','........'],
  bus:['........','.KKKKKK.','.KWWWWK.','.KWWWWK.','.KKKKKK.','.RRRRRR.','.RRRRRR.','..K..K..'],
  isle:['........','..T.....','.TTT.T..','.TTTTTT.','..B.TTT.','.EEEEBE.','LEEEEEEL','.LLLLLL.'],
+ /* a mountain lake: pines on the shore, water in front */
+ tarn:['........','..T.....','.TTT..T.','.TTT.TTT','..B..TTT','EEEEEEBE','LLLLLLLL','LSLLLSLL'],
  /* on the way up from the top station: bell tower, the bronze Buddha and a pagoda */
  tower:['..R...','.RRR..','..X...','.RRR..','..X...','.RRR..','..X...','.XDX..'],
  buddha:['..CC..','.CCCC.','..CC..','.CCCC.','CCCCCC','.CCCC.','GGGGGG','.GGGG.'],
@@ -772,6 +799,8 @@ function drawTile(oc,x,y,t){
  /* railway: dark rail with pale sleepers, on the same art grid */
  const rm=railMask[i];if(rm&&k!=='water'){for(let b=0;b<16;b++)if(rm&(1<<b)){oc.fillStyle=((x*4+(b&3)+y*4+(b>>2))%2)?'#3a2a1a':'#9a9a8c';oc.fillRect(px+(b&3)*S,py+(b>>2)*S,S,S);}}
  if(t.trail&&(k==='rock'||k==='snow'||k==='forest'||k==='grass'||k==='terrace'||k==='scrub'||k==='bare'||k==='garden')){oc.fillStyle='#b59a72';oc.fillRect(px+S,py+S,S*2,S*2);}
+ /* a dam: a pale concrete crest with its shaded face on the art pixel below */
+ const dm=damAt.get(i);if(dm)for(let b=0;b<16;b++)if(dm&(1<<b))sub(b&3,b>>2,(b<12&&(dm&(1<<(b+4))))?'#d2d0c6':'#7c7a70');
  /* hillshade overlay: per subpixel inside the detail box, per tile elsewhere */
  const str=(k==='water'||k==='plaza'||k==='busyard')?0.35:1;
  if(inDetail(x,y)){const bi=(x-DBX)*DF,bj=(y-DBY)*DF;for(let r=0;r<4;r++)for(let c=0;c<4;c++){const sh=dshade[(bj+(r*DF>>2))*DN+bi+(c*DF>>2)];if(sh>0.02)sub(c,r,'rgba(255,255,255,'+(0.2*sh*str).toFixed(3)+')');else if(sh<-0.02)sub(c,r,'rgba(0,0,0,'+(0.28*-sh*str).toFixed(3)+')');}}
@@ -816,7 +845,7 @@ const UI={
  en:{subtitle:'A pixel map of Sa Pa and the Mường Hoa valley built from real elevation data and OpenStreetMap. Walk, trek, ride the cable car.',labels:'LABELS',treks:'TREKS',sky:['SKY: AUTO','SKY: CLEAR','SKY: FOG','SKY: RAIN'],sound:['SOUND OFF','SOUND ON'],lang:'TIẾNG VIỆT',walk:'WALK HERE',me:'◎ ME',tabs:['PLACE','PLACES','SETTINGS','LEGEND'],skyline:'SECTION',shops:'SHOP NAMES',shopsHint:'Zoom in fully to see shop names.',section:'WEST-EAST SECTION WHERE YOU STAND',skyNames:['','CLEAR','FOG','RAIN','SNOW'],days:['SUN','MON','TUE','WED','THU','FRI','SAT'],legs:{walk:'walk',trainDown:'mountain train',trainUp:'mountain train',cableUp:'cable car',cableDown:'cable car'},total:'total',feat:{waterfall:'Waterfall',viewpoint:'Viewpoint',peak:'Peak'},ridge:'HOÀNG LIÊN SƠN RANGE',valleyName:'MƯỜNG HOA VALLEY',festival:'GẦU TÀO FESTIVAL',dayBtn:'DAY: ',busy:{market:'Market day: the villages are in town.',nightmarket:'Saturday night: the love market is on.'},busyWhen:{market:'Busiest on Sunday from 6 to 11 am.',nightmarket:'Busiest on Saturday from 6 to 11 pm.'},home:'BACK TO TOWN',time:'Time',monthL:'Month',auto:'AUTO',visited:'Visited',
   months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
   seasons:{1:'January: dry, cold, snow on the pass some years.',2:'February: peach and plum blossom for Tết, and the Hmong Gầu Tào festival.',3:'March: rhododendrons on Fansipan.',4:'April: fields ploughed, buffalo at work.',5:'May: terraces flooded like mirrors, planting begins.',6:'June: young rice, heavy rain.',7:'July: green terraces, wettest month.',8:'August: rice heads form, thunderstorms.',9:'September: harvest gold, crews cutting rice on the terraces.',10:'October: stubble and clear skies.',11:'November: dry and cool, best trekking.',12:'December: frost in the valley, fog in town.'},
-  legend:[['#7cb342','Rice terraces (colour follows the month)'],['#2e7d32','Forest'],['#7aa844','Scrub'],['#8d8d7a','Rock, above 2,500 m'],['#e8eef5','Snow, January and February'],['#c2ad84','Bare ground'],['#3a7bd5','Rivers, lake'],['#3a2a1a','Mountain railway'],['#e3d8bd','Paved roads'],['#b8a070','Tracks'],['#8a6238','Bridges'],['#6f6f78','Town streets (OSM)'],['#b5452f','Houses (OSM footprints)'],['#4a5566','Hotels (OSM)'],['#8a4a32','Village houses'],['#7fb84e','Gardens'],['#2a9d8f','Shop or café sign'],['#f1c232','Homestay (OSM)'],['dash','Trek routes']],
+  legend:[['#7cb342','Rice terraces (colour follows the month)'],['#2e7d32','Forest'],['#7aa844','Scrub'],['#8d8d7a','Rock, above 2,500 m'],['#e8eef5','Snow, January and February'],['#c2ad84','Bare ground'],['#3a7bd5','Rivers, lakes, reservoirs'],['#d2d0c6','Dam (OSM)'],['#3a2a1a','Mountain railway'],['#e3d8bd','Paved roads'],['#b8a070','Tracks'],['#8a6238','Bridges'],['#6f6f78','Town streets (OSM)'],['#b5452f','Houses (OSM footprints)'],['#4a5566','Hotels (OSM)'],['#8a4a32','Village houses'],['#7fb84e','Gardens'],['#2a9d8f','Shop or café sign'],['#f1c232','Homestay (OSM)'],['dash','Trek routes']],
   help:'Click or tap the map to walk to that spot, or a place to walk there along the roads; a flag marks where you are going and dots show the way. A click on water or a cliff goes to the nearest spot you can reach. Drag to pan, scroll, pinch or <kbd>+</kbd><kbd>-</kbd> to zoom, and double-tap to zoom in on a phone. On a keyboard the arrow keys move the view and <kbd>Enter</kbd> walks to the cross in the middle. Trips between town and the cable car take the mountain train from Sun Plaza. One tile is about 39 m; the scale bar shows 1 km. Only the main places are labelled at first; zoom in for the rest, then street names. Shop names show on hover, or all at once with the Shop names switch in Settings. Month, sky, sound and language are in the Settings tab. Morning fog pools in the valleys and lifts by mid-morning.',
   credits:'Elevation: SRTM via AWS Terrain Tiles. Land cover: Sentinel-2 10 m, Esri and Impact Observatory. Roads, rivers, land cover, buildings, shops, hotels and most places: © OpenStreetMap contributors. Bus station, Sín Chải, Ý Linh Hồ and Giàng Tả Chải are hand placed. Homestay names are as mapped in OpenStreetMap. Monthly temperature and rain: Sa Pa averages from climatestotravel.com. Build pipeline in the tools folder.',
   welcome:'WELCOME TO SA PA',intro:'You start at the stone church. Click or tap anywhere on the map to walk there, pick a place to go straight to it, and ride the cable car from the Mường Hoa base station to Fansipan. Visit all {n} places to fill the journal. Your position and journal are remembered on this device.',go:"LET'S GO",
@@ -829,7 +858,7 @@ const UI={
  vi:{subtitle:'Bản đồ pixel Sa Pa và thung lũng Mường Hoa dựng từ dữ liệu độ cao thật và OpenStreetMap. Đi bộ, trek, đi cáp treo.',labels:'NHÃN',treks:'TREK',sky:['TRỜI: TỰ ĐỘNG','TRỜI: QUANG','TRỜI: SƯƠNG','TRỜI: MƯA'],sound:['TẮT TIẾNG','BẬT TIẾNG'],lang:'ENGLISH',walk:'ĐI TỚI ĐÂY',me:'◎ TÔI',tabs:['ĐỊA ĐIỂM','DANH SÁCH','CÀI ĐẶT','CHÚ GIẢI'],skyline:'LÁT CẮT',shops:'TÊN QUÁN',shopsHint:'Phóng to hết cỡ để thấy tên quán.',section:'LÁT CẮT TÂY-ĐÔNG TẠI CHỖ BẠN ĐỨNG',skyNames:['','QUANG','SƯƠNG','MƯA','TUYẾT'],days:['CN','T2','T3','T4','T5','T6','T7'],legs:{walk:'đi bộ',trainDown:'tàu leo núi',trainUp:'tàu leo núi',cableUp:'cáp treo',cableDown:'cáp treo'},total:'tổng',feat:{waterfall:'Thác nước',viewpoint:'Điểm ngắm cảnh',peak:'Đỉnh núi'},ridge:'DÃY HOÀNG LIÊN SƠN',valleyName:'THUNG LŨNG MƯỜNG HOA',festival:'LỄ HỘI GẦU TÀO',dayBtn:'THỨ: ',busy:{market:'Phiên chợ: dân bản xuống chợ.',nightmarket:'Tối thứ Bảy: chợ tình đang họp.'},busyWhen:{market:'Đông nhất Chủ nhật từ 6 đến 11 giờ sáng.',nightmarket:'Đông nhất tối thứ Bảy từ 18 đến 23 giờ.'},home:'VỀ THỊ XÃ',time:'Giờ',monthL:'Tháng',auto:'TỰ ĐỘNG',visited:'Đã ghé',
   months:['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'],
   seasons:{1:'Tháng 1: khô, rét, có năm tuyết trên đèo.',2:'Tháng 2: hoa đào, hoa mận đón Tết và lễ hội Gầu Tào của người Mông.',3:'Tháng 3: đỗ quyên nở trên Fansipan.',4:'Tháng 4: cày ải, trâu ra đồng.',5:'Tháng 5: ruộng đổ nước như gương, bắt đầu cấy.',6:'Tháng 6: lúa non, mưa lớn.',7:'Tháng 7: ruộng xanh, tháng mưa nhiều nhất.',8:'Tháng 8: lúa trổ bông, giông chiều.',9:'Tháng 9: mùa vàng, người gặt lúa trên ruộng bậc thang.',10:'Tháng 10: gốc rạ, trời trong.',11:'Tháng 11: khô mát, trek đẹp nhất.',12:'Tháng 12: băng giá dưới thung lũng, sương trong thị xã.'},
-  legend:[['#7cb342','Ruộng bậc thang (màu theo tháng)'],['#2e7d32','Rừng'],['#7aa844','Cây bụi'],['#8d8d7a','Đá, trên 2.500 m'],['#e8eef5','Tuyết, tháng 1 và tháng 2'],['#c2ad84','Đất trống'],['#3a7bd5','Suối, hồ'],['#3a2a1a','Đường tàu leo núi'],['#e3d8bd','Đường nhựa'],['#b8a070','Đường đất'],['#8a6238','Cầu'],['#6f6f78','Phố thị xã (OSM)'],['#b5452f','Nhà (theo OSM)'],['#4a5566','Khách sạn (OSM)'],['#8a4a32','Nhà trong bản'],['#7fb84e','Vườn'],['#2a9d8f','Biển hiệu quán, cửa hàng'],['#f1c232','Homestay (theo OSM)'],['dash','Tuyến trek']],
+  legend:[['#7cb342','Ruộng bậc thang (màu theo tháng)'],['#2e7d32','Rừng'],['#7aa844','Cây bụi'],['#8d8d7a','Đá, trên 2.500 m'],['#e8eef5','Tuyết, tháng 1 và tháng 2'],['#c2ad84','Đất trống'],['#3a7bd5','Suối, hồ, hồ thủy điện'],['#d2d0c6','Đập (theo OSM)'],['#3a2a1a','Đường tàu leo núi'],['#e3d8bd','Đường nhựa'],['#b8a070','Đường đất'],['#8a6238','Cầu'],['#6f6f78','Phố thị xã (OSM)'],['#b5452f','Nhà (theo OSM)'],['#4a5566','Khách sạn (OSM)'],['#8a4a32','Nhà trong bản'],['#7fb84e','Vườn'],['#2a9d8f','Biển hiệu quán, cửa hàng'],['#f1c232','Homestay (theo OSM)'],['dash','Tuyến trek']],
   help:'Bấm hoặc chạm vào bản đồ để đi tới điểm đó, hoặc vào một địa điểm để đi tới theo đường; lá cờ đánh dấu nơi bạn đang tới và các chấm chỉ đường đi. Bấm vào mặt nước hay vách đá thì đi tới điểm gần nhất có thể tới. Kéo để dời, lăn chuột, chụm ngón tay hoặc <kbd>+</kbd><kbd>-</kbd> để phóng, chạm hai lần để phóng to trên điện thoại. Trên bàn phím, phím mũi tên dời bản đồ và <kbd>Enter</kbd> đi tới dấu chữ thập ở giữa. Đi giữa thị xã và ga cáp treo sẽ lên tàu hỏa leo núi ở Sun Plaza. Một ô khoảng 39 m; thước tỷ lệ là 1 km. Ban đầu chỉ hiện các địa điểm chính; phóng to để thấy phần còn lại, rồi tên phố. Tên quán hiện khi rê chuột, hoặc bật Tên quán trong Cài đặt. Tháng, thời tiết, âm thanh và ngôn ngữ nằm ở thẻ Cài đặt. Sương sớm đọng dưới thung lũng và tan giữa buổi sáng.',
   credits:'Độ cao: SRTM qua AWS Terrain Tiles. Lớp phủ: Sentinel-2 10 m, Esri và Impact Observatory. Đường, suối, lớp phủ, nhà, quán, khách sạn và hầu hết địa điểm: © OpenStreetMap contributors. Bến xe, Sín Chải, Ý Linh Hồ và Giàng Tả Chải đặt tay. Tên homestay theo OpenStreetMap. Nhiệt độ và lượng mưa theo tháng: trung bình của Sa Pa từ climatestotravel.com. Quy trình dựng dữ liệu ở thư mục tools.',
   welcome:'CHÀO MỪNG ĐẾN SA PA',intro:'Bạn bắt đầu ở nhà thờ đá. Bấm hoặc chạm vào bất kỳ đâu trên bản đồ để đi tới đó, chọn một địa điểm để đi thẳng tới, và đi cáp treo từ ga Mường Hoa lên Fansipan. Ghé đủ {n} nơi để điền kín nhật ký. Vị trí và nhật ký được lưu trên thiết bị này.',go:'ĐI THÔI',
@@ -1147,8 +1176,9 @@ function render(){
   for(const l of order){if(cam.z<7.5&&!l.major&&l!==sel&&l!==hover)continue;const [sx,sy]=scr((l.x+l.w/2)*T,(l.y+l.w)*T+3);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,nameOf(l).toUpperCase(),sx,sy,l===sel?'hi':'',font);}
   /* the range and the valley, named while zoomed out, after the places so they give way to them */
   if(cam.z<6){areaLabel(placed,U().ridge,196,128,232,330,font);areaLabel(placed,U().valleyName,470,292,725,424,font);}
-  if(festival()&&cam.z>=3){const [sx,sy]=scr(FEST.x*T,FEST.y*T+14);placeLabel(placed,U().festival,sx,sy,'',font);}
-  /* peaks with their heights from mid zoom; street names closer in; shop names only on request */
+  if(festival()&&cam.z>=3){const [sx,sy]=scr(FEST.x*T,FEST.y*T+14);if(sx>-80&&sx<cv.width+80&&sy>-20&&sy<cv.height+20)placeLabel(placed,U().festival,sx,sy,'',font);}
+  /* reservoirs, then peaks with their heights, from mid zoom; street names closer in; shop names only on request */
+  if(cam.z>=4.5)for(const k of LAKES){const [sx,sy]=scr(k.x*T,k.y*T);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,(lang==='vi'?k.vi:k.en).toUpperCase(),sx,sy,'peak',font);}
   if(cam.z>=4.5)for(const f of FEAT){if(f.k!=='peak')continue;const [sx,sy]=scr(f.x*T,f.y*T+5);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;const nm=(lang==='vi'?f.n:(f.ne||f.n));placeLabel(placed,(nm?nm.toUpperCase()+' ':'')+f.e.toLocaleString('en')+' m',sx,sy,'peak',font);}
   if(cam.z>=7.5){const sf=BODY_LABEL;for(const st of STREET_LABELS){const [sx,sy]=scr(st.x*T,st.y*T);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,st.n,sx,sy,'street',sf);}}
   if(showShops&&cam.z>=11.5){const pf='11px "IBM Plex Sans",system-ui,sans-serif';for(const [i,ps] of poiAt){const x=i%W,y=(i/W)|0;const [sx,sy]=scr(x*T+T/2,y*T+T+1);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;const p=ps.find(q=>q.n)||ps[0];placeLabel(placed,(p.n||U().poi[p.k]).slice(0,26),sx,sy,'poi',pf);}
@@ -1213,7 +1243,7 @@ function renderCard(){const u=U(),l=sel;
   card.innerHTML='<canvas class="sketch" width="112" height="56" aria-hidden="true"></canvas><p class="kicker"><span>'+l.km.toFixed(1)+' km '+u.fromChurch+'</span>'+(visited.has(l.id)?'<span class="stamp">'+u.stamp+'</span>':'')+'</p><h2>'+nameOf(l)+'</h2><p class="vi">'+altOf(l)+'</p>'+etaHtml+'<ul class="facts">'+f.map(x=>'<li>'+x+'</li>').join('')+'</ul><ul class="times"><li><span>'+u.walkT+'</span>'+trv(l.walk)+'</li><li><span>'+u.bikeT+'</span>'+trv(l.bike)+'</li><li><span>'+u.guideT+'</span>'+u.guide[l.guide]+'</li></ul><p>'+l.d[lang]+'</p>'+busyHtml+'<p class="tipline">'+l.t[lang]+'</p>'+extraHtml+'<p class="src">'+u.src[l.src]+' · '+(lang==='vi'?'độ cao trên lưới ':'grid elevation ')+elevOf(l).toLocaleString(lang==='vi'?'vi-VN':'en-US')+' m</p>';const sk=card.querySelector&&card.querySelector('.sketch');if(sk)drawSketch(l,sk);} /* the grid averages the ground over each cell, so a sharp summit reads a little low */
  [...list.children].forEach(li=>li.firstChild.setAttribute('aria-current',li.firstChild.dataset.id===(l&&l.id)?'true':'false'));
  document.getElementById('visitedCount').innerHTML=U().visited+' <b>'+visited.size+'</b> / '+LM.length;document.getElementById('tab-list').textContent=U().tabs[1]+' '+visited.size+'/'+LM.length;}
-const colorFor={church:'#f4f4f0',sunplaza:'#c9a227',museum:'#c9a227',hotel:'#4a5566',pagoda:'#c2412b',market:'#e07b2a',stalls:'#e07b2a',bus:'#1b1b1b',isle:'#5aa0ec',hill:'#3b8a3f',station:'#4a4a42',peak:'#c2412b',house:'#2e5e32',dao:'#c2412b',rocks:'#4a4a42',falls:'#5aa0ec',gate:'#8d8d7a',pass:'#f1c232',glass:'#5aa0ec'};
+const colorFor={church:'#f4f4f0',sunplaza:'#c9a227',museum:'#c9a227',hotel:'#4a5566',pagoda:'#c2412b',market:'#e07b2a',stalls:'#e07b2a',bus:'#1b1b1b',isle:'#5aa0ec',tarn:'#5aa0ec',hill:'#3b8a3f',station:'#4a4a42',peak:'#c2412b',house:'#2e5e32',dao:'#c2412b',rocks:'#4a4a42',falls:'#5aa0ec',gate:'#8d8d7a',pass:'#f1c232',glass:'#5aa0ec'};
 function renderList(){list.innerHTML='';[...LM].sort((a,b)=>a.km-b.km).forEach(l=>{const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.dataset.id=l.id;
  b.innerHTML='<i style="background:'+colorFor[l.sp]+'"></i><span>'+nameOf(l)+'</span><small>'+l.km.toFixed(1)+' km</small>'+(visited.has(l.id)?'<em>✓</em>':'');b.addEventListener('click',()=>{sel=l;showTab('place');renderCard();follow=false;cam.x=(l.x+l.w/2)*T;cam.y=(l.y+l.w/2)*T;if(cam.z<5)cam.z=5;clampCam();if(PHONE())openSheet(false);cv.focus();});li.appendChild(b);list.appendChild(li);});
  [...list.children].forEach(li=>li.firstChild.setAttribute('aria-current',li.firstChild.dataset.id===(sel&&sel.id)?'true':'false'));}
@@ -1372,7 +1402,7 @@ if(HASH.tab&&TABS.includes(HASH.tab)){showTab(HASH.tab);if(PHONE())openSheet(tru
 if(Object.keys(HASH).some(k=>k!=='worker'))document.getElementById('intro').hidden=true;
 document.fonts&&document.fonts.load('9px "Press Start 2P"').then(()=>{skyDirty=true;}).catch(()=>{});
 booted=true;requestAnimationFrame(loop);
-globalThis.__T={walkTo,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
+globalThis.__T={walkTo,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,damAt,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
 })();
 </script>
 </body>
