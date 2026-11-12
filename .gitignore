@@ -1,0 +1,5 @@
+# Raw downloads for the data refresh (about 9 MB). fetch-data.js rebuilds them; see tools/README.md.
+tools/raw/
+
+# Screenshots from shot.ps1 and check-worker.js, when saved next to the tools as the README examples do.
+tools/shots/

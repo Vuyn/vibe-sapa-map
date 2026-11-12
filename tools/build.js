@@ -9,7 +9,7 @@ const rd=f=>fs.readFileSync(path.join(dataDir,f),'utf8').trim(),bin=f=>fs.readFi
 const osm=JSON.parse(rd('osm-out.json')),osm2=JSON.parse(rd('osm2-out.json'));
 const parts={elev:bin('elev.bin'),detail:bin('detail.bin'),lc:bin('lc.bin')},index={};let off=0;
 for(const k of Object.keys(parts)){index[k]=[off,parts[k].length];off+=parts[k].length;}
-const meta=Buffer.from(JSON.stringify({parts:index,elev:JSON.parse(rd('elev.json')),osm,cover:osm2.cover,water:osm2.water,holes:osm2.holes,dams:osm2.dams||[],buildings:osm2.buildings,pois:osm2.pois}),'utf8');
+const meta=Buffer.from(JSON.stringify({parts:index,elev:JSON.parse(rd('elev.json')),osm,cover:osm2.cover,water:osm2.water,holes:osm2.holes,dams:osm2.dams||[],plants:osm2.plants||[],buildings:osm2.buildings,pois:osm2.pois}),'utf8');
 const head=Buffer.alloc(4);head.writeUInt32LE(meta.length,0);
 const gz=zlib.gzipSync(Buffer.concat([head,meta,...Object.values(parts)]),{level:9}).toString('base64');
 // embedded pixel font

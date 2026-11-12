@@ -58,7 +58,7 @@ To change the area or resolution, edit `frame.json` and run the whole refresh be
 node fetch-data.js                                   # downloads into .\raw; cached files are kept, --force refetches
 node resample.js                                     # elevation, town detail and land-cover grids into .\data
 node parse-osm.js  raw\sapa.json  data\osm-out.json  # roads, streets, rivers, railways, cable car, places to stay, waterfalls, viewpoints, peaks
-node parse-osm2.js raw\sapa2.json data\osm2-out.json # OSM land-cover polygons, lakes with their islands, dams (from raw\dams.json), buildings, shops
+node parse-osm2.js raw\sapa2.json data\osm2-out.json # OSM land-cover polygons, lakes with their islands, dams and power plants (from raw\dams.json), buildings, shops
 node build.js data template.html ..\index.html
 node test-headless.js ..\index.html
 ```
@@ -75,7 +75,7 @@ Both parsers clean names through `names.js`: street names typed without accents 
 | `detail.bin` | 192 x 192 grid for the town box at two samples per tile, metres = 1100 + value x 3.5 |
 | `lc.bin` | Sentinel-2 land-cover class per tile: 0 none, 1 water, 2 trees, 3 flooded, 4 crops, 5 built, 6 bare, 7 snow, 8 cloud, 9 rangeland |
 | `osm-out.json` | Simplified roads, town streets, rivers, railways, cable car line, hotel and guest house points, `stays` (named places to stay outside town) and `feat` (waterfalls, viewpoints and peaks with names and heights), in tile coordinates |
-| `osm2-out.json` | OSM land-cover polygons, `water` (lake and reservoir outlines, kept fine) and `holes` (their islands), `dams` (crest lines, with a name where there is one), building centroids with kind, shops and cafés |
+| `osm2-out.json` | OSM land-cover polygons, `water` (lake and reservoir outlines, kept fine) and `holes` (their islands), `dams` (crest lines) and `plants` (power plants), each with a name where there is one, building centroids with kind, shops and cafés |
 | `fonts/` | Press Start 2P woff2 subsets and their unicode ranges |
 
 ## How the land is classified
@@ -98,9 +98,9 @@ The satellite land cover also marks water, one whole tile at a time. It cannot b
 
 What passes has its shore rounded on the art grid, so it does not show as square blocks. The test fails if more than a handful of lake tiles stand over 40 m above the lowest ground near them.
 
-### Dams and reservoir names
+### Dams, power plants and reservoir names
 
-Dams are `waterway=dam` ways from OpenStreetMap, fetched into `raw\dams.json` and stored in `osm2-out.json`. Each is drawn as a pale crest two art pixels wide. Hồ Séo Mý Tỷ is a place with a card. Two more reservoirs carry a label only (`LAKES` in the template): Sử Pán 1, named by its dam in OpenStreetMap, and Nậm Củn. The Nậm Củn outline has no name in OpenStreetMap; it is identified from the operator's flood notices in Báo Lào Cai, which place the reservoir in Mường Bo commune with a full level of 385 m, the height of the ground under this outline. Check that name if better data turns up.
+Dams (`waterway=dam` ways) and power plants (`power=plant`) come from OpenStreetMap, fetched into `raw\dams.json` and stored in `osm2-out.json`. A dam is drawn as a pale crest two art pixels wide, a plant as a small powerhouse with a blue-grey roof. Those with a name get the usual boxed label once you zoom in to street-name level. OpenStreetMap has the names in Vietnamese only, so the English label is the same name turned round ("Đập thủy điện Sử Pán 2" becomes "Sử Pán 2 dam"). A dam is walkable only where a mapped road runs along its crest, as at Séo Mý Tỷ and Sử Pán 1. Hồ Séo Mý Tỷ is a place with a card. Two more reservoirs carry a label only (`LAKES` in the template): Sử Pán 1, named by its dam in OpenStreetMap, and Nậm Củn. The Nậm Củn outline has no name in OpenStreetMap; it is identified from the operator's flood notices in Báo Lào Cai, which place the reservoir in Mường Bo commune with a full level of 385 m, the height of the ground under this outline. Check that name if better data turns up.
 
 Terraces are drawn from the same idea: every art pixel takes the height of the ground under it, in 10 m levels, so the steps follow the real contours.
 
@@ -112,11 +112,13 @@ Every road is a thin line on the 2 px art grid, stored as 16 bits per tile: main
 
 `build.js` packs the JSON and the three binary grids into one container (`[uint32 length][JSON][elev][detail][lc]`), gzips it and embeds it as base64. In the page, `sharedHelpers`, `unpackData` and `buildTerrain` are plain functions with no outside references, so `getTerrain` can run them in a background worker made from their source text. If the worker fails, the same functions run on the main thread. The result is a set of typed arrays (`kind`, `elev`, `shade`, `flags`, `quad`, `stMask`, ...), one entry per tile. `at(x,y)` returns a small view object over them.
 
-On screens up to 900 px wide the title and side panel give way to the map: the panel becomes a bottom sheet that shows only its tab row until a tab is tapped.
+On screens up to 900 px wide the title and side panel give way to the map: the panel becomes a bottom sheet that shows only its tab row until a tab is tapped. The status row there is a single line: it leaves out the weekday, the sky word and the north mark, uses a shorter scale bar, and drops the rainfall figure whole if the row is still too long, so nothing is cut off at the edge. Check it with `check-worker.js` at 320, 360 and 390 px in both languages.
 
 ## Known gotchas
 
-- `raw` is not in the repository. `parse-osm.js` and `parse-osm2.js` reproduced the committed `osm-out.json` and `osm2-out.json` exactly from the saved download on 2026-11-12, before dams were added. A fresh fetch will pick up whatever has changed in OpenStreetMap since.
+- The text on the place cards (the `LM` array in the template) was checked against sources on 2026-11-12. The parts most likely to go out of date are the hotel's name (Victoria Sapa became The Myst Sapa Resort in September 2026), the cable car's first and last departures, the days of the night market and the love market, whether the Móng Sến viaduct is open, and commune names (Sa Pa has been a ward, not a town-level unit, since 1 July 2025; the Vietnamese text says "trung tâm Sa Pa", not "thị xã"). Check these again before a new release.
+- Five places have no point of their own in OpenStreetMap and are placed by hand (`src:'approx'`): the bus station, Sín Chải (at Sin Chai Ecolodge), Ý Linh Hồ, Giàng Tả Chải and Lếch Dao (on the houses beside the GeoNames point for Bản Lếch, north of Topas Ecolodge).
+- `raw` is not in the repository, and `.gitignore` keeps it out, together with a `shots` folder for screenshots. `parse-osm.js` and `parse-osm2.js` reproduced the committed `osm-out.json` and `osm2-out.json` exactly from the saved download on 2026-11-12, before dams were added. A fresh fetch will pick up whatever has changed in OpenStreetMap since.
 - The cached download in `raw` was made before guest houses were added to the query. The missing ones were merged in by hand once; a fresh `node fetch-data.js --force` asks for them itself.
 - Overpass servers are often busy. `fetch-data.js` splits the request into parts, tries three mirrors, and retries three rounds.
 - The built page is about 450 KB, most of it land cover and elevation. `elevStep: 1` in `frame.json` stores elevation for every tile and adds about 350 KB.

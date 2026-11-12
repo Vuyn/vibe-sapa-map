@@ -39,9 +39,9 @@ async function overpass(parts,file){if(!force&&fs.existsSync(file)&&fs.statSync(
   ['land cover',`[out:json][timeout:180][maxsize:536870912];(way["landuse"](${bb});way["natural"~"^(wood|scrub|grassland|heath|wetland|bare_rock|scree|water)$"](${bb});rel["landuse"](${bb});rel["natural"~"^(wood|scrub|water)$"](${bb});way["leisure"~"^(park|pitch|garden|stadium)$"](${bb}););out geom;`],
   ['buildings and shops',`[out:json][timeout:180];(way["building"](${tb});node["amenity"~"^(cafe|restaurant|pharmacy|atm|bank|fuel|hospital|school|police|post_office|bar|fast_food|clinic)$"](${tb});way["amenity"~"^(cafe|restaurant|pharmacy|atm|bank|fuel|hospital|school|police|post_office|bar|fast_food|clinic)$"](${tb});node["shop"](${tb});way["shop"](${tb}););out center;`],
  ],path.join(raw,'sapa2.json'));
- // dams, in a file of their own so they can be fetched without redoing the large downloads above
+ // dams and power plants, in a file of their own so they can be fetched without redoing the large downloads above
  await overpass([
-  ['dams',`[out:json][timeout:90];(way["waterway"="dam"](${bb}););out tags geom;`],
+  ['dams and power plants',`[out:json][timeout:90];(way["waterway"="dam"](${bb});nwr["power"="plant"](${bb}););out tags geom;`],
  ],path.join(raw,'dams.json'));
  // Sentinel-2 land cover, rendered in class colours at two pixels per tile
  const lc=`https://ic.imagery1.arcgis.com/arcgis/rest/services/Sentinel2_10m_LandCover/ImageServer/exportImage?bbox=${F.LON0},${F.LAT0},${F.LON1},${F.LAT1}&bboxSR=4326&imageSR=4326&size=${F.W*2},${F.H*2}&format=png&interpolation=RSP_NearestNeighbor&f=image`;
