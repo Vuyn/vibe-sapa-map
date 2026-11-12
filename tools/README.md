@@ -30,7 +30,7 @@ Each view is `name=#settings`. The same settings work in a normal browser, so th
 | `h` | Hour, 0 to 24. Stops the clock. |
 | `m` | Month, 1 to 12 |
 | `d` | Weekday, 0 Sunday to 6 Saturday. Sapa Market fills on Sunday 6 to 11; the night market is there on Friday, Saturday and Sunday 16 to 22; the love market is in the church square on Saturday 19 to 22. |
-| `z` | Zoom, 1 to 16 |
+| `z` | Zoom, 1 to 48. From 22 pixels a tile the close-up art is used. |
 | `at` | Centre of the view as tile `x,y`. The church is at 406,199. |
 | `sel` | Place id to open, for example `laochai` |
 | `tab` | `place`, `list`, `settings` or `about` |
@@ -50,8 +50,18 @@ Views that show the effects tied to the clock and the calendar:
 | Cable car and train stopped | `h=20&sel=cable` |
 | Sea of clouds | `h=7&at=228,292` (Fansipan) or `h=7&at=200,149` (the pass), not in rain |
 | Hoarfrost | `m=1&h=8.8` over fields |
+| Close-up art | any view with `z=24`, `z=32` or `z=48` |
+| Market-goers on the roads into town | `d=0&h=7&z=24&at=363,210` |
+| School run | `d=2&h=6.75&z=32&at=426,194` (Monday to Friday) |
+| Trekking group with a guide | `d=2&h=10&z=32&at=440,258` |
+| Marathon runners | `m=9&d=6&h=9&z=32&at=728,356` |
+| Sleeper bus coming up before dawn, headlight on | `h=5.5&z=24&at=475,109` |
+| Ploughing, transplanting, harvest | `m=4`, `m=5`, `m=9` with `z=48&at=516,291` |
+| Fireflies | `m=6&h=21&z=32&at=515,270&sky=1` |
+| Umbrellas | `sky=3&z=32&at=406,199` |
+| Rivers in the rains | `m=7` against `m=3`, at `z=16&at=560,310` |
 
-Opening the page with any setting skips the welcome box. The first frames build terrain a few chunks at a time, so the tool waits 15 seconds of page time by default (`-Budget`). Headless page time runs ahead of a background worker, so `shot.ps1` adds `worker=0` to every view.
+Run `check-worker.js` after every change to drawing code: the logic test never calls `render`, so an error there shows only in a real browser, and `shot.ps1` cannot report page errors. Opening the page with any setting skips the welcome box. The first frames build terrain a few chunks at a time, so the tool waits 15 seconds of page time by default (`-Budget`). Headless page time runs ahead of a background worker, so `shot.ps1` adds `worker=0` to every view.
 
 `check-worker.js` covers what `shot.ps1` cannot. It opens the page in real time, checks that the background worker built the land and that the page is no wider than the window, and can save a screenshot. It also emulates phone sizes, which a browser window cannot reach (the minimum window width is about 500 px):
 
@@ -134,7 +144,30 @@ The slopes are not shaded in the terrain tiles. A separate light layer, one pixe
 - **Yard animals:** chickens, dogs and pigs on village and garden tiles, each within two tiles of home and moving only to a neighbouring tile, so the "nobody on water" check covers them. Birds cross the map along the valley by day in dry weather; they fly, so they are kept in a list of their own.
 - **Sea of clouds:** when the middle of the view is above the morning fog (Fansipan, the pass), the valleys below the fog top become a white floor.
 - **Rainbow:** for 50 seconds after rain turns to a dry sky by day, if the sun is lower than 42 degrees.
-- **Hoarfrost:** pale fields above 900 m on January mornings, gone by 10:00.
+- **Hoarfrost:** pale fields above 900 m on January mornings, gone by 10:00. The walker leaves footprints in it, and in snow, that fade in a minute and a half.
+- **Market-goers:** on Sunday people walk in from Cát Cát, Sín Chải, Ý Linh Hồ, Lao Chải, Tả Van and Tả Phìn with a basket, stay at Sapa Market and walk home, between 4:30 and 14:30.
+- **School run:** Monday to Friday children walk to up to six mapped schools at about 6:30 and home at about 16:30.
+- **Trekking groups:** three groups of five, a guide in front, leave town at about 7:25, 8:10 and 9:00 and walk the valley trek line.
+- **Marathon:** on Fridays and Saturdays in September, 5:00 to 17:00, runners are on the lines of the `vmm` trek (Vietnam Mountain Marathon). The map has no dates, so every September Friday and Saturday counts; the 2026 race was 17 to 20 September.
+- **Sleeper buses:** three come up road 4D from Trung Chải at about 5:00, 5:40 and 6:25, wait at the bus station and leave at 13:30, 14:30 and 15:30. Buses and motorbikes show a headlight in the dark.
+- **The farming year:** field crews (about 270 people in 96 spots) harvest in September and October, bend over the flooded terraces in May and June, and in April one in five is a buffalo and a ploughman.
+- **Rivers in the rains:** June to August every river is one art pixel wider with more white water, and waterfalls throw spray (`wetSeason`, `swell`).
+- **Fireflies and frogs:** over terraces on dry nights from May to August.
+- **Animals and the walker:** chickens scatter, a dog follows for a while, buffalo turn to look.
+- **Rain:** people carry umbrellas, the walker too.
+- **Sky strip:** stars and the moon in its phase at night.
+- **Sounds by the clock:** roosters at first light near villages, the church bell on the hour within earshot (three strokes at 6, 12 and 18), the monastery bell at dusk, rain, frogs on summer nights.
+
+All of these are worked out from the clock, not stored, so a shared link shows the same scene. `clockFigures()` lists every such figure for the test, which checks at each quarter hour of four weekdays that none stands on water.
+
+## The close-up tier
+
+Up to 22 screen pixels a tile the map is drawn from 8-pixel tiles (`drawTile`, chunks of 64 tiles). From there to the top zoom of 48 it is drawn again at three times the detail, 24 pixels a tile (`drawTileHi`, `chunksHi`, chunks of 16 tiles, at most 40 kept): houses with roofs, doors and windows, tree crowns, terrace edges with the month's crop, kerbs, bridges. A close-up chunk takes 3 to 9 ms to build; a frame builds for at most 12 ms and shows the coarser chunk underneath until the fine one is ready. Nothing new is stored: the close-up art reads the same per-tile arrays.
+
+- **Figures** in close-up come from `FIG`, rows of small pixels, coloured through `fig(name, cols)` and stamped with `putFig`. The homestay, viewpoint, peak and power-plant signs have `FIG` versions too.
+- **Landmark sprites** are not redrawn: `sprHi` smooths the 12-pixel sprites with the Scale3x rule. They are the coarsest thing on screen at zoom 48.
+- **Layers that hold one value a tile** (sun and shadow, frost, fog, the sea of clouds) are drawn with smoothing in close-up, where a tile would otherwise show as a square of 22 to 48 pixels. Night glows are cut from pixels a third the size (`pixelDisc`).
+- **Windows at night** use `houseBox` and `hiWins`, the same functions the close-up house art uses, so a lit window sits on a drawn window.
 
 ## How roads, the town and villages are drawn
 

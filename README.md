@@ -16,6 +16,7 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 - **33 places with a card each:** the stone church, the lake, the markets, Fansipan, waterfalls, the villages of the valley, and Hồ Séo Mý Tỷ, the reservoir high on the Hoàng Liên range. Each card has a short description, a travel tip, walking and riding times, and a small picture built from the real skyline behind that place.
 - **Real terrain:** rice terraces that follow the contour lines, rivers that widen downstream with rapids where they fall steeply, the true outline of Hồ Sa Pa with its island, the hydropower reservoirs with their dams and power plants, and hill shading from the elevation model.
 - **Town detail:** streets, buildings, hotels, shops and cafés from OpenStreetMap, with street names when you zoom in.
+- **A close-up view:** zoom in past street level and the map is redrawn at three times the detail: houses with doors and windows, tree crowns, the crop on each terrace, and people small enough to blend in but clear enough to tell a guide from a farmer.
 - **Homestays:** named homestays near the valley villages, as mapped in OpenStreetMap.
 - **Peaks, waterfalls and viewpoints** with their names and heights.
 
@@ -23,13 +24,13 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 
 - **Walk:** click or tap anywhere and the walker finds a way there along roads and trails. A flag marks the destination and dots show the path. A click on water or a cliff goes to the nearest spot that can be reached.
 - **Ride:** trips between town and the cable car base take the Mường Hoa mountain train, and the cable car goes up to Fansipan. Both keep their real opening hours; after the last car the walker goes on foot.
-- **Change the month:** the terraces flood in May, turn green in summer and gold in September. February brings peach blossom and the Hmong Gầu Tào festival, September and October bring harvest crews, and January and February bring snow on the high ridge.
+- **Change the month:** the terraces flood in May, turn green in summer and gold in September. February brings peach blossom and the Hmong Gầu Tào festival, April brings buffalo ploughing, May and June people bent over the seedlings, September and October harvest crews, and January and February snow on the high ridge. From June to August the rivers run wider and whiter.
 - **Change the time and the sky:** the sun crosses the sky as it does at Sa Pa's latitude, so the mountains throw long shadows in the morning and evening and almost none at noon. Night brings lit windows and street lamps; there is morning valley fog, a sea of clouds seen from Fansipan and the pass, rain with a rainbow after it, and hoarfrost on the fields on January mornings.
 - **Visit on market day:** Sapa Market fills up on Sunday morning, the night market sets up on Friday, Saturday and Sunday evenings, and the love market fills the church square on Saturday evening.
-- **Watch village life:** kitchen smoke at breakfast and supper time, chickens, dogs and pigs in the yards, buffalo in the fields, birds over the valley.
+- **Watch village life:** kitchen smoke at breakfast and supper time, chickens, dogs and pigs in the yards, buffalo in the fields, birds over the valley. Children walk to school on weekdays, villagers walk to market on Sunday, trekking groups follow their guide down the valley in the morning, sleeper buses arrive before dawn, and on September Fridays and Saturdays the mountain marathon is on. Fireflies come out over the terraces on summer nights. The animals notice the walker.
 - **Keep a journal:** places you have walked to are ticked off. Your position and journal are saved in the browser.
 - **Read the weather:** the status bar shows the typical temperature and rainfall for the chosen month, adjusted to the height where the walker stands.
-- **Listen:** optional sound of river, wind, birds, market chatter, the train and the cable car.
+- **Listen:** optional sound of river, wind, birds, market chatter, the train and the cable car, with roosters at dawn, the church bell on the hour, the monastery bell at dusk, rain, and frogs on summer nights.
 
 ## Controls
 
@@ -53,7 +54,7 @@ The address can carry a view, which makes a shareable link. For example, `index.
 | `h` | Hour, 0 to 24 |
 | `m` | Month, 1 to 12 |
 | `d` | Weekday, 0 Sunday to 6 Saturday |
-| `z` | Zoom, 1 to 16 |
+| `z` | Zoom, 1 to 48 |
 | `at` | Centre of the view as tile `x,y` (the church is at 406,199) |
 | `sel` | Place to open, for example `laochai` |
 | `lang` | `vi` or `en` |

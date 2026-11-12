@@ -49,6 +49,11 @@ new Function(m[1])();
   const a=T.sunAt(8,12),b=T.sunAt(12,12),early=pct(7.5,9),noon=pct(12,9);
   console.log('sun: December 8:00 bearing',Math.round(a.az*180/Math.PI),'| December noon altitude',Math.round(b.alt*180/Math.PI),'| land in shadow at 7:30',early.toFixed(1)+'%','at noon',noon.toFixed(1)+'%');
   if(!(a.az>1.75&&a.az<2.45)||!(b.alt>0.72&&b.alt<0.82)||!(early>10&&noon<3))bad++;T.lightLayers();}
+ // the figures placed by the clock (Sunday market-goers, weekday pupils, trekking groups, marathon runners, buses)
+ // are on dry ground at every quarter hour of a Sunday, a Tuesday, a Friday and a Saturday in September
+ {let wet=0,most={};const where=[];for(const d of [0,2,5,6])for(let h=4;h<19;h+=0.25){T.setClock(h,d,9);const n={};for(const p of T.clockFigures()){n[p[2]]=(n[p[2]]||0)+1;if(!T.dryAt(p[0],p[1])){wet++;if(where.length<4)where.push(p[2]+' '+p[0].toFixed(1)+','+p[1].toFixed(1)+' day '+d+' '+h+'h');}}for(const k in n)most[k]=Math.max(most[k]||0,n[k]);}
+  T.setClock(9,2,9);console.log('clock figures, most seen at once',JSON.stringify(most),'| on water',wet,where.join(' | '),'| market-goers',T.GOERS.length,'pupils',T.PUPILS.length,'runners',T.RUNNERS.length);
+  if(wet||!T.GOERS.length||!most.trekker||!most.bus||!most.runner)bad++;}
  // nobody stands or walks on water: sample every walker's whole line, and everyone who stands still
  {let wet=0;const dry=T.dryAt;for(const a of T.amb){if(a.kind==='train')continue;if(a.path){for(const q of a.path)if(!dry(q[0],q[1]))wet++;for(let i=0;i<a.path.length-1;i++)for(let k=1;k<8;k++)if(!dry(a.path[i][0]+(a.path[i+1][0]-a.path[i][0])*k/8,a.path[i][1]+(a.path[i+1][1]-a.path[i][1])*k/8))wet++;}else if(a.px!==undefined&&!dry(a.px/8,a.py/8))wet++;}
   for(const s of T.shoppers)if(!dry(s.x,s.y))wet++;for(const c of T.crews)if(!dry(c.x,c.y))wet++;for(const s of T.stalls)if(!dry(s.x,s.y))wet++;

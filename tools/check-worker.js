@@ -27,7 +27,7 @@ const pr=spawn(edge,['--headless=new','--disable-gpu','--hide-scrollbars','--no-
   const ms=Date.now()-t0,wk=await ev('JSON.stringify(window.__wk)'),size=await ev('innerWidth+"x"+innerHeight+" scrollWidth "+document.documentElement.scrollWidth');
   await sleep(2500); // let the first chunks paint
   if(out){const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(out,Buffer.from(shot.data,'base64'));}
-  console.log('ready',ready,'after',ms,'ms | workers',wk,'| window',size,'| page errors',errors.length?errors.join(' / '):'none');
+  console.log('ready',ready,'after',ms,'ms | workers',wk,'| window',size,'| page errors',errors.length?errors.length+' in all, distinct: '+[...new Set(errors.map(e=>String(e).split('\n').slice(0,2).join(' ').replace(/file:\/\/\S*\//g,'')))].join(' / '):'none'); // an error in the frame loop repeats every frame: say each one once
   const w=JSON.parse(wk||'{}');process.exitCode=ready&&w.made===1&&w.ok===1&&!errors.length?0:1;
  }catch(e){console.log('FAILED',e.message);process.exitCode=1;}
  finally{try{ws&&ws.close();}catch(e){}pr.kill();}
