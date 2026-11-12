@@ -282,9 +282,9 @@ const LM=[
   t:{en:'Sunday morning is the traditional market day, when people from the villages come in to trade.',vi:'Sáng Chủ nhật là phiên chợ truyền thống, khi bà con các bản xuống chợ.'},
   eat:{en:'Sa Pa dishes to try: thắng cố (horse stew), Sa Pa salmon or sturgeon hotpot, roast lợn cắp nách (small free-range pig), smoked buffalo, cơm lam (sticky rice in bamboo), cải mèo greens.',vi:'Món Sa Pa nên thử: thắng cố, lẩu cá hồi hoặc cá tầm Sa Pa, lợn cắp nách quay, thịt trâu gác bếp, cơm lam, rau cải mèo.'}},
  {id:'nightmarket',en:'Night Market',vi:'Chợ đêm Sa Pa',lat:22.3393,lon:103.8500,sp:'stalls',src:'osm',walk:'15 min',bike:'4 min',guide:0,
-  f:{en:['Busiest at weekends','Grilled skewers','Beside Sapa Market'],vi:['Đông nhất cuối tuần','Đồ nướng','Cạnh chợ Sa Pa']},
-  d:{en:'Food stalls and brocade on N1 street and in the yard beside Sapa Market, running since 2017. Grilled skewers, bamboo rice, roast chestnuts and táo mèo wine are the staples.',vi:'Hàng ăn và thổ cẩm trên đường N1 và sân cạnh chợ Sa Pa, họp từ năm 2017. Đồ nướng xiên, cơm lam, hạt dẻ nướng và rượu táo mèo là những món chính.'},
-  t:{en:'Come after dark, best at the weekend. The Saturday love market is at the church square, not here.',vi:'Đến sau khi trời tối, vui nhất vào cuối tuần. Chợ tình tối thứ Bảy ở quảng trường nhà thờ, không phải ở đây.'},
+  f:{en:['Friday to Sunday','Grilled skewers','Beside Sapa Market'],vi:['Thứ Sáu đến Chủ nhật','Đồ nướng','Cạnh chợ Sa Pa']},
+  d:{en:'Food stalls and brocade on N1 street and in the yard beside Sapa Market, on Friday, Saturday and Sunday evenings since 2017. Grilled skewers, bamboo rice, roast chestnuts and táo mèo wine are the staples.',vi:'Hàng ăn và thổ cẩm trên đường N1 và sân cạnh chợ Sa Pa, họp tối thứ Sáu, thứ Bảy và Chủ nhật từ năm 2017. Đồ nướng xiên, cơm lam, hạt dẻ nướng và rượu táo mèo là những món chính.'},
+  t:{en:'The stalls open around 4 pm and close around 10 pm. The Saturday love market is at the church square, not here.',vi:'Hàng quán mở khoảng 16 giờ và dọn khoảng 22 giờ. Chợ tình tối thứ Bảy ở quảng trường nhà thờ, không phải ở đây.'},
   eat:{en:'Dishes to try: grilled pork and vegetable skewers, roast sweet potato and chestnuts, cơm lam, a cup of táo mèo (wild apple) wine.',vi:'Món nên thử: thịt và rau nướng xiên, khoai và hạt dẻ nướng, cơm lam, một chén rượu táo mèo.'}},
  {id:'bus',en:'Sapa Bus Station',vi:'Bến xe Sa Pa',lat:22.3400,lon:103.8530,sp:'bus',src:'approx',walk:'17 min',bike:'5 min',guide:0,
   f:{en:['Hanoi 5-6 h','Lào Cai 1 h'],vi:['Hà Nội 5-6 h','Lào Cai 1 h']},
@@ -308,7 +308,7 @@ const LM=[
   d:{en:'The Hoàng Liên National Park gate where the classic Fansipan trek starts: lunch at the 2,200 m hut, the night at the 2,800 m camp, the summit the next morning.',vi:'Cổng Vườn quốc gia Hoàng Liên, nơi bắt đầu đường leo Fansipan kinh điển: nghỉ trưa ở lán 2.200 m, ngủ đêm ở lán 2.800 m, sáng hôm sau lên đỉnh.'},
   t:{en:'A park permit and a guide are required. Book through a trekking agency in town.',vi:'Bắt buộc có giấy phép vào rừng và người dẫn đường. Nên đặt qua công ty trekking ở Sa Pa.'}},
  {id:'pass',en:'O Quy Ho Pass · Heaven’s Gate',vi:'Đèo Ô Quy Hồ · Cổng Trời',lat:22.35297,lon:103.76481,sp:'pass',major:1,src:'osm',walk:'4 h',bike:'30 min',guide:0,
-  f:{en:['About 2,000 m','~50 km long','Four great passes'],vi:['Khoảng 2.000 m','Dài ~50 km','Tứ đại đỉnh đèo']},
+  f:{en:['2,073 m','~50 km long','Four great passes'],vi:['2.073 m','Dài ~50 km','Tứ đại đỉnh đèo']},
   d:{en:'One of the four great passes of the northwest, climbing over the Hoàng Liên Sơn into Lai Châu. The Heaven’s Gate viewpoint at the top sometimes sees snow.',vi:'Một trong tứ đại đỉnh đèo Tây Bắc, vượt Hoàng Liên Sơn sang Lai Châu. Điểm ngắm Cổng Trời trên đỉnh đôi khi có tuyết.'},
   t:{en:'Ride it, do not bus it. The fog can be thick: go slowly.',vi:'Đi xe máy, đừng đi xe khách. Sương có thể rất dày: đi chậm.'}},
  {id:'silver',en:'Silver Waterfall',vi:'Thác Bạc',lat:22.36324,lon:103.77683,sp:'falls',major:1,src:'osm',walk:'3.5 h',bike:'25 min',guide:0,
@@ -461,10 +461,8 @@ function buildTerrain(U,P,HP){
  /* Sentinel-2 land cover per tile: 0 none 1 water 2 trees 3 flooded 4 crops 5 built 6 bare 7 snow 8 cloud 9 rangeland */
  const lcGrid=U.part('lc');
  const eAt=(x,y)=>elev[Math.min(H-1,Math.max(0,y))*W+Math.min(W-1,Math.max(0,x))];
- const dAt=(i,j)=>detail[Math.min(DN-1,Math.max(0,j))*DN+Math.min(DN-1,Math.max(0,i))];
- /* hillshade: light from the north-west; positive = lit */
- const shade=new Float32Array(N);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const gx=(eAt(x+1,y)-eAt(x-1,y))/2,gy=(eAt(x,y+1)-eAt(x,y-1))/2;shade[y*W+x]=Math.max(-1,Math.min(1,(gx+gy)/(55/K)));}
- const dshade=new Float32Array(DN*DN);for(let j=0;j<DN;j++)for(let i=0;i<DN;i++){const gx=(dAt(i+1,j)-dAt(i-1,j))/2,gy=(dAt(i,j+1)-dAt(i,j-1))/2;dshade[j*DN+i]=Math.max(-1,Math.min(1,(gx+gy)/14));}
+ /* the shading of the slopes and the shadows the mountains cast are not worked out here: they follow the sun, so the
+    page draws them as a layer of its own from elev and detail (section 5) */
  const colMax=new Float32Array(W);for(let x=0;x<W;x++){let m=0;for(let y=0;y<H;y++)m=Math.max(m,elev[y*W+x]);colMax[x]=m;}
 
  const kind=new Uint8Array(N),flags=new Uint8Array(N),snow=new Uint8Array(N),quad=new Uint16Array(N);
@@ -632,11 +630,11 @@ function buildTerrain(U,P,HP){
  /* waterfalls, viewpoints and peaks: fill in a height from the grid where OSM has none */
  const feat=(OSM.feat||[]).filter(f=>f.x>=0&&f.y>=0&&f.x<W&&f.y<H).map(f=>({k:f.k,n:f.n||'',ne:f.ne||'',x:f.x,y:f.y,e:f.e||Math.round(elev[Math.floor(f.y)*W+Math.floor(f.x)])}));
  const u16=a=>Uint16Array.from(a);
- const out={elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles:u16(water),windowTiles:u16(windows),stTiles:u16(sts),lampPts:u16(lamps),
+ const out={elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles:u16(water),windowTiles:u16(windows),stTiles:u16(sts),lampPts:u16(lamps),
   streetLabels,trainLine,cableLine,trekLines,ways,passRoad:longest(/o quy ho|quoc lo 4d/),valleyRoad:longest(/tinh 152|lao chai/),feat,pois:POIS,stays:OSM.stays||[],dams:Object.keys(damM).map(k=>[+k,damM[k]]),
   /* what OpenStreetMap names along the rivers: dams (at the middle of the crest) and power plants; d is 1 for a dam */
   power:(D.dams||[]).filter(d=>d.n).map(d=>{const m=polyAt(unpack(d),0.5);return{n:d.n,x:m[0],y:m[1],d:1};}).concat((D.plants||[]).map(p=>({n:p.n||'',x:p.x,y:p.y,d:0})))};
- out.transfer=[elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
+ out.transfer=[elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
  return out;
 }
 const {hash,polyLen,polyAt,nz}=sharedHelpers();
@@ -658,7 +656,7 @@ async function getTerrain(){
  }catch(e){if(e.message==='nogzip')throw e;return here();}
 }
 let R;try{R=await getTerrain();}catch(e){loadingEl.textContent=e.message==='nogzip'?'Bản đồ cần trình duyệt từ 2023 trở lên · This map needs a browser from 2023 or later (Chrome 80+, Firefox 113+, Safari 16.4+).':'Không dựng được bản đồ · Could not build the map: '+e.message;return;}
-const {elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles,windowTiles,stTiles,lampPts}=R;
+const {elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles,windowTiles,stTiles,lampPts}=R;
 const POIS=R.pois,STREET_LABELS=R.streetLabels,TRAIN_LINE=R.trainLine,CABLE_LINE=R.cableLine,WAYS=R.ways;
 for(const t of TREKS)t.lines=R.trekLines[t.id]||t.lines;
 const DBX=FR.detail.x,DBY=FR.detail.y,DBS=FR.detail.size,DF=FR.detail.factor,DN=DBS*DF;
@@ -819,10 +817,7 @@ function drawTile(oc,x,y,t){
  if(t.trail&&(k==='rock'||k==='snow'||k==='forest'||k==='grass'||k==='terrace'||k==='scrub'||k==='bare'||k==='garden')){oc.fillStyle='#b59a72';oc.fillRect(px+S,py+S,S*2,S*2);}
  /* a dam: a pale concrete crest with its shaded face on the art pixel below */
  const dm=damAt.get(i);if(dm)for(let b=0;b<16;b++)if(dm&(1<<b))sub(b&3,b>>2,(b<12&&(dm&(1<<(b+4))))?'#d2d0c6':'#7c7a70');
- /* hillshade overlay: per subpixel inside the detail box, per tile elsewhere */
- const str=(k==='water'||k==='plaza'||k==='busyard')?0.35:1;
- if(inDetail(x,y)){const bi=(x-DBX)*DF,bj=(y-DBY)*DF;for(let r=0;r<4;r++)for(let c=0;c<4;c++){const sh=dshade[(bj+(r*DF>>2))*DN+bi+(c*DF>>2)];if(sh>0.02)sub(c,r,'rgba(255,255,255,'+(0.2*sh*str).toFixed(3)+')');else if(sh<-0.02)sub(c,r,'rgba(0,0,0,'+(0.28*-sh*str).toFixed(3)+')');}}
- else{const sh=shade[i];if(sh>0.02)fill('rgba(255,255,255,'+(0.2*sh*str).toFixed(3)+')');else if(sh<-0.02)fill('rgba(0,0,0,'+(0.28*-sh*str).toFixed(3)+')');}
+ /* no shading here: the light on the slopes moves with the sun and is drawn over the terrain as its own layer (section 5) */
 }
 
 /* =====================================================================
@@ -840,10 +835,76 @@ let miniDirty=true;const miniCache=document.createElement('canvas');miniCache.wi
 const FLAT={bare:'#c2ad84',water:'#3a7bd5',bridge:'#8a6238',grass:'#8bc34a',scrub:'#7aa844',orchard:'#7cb342',forest:'#2e7d32',rock:'#8d8d7a',snow:'#e8eef5',road:'#e3d8bd',track:'#b8a070',street:'#6f6f78',plaza:'#ddd0b0',park:'#7cb342',busyard:'#55555c',market:'#e07b2a',hotel:'#4a5566',big:'#7d7d85',town:'#b9806a',hut:'#5a3a22',village:'#9a7a58',garden:'#7fb84e'};
 function flatColor(x,y){const t=at(x,y);let k=t.k;if((flags[y*W+x]&2)&&k!=='water'&&k!=='bridge'&&k!=='plaza')return FLAT.road;if(k==='town'){const q=quad[y*W+x],n=(q&7?1:0)+(q&56?1:0)+(q&448?1:0)+(q&3584?1:0);return n>=3?'#a8644e':n===2?'#b9806a':'#c4b08e';}if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';if(k==='terrace'){const F=fieldPal(x,y);return Math.floor(t.e/25)%2?F[0]:F[2];}if(k==='forest'&&t.e>2000)return '#1f5e2a';if(dry()){if(k==='grass')return '#9aa65a';if(k==='garden')return '#8fa558';}return FLAT[k]||'#000';}
 const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];rgbCache.set(c,v);}return v;};
-/* written straight into pixel data: one pass over the grid, with the hillshade blended in */
+/* written straight into pixel data in one pass over the grid; the light layer below goes on top of it */
 function miniImage(){if(miniDirty){const mcx=miniCache.getContext('2d'),img=mcx.createImageData(W,H),d=img.data;
- for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y)),sh=shade[i];let r=c[0],g=c[1],b=c[2];if(sh>0.05){const a=0.22*sh;r+=(255-r)*a;g+=(255-g)*a;b+=(255-b)*a;}else if(sh<-0.05){const a=1-0.3*-sh;r*=a;g*=a;b*=a;}d[i*4]=r;d[i*4+1]=g;d[i*4+2]=b;d[i*4+3]=255;}
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y));d[i*4]=c[0];d[i*4+1]=c[1];d[i*4+2]=c[2];d[i*4+3]=255;}
  mcx.putImageData(img,0,0);miniDirty=false;}return miniCache;}
+/* ---- THE SUN ----
+   The light on the land follows the sun through the day. sunAt gives its height and compass bearing for the hour and the
+   month at this latitude. lightLayers turns that into two small images, one pixel per tile (and one per half tile in
+   the town box, where the elevation is finer), which the renderer stretches over the terrain:
+   - relief: slopes that face the light are brightened, slopes that face away are darkened. The light is the sun mixed
+     with a steady glow from the north-west, the mapmaker's usual light, which takes over at noon and at night so the
+     mountains never go flat;
+   - cast shadows: one sweep across the grid from the sun's side. Each tile remembers how high the shadow of everything
+     behind it stands; a tile below that line is in shadow. Long at sunrise and sunset, short at noon, none in rain.
+   The layers are worked out again only when the sun has moved a fifth of an hour, or the month or the sky changes. */
+const LAT_R=(LAT0+LAT1)/2*Math.PI/180,MID_DAY=[15,46,75,105,135,166,196,227,258,288,319,349];
+function sunAt(h,m){const dec=23.44*Math.PI/180*Math.sin(2*Math.PI*(284+MID_DAY[m-1])/365),w=(h-12)*15*Math.PI/180;
+ const alt=Math.asin(Math.sin(LAT_R)*Math.sin(dec)+Math.cos(LAT_R)*Math.cos(dec)*Math.cos(w));
+ /* bearing clockwise from north: 90 east, 180 south, 270 west */
+ return{alt,az:Math.atan2(Math.sin(w),Math.cos(w)*Math.sin(LAT_R)-Math.tan(dec)*Math.cos(LAT_R))+Math.PI};}
+const mkCanvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
+const lightMain=mkCanvas(W,H),lightDet=mkCanvas(DN,DN),shadowTop=new Float32Array(W*H),shadowDepth=new Float32Array(W*H);
+let lightKey='';
+/* how far the terrain towards the sun stands above each tile, in metres (0 where the sun reaches the ground) */
+function castShadows(sx,sy,tanAlt){const lx=-sx,ly=-sy,hs=shadowTop,out=shadowDepth;
+ if(Math.abs(lx)>=Math.abs(ly)){const dir=lx>0?1:-1,sl=ly/Math.abs(lx),drop=Math.hypot(1,sl)*MPT*tanAlt;
+  for(let k=0;k<W;k++){const x=dir>0?k:W-1-k,xp=x-dir;for(let y=0;y<H;y++){const i=y*W+x,e=elev[i];let h=-1e9;
+    if(xp>=0&&xp<W){const yf=y-sl,y0=Math.floor(yf),t=yf-y0,a=Math.min(H-1,Math.max(0,y0)),b=Math.min(H-1,Math.max(0,y0+1));h=hs[a*W+xp]*(1-t)+hs[b*W+xp]*t-drop;}
+    hs[i]=h>e?h:e;out[i]=h>e?h-e:0;}}}
+ else{const dir=ly>0?1:-1,sl=lx/Math.abs(ly),drop=Math.hypot(1,sl)*MPT*tanAlt;
+  for(let k=0;k<H;k++){const y=dir>0?k:H-1-k,yp=y-dir;for(let x=0;x<W;x++){const i=y*W+x,e=elev[i];let h=-1e9;
+    if(yp>=0&&yp<H){const xf=x-sl,x0=Math.floor(xf),t=xf-x0,a=Math.min(W-1,Math.max(0,x0)),b=Math.min(W-1,Math.max(0,x0+1));h=hs[yp*W+a]*(1-t)+hs[yp*W+b]*t-drop;}
+    hs[i]=h>e?h:e;out[i]=h>e?h-e:0;}}}
+ return out;}
+const dAt=(i,j)=>detail[Math.min(DN-1,Math.max(0,j))*DN+Math.min(DN-1,Math.max(0,i))];
+function lightLayers(){const s=sunAt(hour,month),deg=s.alt*180/Math.PI,sk=skyNow(),key=(deg>-3?Math.round(hour*5):'night')+'|'+month+'|'+sk;
+ if(key===lightKey)return LIGHT;lightKey=key;
+ const up=Math.max(0,Math.min(1,deg/8)),sx=Math.sin(s.az),sy=-Math.cos(s.az); /* sx,sy: the way to the sun on the map, x east and y south */
+ const wS=0.75*up*Math.cos(s.alt),wN=1-wS; /* how much of the relief the sun models, and how much the north-west glow */
+ const cast=Math.max(0,Math.min(1,(deg-2)/8))*(sk===1?1:sk===2?0.3:0),depth=cast>0?castShadows(sx,sy,Math.tan(Math.max(0.035,s.alt))):null;
+ const weak=new Uint8Array(KINDS.length);weak[KI.water]=weak[KI.bridge]=weak[KI.plaza]=weak[KI.busyard]=1;
+ const put=(d,j,sh,str,a)=>{/* a: shadow strength 0-1 */
+  sh*=str;if(a>0.02){d[j]=10;d[j+1]=16;d[j+2]=40;d[j+3]=Math.round(255*(a+(sh<0?0.28*-sh*(1-a):0)));}
+  else if(sh>0.02){d[j]=d[j+1]=d[j+2]=255;d[j+3]=Math.round(255*0.2*sh);}
+  else if(sh<-0.02){d[j]=d[j+1]=d[j+2]=0;d[j+3]=Math.round(255*0.28*-sh);}
+  else d[j+3]=0;};
+ const mcx=lightMain.getContext('2d'),img=mcx.createImageData(W,H),d=img.data;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,gx=(eAt(x+1,y)-eAt(x-1,y))/2,gy=(eAt(x,y+1)-eAt(x,y-1))/2;
+  const sh=inDetail(x,y)?0:Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/(55/K)));
+  put(d,i*4,sh,weak[kind[i]]?0.35:1,depth?cast*0.3*Math.min(1,depth[i]/12):0);}
+ mcx.putImageData(img,0,0);
+ /* the town box: the same relief from the finer elevation there; its shadows are already in the main layer */
+ const dcx=lightDet.getContext('2d'),dim=dcx.createImageData(DN,DN),dd=dim.data;
+ for(let j=0;j<DN;j++)for(let i=0;i<DN;i++){const gx=(dAt(i+1,j)-dAt(i-1,j))/2,gy=(dAt(i,j+1)-dAt(i,j-1))/2,k=kind[(DBY+Math.floor(j/DF))*W+DBX+Math.floor(i/DF)];
+  put(dd,(j*DN+i)*4,Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/14)),weak[k]?0.35:1,0);}
+ dcx.putImageData(dim,0,0);
+ return LIGHT;}
+const LIGHT={main:lightMain,det:lightDet};
+/* drawn over the terrain in map pixels, by the main view and by the overview (scale 1 there) */
+function drawLight(c,tile){const L=lightLayers();c.drawImage(L.main,0,0,W*tile,H*tile);c.drawImage(L.det,DBX*tile,DBY*tile,DBS*tile,DBS*tile);}
+/* hoarfrost: a pale block on most open field tiles above 900 m, in three strengths */
+let frostC=null;function frostMask(){if(frostC)return frostC;frostC=mkCanvas(W,H);const fc=frostC.getContext('2d'),img=fc.createImageData(W,H),d=img.data;
+ for(let i=0;i<W*H;i++){const k=kind[i];if((k!==KI.terrace&&k!==KI.grass&&k!==KI.garden&&k!==KI.bare)||elev[i]<=900)continue;const h=hash(i%W+3,((i/W)|0)+17);if(h<0.12)continue;d[i*4]=236;d[i*4+1]=244;d[i*4+2]=250;d[i*4+3]=Math.round(255*(0.24+0.14*Math.floor(h*3)));}
+ fc.putImageData(img,0,0);return frostC;}
+/* the sea of clouds seen from above the morning fog: everything below the fog top is a white floor in four soft tones,
+   thin at its shore and solid over the deep valleys. A few levels are kept, like the fog masks. */
+const seaMasks=new Map();
+function seaMask(level){const key=Math.round(level/40);let c=seaMasks.get(key);if(c)return c;c=mkCanvas(W,H);const sx=c.getContext('2d'),img=sx.createImageData(W,H),d=img.data;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,dep=key*40-elev[i];if(dep<=0)continue;const n=nz(x/9+3,y/9+7)*0.6+nz(x/3+11,y/3+5)*0.4,v=228+Math.round(n*3)*9;
+  d[i*4]=v;d[i*4+1]=v;d[i*4+2]=Math.min(255,v+5);d[i*4+3]=Math.round(255*Math.min(0.92,0.45+Math.round(Math.min(1,dep/240)*4)/4*0.4+(n>0.55?0.07:0)));}
+ sx.putImageData(img,0,0);if(seaMasks.size>=4)seaMasks.delete(seaMasks.keys().next().value);seaMasks.set(key,c);return c;}
 /* valley fog masks: one pixel per tile, alpha from how far below the fog level the ground is */
 const fogMasks=new Map();
 function fogMask(level){const key=Math.round(level/40);let c=fogMasks.get(key);if(c)return c;c=document.createElement('canvas');c.width=W;c.height=H;const fc=c.getContext('2d');const img=fc.createImageData(W,H);for(let i=0;i<W*H;i++){const a=Math.round(Math.max(0,Math.min(1,(key*40-elev[i])/220))*4)/4*0.45;img.data[i*4]=235;img.data[i*4+1]=240;img.data[i*4+2]=245;img.data[i*4+3]=Math.round(a*255);}fc.putImageData(img,0,0);fogMasks.set(key,c);return c;}
@@ -860,9 +921,9 @@ function lightsImages(){if(lightsCache)return lightsCache;const mk=(w,h)=>{const
    ===================================================================== */
 let lang='vi'; // Vietnamese first; the choice is remembered
 const UI={
- en:{subtitle:'A pixel map of Sa Pa and the Mường Hoa valley built from real elevation data and OpenStreetMap. Walk, trek, ride the cable car.',labels:'LABELS',treks:'TREKS',sky:['SKY: AUTO','SKY: CLEAR','SKY: FOG','SKY: RAIN'],sound:['SOUND OFF','SOUND ON'],lang:'TIẾNG VIỆT',walk:'WALK HERE',me:'◎ ME',tabs:['PLACE','PLACES','SETTINGS','LEGEND'],skyline:'SECTION',shops:'SHOP NAMES',shopsHint:'Zoom in fully to see shop names.',section:'WEST-EAST SECTION WHERE YOU STAND',skyNames:['','CLEAR','FOG','RAIN','SNOW'],days:['SUN','MON','TUE','WED','THU','FRI','SAT'],legs:{walk:'walk',trainDown:'mountain train',trainUp:'mountain train',cableUp:'cable car',cableDown:'cable car'},total:'total',feat:{waterfall:'Waterfall',viewpoint:'Viewpoint',peak:'Peak'},ridge:'HOÀNG LIÊN SƠN RANGE',valleyName:'MƯỜNG HOA VALLEY',festival:'GẦU TÀO FESTIVAL',dayBtn:'DAY: ',busy:{market:'Market day: the villages are in town.',nightmarket:'Saturday night: the night market is at its busiest.'},busyWhen:{market:'Busiest on Sunday from 6 to 11 am.',nightmarket:'Busiest on Saturday from 6 to 11 pm.'},home:'BACK TO TOWN',time:'Time',monthL:'Month',auto:'AUTO',visited:'Visited',
+ en:{subtitle:'A pixel map of Sa Pa and the Mường Hoa valley built from real elevation data and OpenStreetMap. Walk, trek, ride the cable car.',labels:'LABELS',treks:'TREKS',sky:['SKY: AUTO','SKY: CLEAR','SKY: FOG','SKY: RAIN'],sound:['SOUND OFF','SOUND ON'],lang:'TIẾNG VIỆT',walk:'WALK HERE',me:'◎ ME',tabs:['PLACE','PLACES','SETTINGS','LEGEND'],skyline:'SECTION',shops:'SHOP NAMES',shopsHint:'Zoom in fully to see shop names.',section:'WEST-EAST SECTION WHERE YOU STAND',skyNames:['','CLEAR','FOG','RAIN','SNOW'],days:['SUN','MON','TUE','WED','THU','FRI','SAT'],legs:{walk:'walk',trainDown:'mountain train',trainUp:'mountain train',cableUp:'cable car',cableDown:'cable car'},total:'total',feat:{waterfall:'Waterfall',viewpoint:'Viewpoint',peak:'Peak'},ridge:'HOÀNG LIÊN SƠN RANGE',valleyName:'MƯỜNG HOA VALLEY',festival:'GẦU TÀO FESTIVAL',dayBtn:'DAY: ',busy:{market:'Market day: the villages are in town.',nightmarket:'The night market is open: Friday, Saturday and Sunday evenings.',church:'Saturday evening: the love market is on in the church square.'},busyWhen:{market:'Busiest on Sunday from 6 to 11 am.',nightmarket:'Open on Friday, Saturday and Sunday, from about 4 to 10 pm.',church:'Love market: Saturday evening from 7 pm, in the square.'},love:'LOVE MARKET',rideOpen:'Cable car and mountain train are running: today {a} to {b}.',rideClosed:'Cable car and mountain train are closed now: today they run {a} to {b}.',home:'BACK TO TOWN',time:'Time',monthL:'Month',auto:'AUTO',visited:'Visited',
   months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-  seasons:{1:'January: dry, cold, snow on the pass some years.',2:'February: peach and plum blossom for Tết, and the Hmong Gầu Tào festival.',3:'March: rhododendrons on Fansipan.',4:'April: fields ploughed, buffalo at work.',5:'May: terraces flooded like mirrors, planting begins.',6:'June: young rice, heavy rain.',7:'July: green terraces, wettest month.',8:'August: rice heads form, thunderstorms.',9:'September: harvest gold, crews cutting rice on the terraces.',10:'October: stubble and clear skies.',11:'November: dry and cool, best trekking.',12:'December: frost in the valley, fog in town.'},
+  seasons:{1:'January: dry and cold, hoarfrost on the fields at dawn, snow on the pass some years.',2:'February: peach and plum blossom for Tết, and the Hmong Gầu Tào festival.',3:'March: rhododendrons on Fansipan.',4:'April: fields ploughed, buffalo at work.',5:'May: terraces flooded like mirrors, planting begins.',6:'June: young rice, heavy rain.',7:'July: green terraces, wettest month.',8:'August: rice heads form, thunderstorms.',9:'September: harvest gold, crews cutting rice on the terraces.',10:'October: stubble and clear skies.',11:'November: dry and cool, best trekking.',12:'December: frost in the valley, fog in town.'},
   legend:[['#7cb342','Rice terraces (colour follows the month)'],['#2e7d32','Forest'],['#7aa844','Scrub'],['#8d8d7a','Rock, above 2,500 m'],['#e8eef5','Snow, January and February'],['#c2ad84','Bare ground'],['#3a7bd5','Rivers, lakes, reservoirs'],['#d2d0c6','Dam (OSM)'],['#3d6a8a','Hydropower plant (OSM)'],['#3a2a1a','Mountain railway'],['#e3d8bd','Paved roads'],['#b8a070','Tracks'],['#8a6238','Bridges'],['#6f6f78','Town streets (OSM)'],['#b5452f','Houses (OSM footprints)'],['#4a5566','Hotels (OSM)'],['#8a4a32','Village houses'],['#7fb84e','Gardens'],['#2a9d8f','Shop or café sign'],['#f1c232','Homestay (OSM)'],['dash','Trek routes']],
   help:'Click or tap the map to walk to that spot, or a place to walk there along the roads; a flag marks where you are going and dots show the way. A click on water or a cliff goes to the nearest spot you can reach. Drag to pan, scroll, pinch or <kbd>+</kbd><kbd>-</kbd> to zoom, and double-tap to zoom in on a phone. On a keyboard the arrow keys move the view and <kbd>Enter</kbd> walks to the cross in the middle. Trips between town and the cable car take the mountain train from Sun Plaza. One tile is about 39 m; the scale bar shows 1 km. Only the main places are labelled at first; zoom in for the rest, then street names. Shop names show on hover, or all at once with the Shop names switch in Settings. Month, sky, sound and language are in the Settings tab. Morning fog pools in the valleys and lifts by mid-morning.',
   credits:'Elevation: SRTM via AWS Terrain Tiles. Land cover: Sentinel-2 10 m, Esri and Impact Observatory. Roads, rivers, land cover, buildings, shops, hotels and most places: © OpenStreetMap contributors. Bus station, Sín Chải, Ý Linh Hồ, Giàng Tả Chải and Lếch Dao are hand placed. Homestay names are as mapped in OpenStreetMap. Monthly temperature and rain: Sa Pa averages from climatestotravel.com. Build pipeline in the tools folder.',
@@ -871,11 +932,11 @@ const UI={
   fromChurch:'from the church',walkT:'On foot',bikeT:'Motorbike',guideT:'Guide',guide:['Not needed','Recommended','Required'],stamp:'VISITED',src:{osm:'Position from OpenStreetMap',approx:'Position approximate'},
   etaWalk:'walk',here:'YOU',stay:'Homestay',stayLine:'Homestays here (OpenStreetMap): ',climTip:'Typical for this month at the height where you stand: mean temperature, and rain for the whole month in Sa Pa.',
   poi:{cafe:'Café',food:'Restaurant',bar:'Bar',pharmacy:'Pharmacy',hospital:'Hospital',atm:'ATM / bank',fuel:'Fuel',school:'School',police:'Police',post:'Post office',shop:'Shop'},
-  toast:{deep:'Too deep to wade.',cloud:'Above the snow line. Take the cable car or the trail.',walking:'Walking to ',arrived:'Arrived: ',cable:'Riding the cable car...',train:'Riding the mountain train...',noPath:'No path there.',near:'Walking to the nearest spot you can reach.',pick:'Pick a place first.',home:'Back at the church square.',visited:'New place in the journal: '},
+  toast:{closed:'Cable car and mountain train are closed (they run {a} to {b}). Going on foot.',rainbow:'The rain has stopped: a rainbow.',sea:'A sea of clouds below you.',deep:'Too deep to wade.',cloud:'Above the snow line. Take the cable car or the trail.',walking:'Walking to ',arrived:'Arrived: ',cable:'Riding the cable car...',train:'Riding the mountain train...',noPath:'No path there.',near:'Walking to the nearest spot you can reach.',pick:'Pick a place first.',home:'Back at the church square.',visited:'New place in the journal: '},
   scale:'1 KM',hourFmt:h=>String(Math.floor(h)).padStart(2,'0')+':'+(h%1?'30':'00')},
- vi:{subtitle:'Bản đồ pixel Sa Pa và thung lũng Mường Hoa dựng từ dữ liệu độ cao thật và OpenStreetMap. Đi bộ, trek, đi cáp treo.',labels:'NHÃN',treks:'TREK',sky:['TRỜI: TỰ ĐỘNG','TRỜI: QUANG','TRỜI: SƯƠNG','TRỜI: MƯA'],sound:['TẮT TIẾNG','BẬT TIẾNG'],lang:'ENGLISH',walk:'ĐI TỚI ĐÂY',me:'◎ TÔI',tabs:['ĐỊA ĐIỂM','DANH SÁCH','CÀI ĐẶT','CHÚ GIẢI'],skyline:'LÁT CẮT',shops:'TÊN QUÁN',shopsHint:'Phóng to hết cỡ để thấy tên quán.',section:'LÁT CẮT TÂY-ĐÔNG TẠI CHỖ BẠN ĐỨNG',skyNames:['','QUANG','SƯƠNG','MƯA','TUYẾT'],days:['CN','T2','T3','T4','T5','T6','T7'],legs:{walk:'đi bộ',trainDown:'tàu leo núi',trainUp:'tàu leo núi',cableUp:'cáp treo',cableDown:'cáp treo'},total:'tổng',feat:{waterfall:'Thác nước',viewpoint:'Điểm ngắm cảnh',peak:'Đỉnh núi'},ridge:'DÃY HOÀNG LIÊN SƠN',valleyName:'THUNG LŨNG MƯỜNG HOA',festival:'LỄ HỘI GẦU TÀO',dayBtn:'THỨ: ',busy:{market:'Phiên chợ: dân bản xuống chợ.',nightmarket:'Tối thứ Bảy: chợ đêm đông nhất.'},busyWhen:{market:'Đông nhất Chủ nhật từ 6 đến 11 giờ sáng.',nightmarket:'Đông nhất tối thứ Bảy từ 18 đến 23 giờ.'},home:'VỀ TRUNG TÂM',time:'Giờ',monthL:'Tháng',auto:'TỰ ĐỘNG',visited:'Đã ghé',
+ vi:{subtitle:'Bản đồ pixel Sa Pa và thung lũng Mường Hoa dựng từ dữ liệu độ cao thật và OpenStreetMap. Đi bộ, trek, đi cáp treo.',labels:'NHÃN',treks:'TREK',sky:['TRỜI: TỰ ĐỘNG','TRỜI: QUANG','TRỜI: SƯƠNG','TRỜI: MƯA'],sound:['TẮT TIẾNG','BẬT TIẾNG'],lang:'ENGLISH',walk:'ĐI TỚI ĐÂY',me:'◎ TÔI',tabs:['ĐỊA ĐIỂM','DANH SÁCH','CÀI ĐẶT','CHÚ GIẢI'],skyline:'LÁT CẮT',shops:'TÊN QUÁN',shopsHint:'Phóng to hết cỡ để thấy tên quán.',section:'LÁT CẮT TÂY-ĐÔNG TẠI CHỖ BẠN ĐỨNG',skyNames:['','QUANG','SƯƠNG','MƯA','TUYẾT'],days:['CN','T2','T3','T4','T5','T6','T7'],legs:{walk:'đi bộ',trainDown:'tàu leo núi',trainUp:'tàu leo núi',cableUp:'cáp treo',cableDown:'cáp treo'},total:'tổng',feat:{waterfall:'Thác nước',viewpoint:'Điểm ngắm cảnh',peak:'Đỉnh núi'},ridge:'DÃY HOÀNG LIÊN SƠN',valleyName:'THUNG LŨNG MƯỜNG HOA',festival:'LỄ HỘI GẦU TÀO',dayBtn:'THỨ: ',busy:{market:'Phiên chợ: dân bản xuống chợ.',nightmarket:'Chợ đêm đang họp: tối thứ Sáu, thứ Bảy và Chủ nhật.',church:'Tối thứ Bảy: chợ tình đang diễn ra ở quảng trường nhà thờ.'},busyWhen:{market:'Đông nhất Chủ nhật từ 6 đến 11 giờ sáng.',nightmarket:'Họp thứ Sáu, thứ Bảy và Chủ nhật, khoảng 16 đến 22 giờ.',church:'Chợ tình: tối thứ Bảy từ 19 giờ, tại quảng trường.'},love:'CHỢ TÌNH',rideOpen:'Cáp treo và tàu leo núi đang chạy: hôm nay {a} đến {b}.',rideClosed:'Cáp treo và tàu leo núi đang nghỉ: hôm nay chạy {a} đến {b}.',home:'VỀ TRUNG TÂM',time:'Giờ',monthL:'Tháng',auto:'TỰ ĐỘNG',visited:'Đã ghé',
   months:['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'],
-  seasons:{1:'Tháng 1: khô, rét, có năm tuyết trên đèo.',2:'Tháng 2: hoa đào, hoa mận đón Tết và lễ hội Gầu Tào của người Mông.',3:'Tháng 3: đỗ quyên nở trên Fansipan.',4:'Tháng 4: cày ải, trâu ra đồng.',5:'Tháng 5: ruộng đổ nước như gương, bắt đầu cấy.',6:'Tháng 6: lúa non, mưa lớn.',7:'Tháng 7: ruộng xanh, tháng mưa nhiều nhất.',8:'Tháng 8: lúa trổ bông, giông chiều.',9:'Tháng 9: mùa vàng, người gặt lúa trên ruộng bậc thang.',10:'Tháng 10: gốc rạ, trời trong.',11:'Tháng 11: khô mát, trek đẹp nhất.',12:'Tháng 12: băng giá dưới thung lũng, sương trong phố.'},
+  seasons:{1:'Tháng 1: khô, rét, sương muối trắng ruộng lúc sáng sớm, có năm tuyết trên đèo.',2:'Tháng 2: hoa đào, hoa mận đón Tết và lễ hội Gầu Tào của người Mông.',3:'Tháng 3: đỗ quyên nở trên Fansipan.',4:'Tháng 4: cày ải, trâu ra đồng.',5:'Tháng 5: ruộng đổ nước như gương, bắt đầu cấy.',6:'Tháng 6: lúa non, mưa lớn.',7:'Tháng 7: ruộng xanh, tháng mưa nhiều nhất.',8:'Tháng 8: lúa trổ bông, giông chiều.',9:'Tháng 9: mùa vàng, người gặt lúa trên ruộng bậc thang.',10:'Tháng 10: gốc rạ, trời trong.',11:'Tháng 11: khô mát, trek đẹp nhất.',12:'Tháng 12: băng giá dưới thung lũng, sương trong phố.'},
   legend:[['#7cb342','Ruộng bậc thang (màu theo tháng)'],['#2e7d32','Rừng'],['#7aa844','Cây bụi'],['#8d8d7a','Đá, trên 2.500 m'],['#e8eef5','Tuyết, tháng 1 và tháng 2'],['#c2ad84','Đất trống'],['#3a7bd5','Suối, hồ, hồ thủy điện'],['#d2d0c6','Đập (theo OSM)'],['#3d6a8a','Nhà máy thủy điện (theo OSM)'],['#3a2a1a','Đường tàu leo núi'],['#e3d8bd','Đường nhựa'],['#b8a070','Đường đất'],['#8a6238','Cầu'],['#6f6f78','Đường phố (OSM)'],['#b5452f','Nhà (theo OSM)'],['#4a5566','Khách sạn (OSM)'],['#8a4a32','Nhà trong bản'],['#7fb84e','Vườn'],['#2a9d8f','Biển hiệu quán, cửa hàng'],['#f1c232','Homestay (theo OSM)'],['dash','Tuyến trek']],
   help:'Bấm hoặc chạm vào bản đồ để đi tới điểm đó, hoặc vào một địa điểm để đi tới theo đường; lá cờ đánh dấu nơi bạn đang tới và các chấm chỉ đường đi. Bấm vào mặt nước hay vách đá thì đi tới điểm gần nhất có thể tới. Kéo để dời, lăn chuột, chụm ngón tay hoặc <kbd>+</kbd><kbd>-</kbd> để phóng, chạm hai lần để phóng to trên điện thoại. Trên bàn phím, phím mũi tên dời bản đồ và <kbd>Enter</kbd> đi tới dấu chữ thập ở giữa. Đi giữa trung tâm và ga cáp treo sẽ lên tàu hỏa leo núi ở Sun Plaza. Một ô khoảng 39 m; thước tỷ lệ là 1 km. Ban đầu chỉ hiện các địa điểm chính; phóng to để thấy phần còn lại, rồi tên phố. Tên quán hiện khi rê chuột, hoặc bật Tên quán trong Cài đặt. Tháng, thời tiết, âm thanh và ngôn ngữ nằm ở thẻ Cài đặt. Sương sớm đọng dưới thung lũng và tan giữa buổi sáng.',
   credits:'Độ cao: SRTM qua AWS Terrain Tiles. Lớp phủ: Sentinel-2 10 m, Esri và Impact Observatory. Đường, suối, lớp phủ, nhà, quán, khách sạn và hầu hết địa điểm: © OpenStreetMap contributors. Bến xe, Sín Chải, Ý Linh Hồ, Giàng Tả Chải và Lếch Dao đặt tay. Tên homestay theo OpenStreetMap. Nhiệt độ và lượng mưa theo tháng: trung bình của Sa Pa từ climatestotravel.com. Quy trình dựng dữ liệu ở thư mục tools.',
@@ -884,7 +945,7 @@ const UI={
   fromChurch:'từ nhà thờ',walkT:'Đi bộ',bikeT:'Xe máy',guideT:'Hướng dẫn',guide:['Không cần','Nên có','Bắt buộc'],stamp:'ĐÃ GHÉ',src:{osm:'Vị trí theo OpenStreetMap',approx:'Vị trí ước lượng'},
   etaWalk:'đi bộ',here:'BẠN',stay:'Homestay',stayLine:'Homestay ở đây (theo OpenStreetMap): ',climTip:'Điển hình của tháng này ở độ cao bạn đang đứng: nhiệt độ trung bình, và lượng mưa cả tháng tại Sa Pa.',
   poi:{cafe:'Cà phê',food:'Quán ăn',bar:'Quán bar',pharmacy:'Nhà thuốc',hospital:'Bệnh viện',atm:'ATM / ngân hàng',fuel:'Cây xăng',school:'Trường học',police:'Công an',post:'Bưu điện',shop:'Cửa hàng'},
-  toast:{deep:'Suối sâu quá, không lội được.',cloud:'Trên đường tuyết. Đi cáp treo hoặc theo lối mòn.',walking:'Đang đi tới ',arrived:'Đã đến: ',cable:'Đang đi cáp treo...',train:'Đang đi tàu hỏa leo núi...',noPath:'Không có đường tới đó.',near:'Đi tới điểm gần nhất có thể tới.',pick:'Chọn địa điểm trước.',home:'Đã về sân nhà thờ.',visited:'Nơi mới trong nhật ký: '},
+  toast:{closed:'Cáp treo và tàu leo núi đã nghỉ (giờ chạy {a} đến {b}). Đi bộ vậy.',rainbow:'Tạnh mưa rồi: cầu vồng kìa.',sea:'Biển mây ngay dưới chân bạn.',deep:'Suối sâu quá, không lội được.',cloud:'Trên đường tuyết. Đi cáp treo hoặc theo lối mòn.',walking:'Đang đi tới ',arrived:'Đã đến: ',cable:'Đang đi cáp treo...',train:'Đang đi tàu hỏa leo núi...',noPath:'Không có đường tới đó.',near:'Đi tới điểm gần nhất có thể tới.',pick:'Chọn địa điểm trước.',home:'Đã về sân nhà thờ.',visited:'Nơi mới trong nhật ký: '},
   scale:'1 KM',hourFmt:h=>String(Math.floor(h)).padStart(2,'0')+':'+(h%1?'30':'00')}
 };
 const U=()=>UI[lang];
@@ -958,8 +1019,11 @@ function estimate(path){let min=0;for(const [x,y] of path){const i=y*W+x,paved=s
    A trip is a list of legs: walk to a place, ride the mountain train,
    ride the cable car. The same plan drives the walker and the card.
    ===================================================================== */
+let seaSaid=-1e9;
 let pending=null,goal=null; // goal: the tile the walker is heading for, marked with a flag
-function arrive(){if(goal&&!hero.path.length&&Math.abs(hero.x-goal[0])+Math.abs(hero.y-goal[1])<=1)goal=null;const l=LM.find(l=>hero.x>=l.x-K*2&&hero.x<=l.x+l.w+K&&hero.y>=l.y-K*2&&hero.y<=l.y+l.w+K*2);if(l){if(l!==sel){sel=l;renderCard();}if(!visited.has(l.id)){visited.add(l.id);say(U().toast.visited+nameOf(l));renderCard();renderList();}}saveState();}
+function arrive(){if(goal&&!hero.path.length&&Math.abs(hero.x-goal[0])+Math.abs(hero.y-goal[1])<=1)goal=null;const l=LM.find(l=>hero.x>=l.x-K*2&&hero.x<=l.x+l.w+K&&hero.y>=l.y-K*2&&hero.y<=l.y+l.w+K*2);if(l){if(l!==sel){sel=l;renderCard();}if(!visited.has(l.id)){visited.add(l.id);say(U().toast.visited+nameOf(l));renderCard();renderList();}
+  /* up on Fansipan or the pass on a foggy morning: say so, once in a while, after the arrival notice has had its turn */
+  if((l.id==='fansipan'||l.id==='doquyen'||l.id==='pass')&&performance.now()-seaSaid>90000){const fl=fogLevel(hour);if(fl>=1500&&eAt(hero.x,hero.y)>fl+60){seaSaid=performance.now();setTimeout(()=>say(U().toast.sea),2400);}}}saveState();}
 function goTo(tx,ty,label,then){const p=findPath(hero.x,hero.y,tx,ty);if(!p){say(U().toast.noPath);goal=null;return false;}hero.path=p;pending=then||null;if(label)say(U().toast.walking+label);follow=true;return true;}
 const RIDES={
  trainDown:{line:()=>TRAIN_LINE,sprite:'train',dur:3800,toast:'train',min:6},
@@ -967,10 +1031,12 @@ const RIDES={
  cableUp:{line:()=>CABLE_LINE,sprite:'gondola',dur:5200,toast:'cable',min:15},
  cableDown:{line:()=>CABLE_LINE.slice().reverse(),sprite:'gondola',dur:5200,toast:'cable',min:15}};
 /* work out the legs from where the walker stands to a place */
-function planLegs(l){const legs=[];let px=hero.x,py=hero.y;const st=byId('cable'),top=byId('doquyen'),sp=byId('sunplaza'),fan=byId('fansipan');
+function planLegs(l,anyHour){const legs=[];let px=hero.x,py=hero.y;const st=byId('cable'),top=byId('doquyen'),sp=byId('sunplaza'),fan=byId('fansipan'),open=anyHour||ridesOpen();
  const near=(p,r)=>Math.abs(px-p.x-p.w/2)<=r&&Math.abs(py-p.y-p.w/2)<=r;
  const put=(k,to)=>{const t=nearTarget(to);legs.push({k,to,from:[px,py],target:t});px=t[0];py=t[1];};
  for(let guard=0;guard<4;guard++){const atTop=near(top,6*K)||near(fan,6*K),atBase=near(st,4*K),inTown=townDist(px,py)<TOWN_R,high=l===top||l===fan;
+  /* after hours nothing runs: every leg is on foot, the Fansipan trail included */
+  if(!open){put('walk',l);break;}
   if(high){if(!atTop){if(!atBase){if(inTown){if(!near(sp,4*K))put('walk',sp);put('trainDown',st);}else put('walk',st);}put('cableUp',top);}if(l===fan)put('walk',fan);else if(!near(top,3*K))put('walk',top);break;}
   if(atTop){if(!near(top,4*K))put('walk',top);put('cableDown',st);if(l===st)break;continue;}
   if(l===st){if(!atBase){if(inTown){if(!near(sp,4*K))put('walk',sp);put('trainDown',st);}else put('walk',st);}break;}
@@ -982,7 +1048,10 @@ function rideAlong(line,sprite,dur,dest,after,msg){hero.path=[];pending=null;her
 function runLegs(legs){const g=legs.shift();if(!g)return;const next=()=>runLegs(legs);
  if(g.k==='walk'){if(!goTo(g.target[0],g.target[1],nameOf(g.to),next))return;if(!hero.path.length){pending=null;next();}}
  else{const r=RIDES[g.k];rideAlong(r.line(),r.sprite,r.dur,g.to,next,U().toast[r.toast]);}}
-function travel(l){sel=l;showTab('place');renderCard();if(hero.riding)return;hero.path=[];pending=null;const legs=planLegs(l);goal=legs.length?legs[legs.length-1].target:null;runLegs(legs);if(!hero.path.length&&!hero.riding&&!pending)goal=null;}
+function travel(l){sel=l;showTab('place');renderCard();if(hero.riding)return;hero.path=[];pending=null;const legs=planLegs(l);goal=legs.length?legs[legs.length-1].target:null;
+ /* would a ride have been part of this trip in opening hours? then say why the walker sets off on foot */
+ const shut=!ridesOpen()&&planLegs(l,true).some(g=>g.k!=='walk');
+ runLegs(legs);if(!hero.path.length&&!hero.riding&&!pending)goal=null;if(shut)say(rideLine(U().toast.closed));}
 /* a click on the map: walk to that tile, or to the nearest one that can be reached when it is water, cliff or cut off */
 function nearestOpen(tx,ty){let best=null,bd=1e9;for(let r=1;r<=24&&r<=bd+1;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const x=tx+dx,y=ty+dy;if(x<0||y<0||x>=W||y>=H||!reach[y*W+x])continue;const d=Math.hypot(dx,dy);if(d<bd){bd=d;best=[x,y];}}return best;}
 function walkTo(tx,ty){if(tx<0||ty<0||tx>=W||ty>=H||hero.riding)return;let t=[tx,ty];if(!reach[ty*W+tx]){t=nearestOpen(tx,ty);if(!t){say(U().toast.noPath);return;}say(U().toast.near);}
@@ -1038,12 +1107,39 @@ function fieldSpot(){for(let tries=0;tries<60&&villageTiles.length;tries++){cons
 for(let i=0;i<90;i++){const s=fieldSpot();if(!s)break;const b={kind:'buffalo',x:s[0],y:s[1],wait:rnd()*3000,flip:rnd()<0.5};amb.push(b);if(rnd()<0.45)amb.push({kind:'child',follow:b,body:pick(CLOTH)});}
 const crews=[];for(let i=0;i<34;i++){const s=fieldSpot();if(!s||kind[s[1]*W+s[0]]!==KI.terrace)continue;for(let j=0;j<4+Math.floor(rnd()*4);j++){const x=s[0]+(rnd()*2-1)*1.6,y=s[1]+(rnd()*2-1)*1.2;if(kind[Math.floor(y)*W+Math.floor(x)]===KI.terrace)crews.push({x,y,ph:rnd()*6,body:pick(CLOTH)});}}
 const harvesting=()=>month===9||month===10;
-function tickAmb(dt){for(const a of amb){
+/* village yards: chickens, dogs and the small black pigs of the hills. Each keeps to within two tiles of home. */
+{const yard=(kind,n,spd,roam,bodies)=>{for(let i=0,tries=0;i<n&&tries<n*6&&villageTiles.length;tries++){const j=pick(villageTiles),x=j%W,y=(j/W)|0;if(x<2||y<2||x>=W-2||y>=H-2)continue;const fx=x+0.15+rnd()*0.7,fy=y+0.15+rnd()*0.7;amb.push({kind,roam,spd,hx:x,hy:y,fx,fy,tx:fx,ty:fy,wait:rnd()*roam*3,flip:rnd()<0.5,body:pick(bodies),ph:Math.floor(rnd()*97)});i++;}};
+ yard('chicken',230,0.5,900,['#f4f4f0','#b5722a','#3a2a1a','#c9a227']);yard('dog',70,0.9,2200,['#8a6238','#1b1b1b','#c9b48a']);yard('pig',60,0.3,3000,['#2a2420','#2a2420','#d9a0a0']);}
+/* birds over the valley: small flocks that cross the map along it, by day and in dry weather. They fly, so they are
+   kept apart from everything that must stay off the water. */
+const flocks=[];{const ax=byId('church'),bx=byId('banho'),A=[(ax.x)*T,(ax.y)*T],B=[bx.x*T,bx.y*T],L=Math.hypot(B[0]-A[0],B[1]-A[1]),ux=(B[0]-A[0])/L,uy=(B[1]-A[1])/L;
+ for(let i=0;i<8;i++){const dir=i%2?1:-1,along=rnd()*1.3-0.15,off=(rnd()*2-1)*70*T,spd=11+rnd()*8;flocks.push({x:A[0]+ux*L*along-uy*off,y:A[1]+uy*L*along+ux*off,vx:ux*dir*spd,vy:uy*dir*spd,n:4+Math.floor(rnd()*4),ph:Math.floor(rnd()*50)});}}
+function tickFlocks(dt){for(const f of flocks){f.x+=f.vx*dt/1000;f.y+=f.vy*dt/1000+Math.sin((frame+f.ph)*0.05)*0.02*dt/16;const m=30*T;if(f.x<-m||f.y<-m||f.x>W*T+m||f.y>H*T+m){/* gone off the map: come back in from the far side */f.x=f.vx>0?-m+1:W*T+m-1;f.x=Math.max(-m+1,Math.min(W*T+m-1,f.x));f.y=Math.max(0,Math.min(H*T,H*T*(0.15+Math.random()*0.7)));}}}
+/* kitchen smoke over the villages at breakfast and supper time: 0 to 1 */
+const smokeAmt=h=>Math.max(0,Math.min(1,1.6*(h>=5.5&&h<=8.5?1-Math.abs(h-7)/1.5:h>=16.5&&h<=19.5?1-Math.abs(h-18)/1.5:0)));
+/* hoarfrost: white on the fields on January mornings, gone once the sun is up */
+const frostAmt=h=>month===1&&skyNow()!==3&&h>=2&&h<10?Math.min(1,(10-h)/1.5):0;
+function tickAmb(dt){const open=ridesOpen();for(const a of amb){
+ if(a.kind==='train'&&!open){a.t=0;a.dir=1;a.hold=0;const p=a.path[0];a.px=p[0]*T;a.py=p[1]*T;continue;} /* after hours the train waits at Sun Plaza */
+ if(a.roam){/* small animals potter about their own yard: one step at a time to the tile they are on or the one beside it */
+  a.wait-=dt;if(a.wait<=0){a.wait=a.roam+Math.random()*a.roam*2;const cx=Math.floor(a.fx),cy=Math.floor(a.fy),d=[[0,0],[1,0],[-1,0],[0,1],[0,-1]][Math.floor(Math.random()*5)],nx=cx+d[0],ny=cy+d[1];
+   if(nx>0&&ny>0&&nx<W-1&&ny<H-1&&Math.abs(nx-a.hx)<=2&&Math.abs(ny-a.hy)<=2){const k=kind[ny*W+nx];if(k===KI.village||k===KI.garden||k===KI.grass){a.tx=nx+0.15+Math.random()*0.7;a.ty=ny+0.15+Math.random()*0.7;}}}
+  const dx=a.tx-a.fx,dy=a.ty-a.fy,dd=Math.hypot(dx,dy);a.moving=dd>0.03;if(a.moving){const st=Math.min(dd,a.spd*dt/1000);a.fx+=dx/dd*st;a.fy+=dy/dd*st;if(Math.abs(dx)>0.02)a.flip=dx<0;}
+  a.px=a.fx*T;a.py=a.fy*T;continue;}
  if(a.path){if(a.hold>0)a.hold-=dt;else{a.t+=a.spd*a.dir*dt/1000/a.len;if(a.t>1){a.t=1;a.dir=-1;a.hold=a.pause||0;}if(a.t<0){a.t=0;a.dir=1;a.hold=a.pause||0;}}const p=polyAt(a.path,a.t);a.px=p[0]*T;a.py=p[1]*T;}
  else if(a.follow){let ox=a.follow.flip?5:-5;if(!dryAt((a.follow.px+ox)/T,(a.follow.py+1)/T))ox=-ox;a.px=a.follow.px+ox;a.py=a.follow.py+1;}
  else{a.wait-=dt;if(a.wait<=0){a.wait=2000+Math.random()*5000;const dx=Math.round(Math.random()*2-1),dy=Math.round(Math.random()*2-1),nx=a.x+dx,ny=a.y+dy;if(nx>0&&ny>0&&nx<W&&ny<H){const k=kind[ny*W+nx];if(k===KI.terrace||k===KI.grass||k===KI.garden||k===KI.bare){a.x=nx;a.y=ny;if(dx)a.flip=dx<0;}}}a.px=a.x*T+T/2;a.py=a.y*T+T/2;}}}
-/* market days: a crowd and extra stalls at Sapa Market on Sunday morning and at the night market on Saturday night */
-const marketBusy=id=>id==='market'?(day===0&&hour>=6&&hour<11):id==='nightmarket'?(day===6&&hour>=18&&hour<23):false;
+/* busy times: a crowd and extra stalls at Sapa Market on Sunday morning; the night market, which is there only on
+   Friday, Saturday and Sunday evenings; and the love market in the church square on Saturday evening */
+const marketBusy=id=>id==='market'?(day===0&&hour>=6&&hour<11):id==='nightmarket'?((day===5||day===6||day===0)&&hour>=16&&hour<22):id==='church'?(day===6&&hour>=19&&hour<22):false;
+/* the cable car keeps Sun World's hours: first car at 8:00 (7:30 on Saturday and Sunday), last car down at 16:00
+   (17:00 on Friday and Saturday). The mountain train has no timetable of its own in any source found; it is run to
+   feed the cable car, so it keeps the same hours here. Outside them both stand still and the walker goes on foot. */
+const rideHours=()=>[(day===0||day===6)?7.5:8,(day===5||day===6)?17:16];
+const ridesOpen=()=>{const r=rideHours();return hour>=r[0]&&hour<r[1];};
+const hm=h=>Math.floor(h)+':'+(h%1?'30':'00');
+const rideLine=s=>s.replace('{a}',hm(rideHours()[0])).replace('{b}',hm(rideHours()[1]));
+const RIDE_CARDS=new Set(['sunplaza','cable','doquyen','fansipan']);
 const shoppers=[],stalls=[];for(const id of ['market','nightmarket']){const l=byId(id),cx=l.x+l.w/2,cy=l.y+l.w+1.5;
  for(let i=0;i<54;i++){let x,y,tries=0;do{x=cx+(rnd()*2-1)*3.2*K;y=cy+(rnd()*2-1)*1.6*K;}while(!dryAt(x,y)&&++tries<20);if(dryAt(x,y))shoppers.push({id,x,y,hx:cx,hy:cy,wait:rnd()*2000,body:pick(CLOTH),head:pick(HEAD),base:i<5});}
  for(let i=0;i<10;i++){const x=cx+(i%5-2)*1.3*K,y=cy+(i<5?-0.9:0.9)*K;if(dryAt(x,y))stalls.push({id,x,y,base:i<2,i});}}
@@ -1073,6 +1169,12 @@ function fogLevel(h){const winter=month===12||month<=2;let L=0;
  if(skyNow()===2)L=Math.max(L,2600);return L;}
 let autoSky=1,autoSkyT=0;function pickAutoSky(){const r=Math.random();const rainP=month>=6&&month<=8?0.5:month===5||month===9?0.25:0.08;const fogP=month===12||month<=2?0.35:0.12;autoSky=r<rainP?3:r<rainP+fogP?2:1;}pickAutoSky();
 const skyNow=()=>skyMode===0?autoSky:skyMode;
+/* how much of the sea of clouds shows: nothing from down in the fog, all of it from 120 m above its top. The viewpoint
+   is the middle of the view, so it appears when you stand on, or look at, Fansipan or the pass in the morning. */
+const seaAmt=fl=>{if(fl<1500)return 0;return Math.max(0,Math.min(1,(eAt(Math.floor(cam.x/T),Math.floor(cam.y/T))-fl)/120));};
+/* the rainbow shows for this long after rain gives way to a dry sky; #rainbow=1 in the address keeps one up for checking */
+const RAINBOW_MS=50000;let rainbowUntil=0,lastSkyR=0;
+const SQ=SPEC.square; // the square in front of the church, where the love market is held
 
 /* =====================================================================
    11. RENDER
@@ -1107,6 +1209,8 @@ function render(){
    else{waiting++;ctx.drawImage(miniImage(),cx*CH_T,cy*CH_T,CH_T,CH_T,cx*CH_T*T,cy*CH_T*T,CH_T*T,CH_T*T);continue;}
    ctx.drawImage(c,cx*CH_T*T,cy*CH_T*T);}
   if(waiting)lastInput=performance.now();}
+ /* the light of the hour on the slopes, and the shadows of the mountains */
+ drawLight(ctx,T);
  ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c)))ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}
   /* rapids flicker white */
   if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
@@ -1115,7 +1219,8 @@ function render(){
  const ca=CABLE_LINE[0],cb=CABLE_LINE[CABLE_LINE.length-1],ax=ca[0]*T,ay=ca[1]*T-6,bx=cb[0]*T,by=cb[1]*T-4;
  ctx.strokeStyle='#1b1b1b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
  if(!lowZoom){for(let i=1;i<12;i++){const tx=ax+(bx-ax)*i/12,ty=ay+(by-ay)*i/12;ctx.fillStyle='#4a4a42';ctx.fillRect(Math.round(tx)-1,Math.round(ty)-1,2,10);}
-  const gt=(gond%600)/600;drawGondola(ctx,Math.round(ax+(bx-ax)*gt),Math.round(ay+(by-ay)*gt));drawGondola(ctx,Math.round(ax+(bx-ax)*(1-gt)),Math.round(ay+(by-ay)*(1-gt)));}
+  /* two cars pass each other on the rope in opening hours; after hours one waits at each station */
+  const gt=ridesOpen()?(gond%600)/600:0;drawGondola(ctx,Math.round(ax+(bx-ax)*gt),Math.round(ay+(by-ay)*gt));drawGondola(ctx,Math.round(ax+(bx-ax)*(1-gt)),Math.round(ay+(by-ay)*(1-gt)));}
  /* waterfalls, viewpoints and peaks */
  if(!lowZoom)for(const f of FEAT){const fx=Math.round(f.x*T),fy=Math.round(f.y*T);if(!seen(fx,fy,20))continue;
   if(f.k==='waterfall'){ctx.fillStyle='#f4f4f0';ctx.fillRect(fx-1,fy-4,2,6);ctx.fillStyle='#8fc3ff';ctx.fillRect(fx-2,fy+2,4,2);}
@@ -1134,21 +1239,34 @@ function render(){
   if(visited.has(l.id)){ctx.fillStyle='#2e7d32';ctx.fillRect(l.x*T+wp-2,l.y*T-2,4,4);ctx.fillStyle='#f4f4f0';ctx.fillRect(l.x*T+wp-1,l.y*T-1,2,2);}}
  /* the way the walker is about to take, as a dotted line */
  if(hero.path.length&&!hero.riding){const st=lowZoom?Math.max(2,Math.round(3/s)):1,d=lowZoom?Math.max(2,Math.round(1.6/s)):2;for(const pass of [0,1]){ctx.fillStyle=pass?YOU_COL:'#1b1b1b';const e=pass?0:1;for(let i=(hero.path.length-1)%st;i<hero.path.length;i+=st){const p=hero.path[i];if(seen(p[0]*T,p[1]*T,T))ctx.fillRect(p[0]*T+T/2-d/2-e,p[1]*T+T/2-d/2-e,d+2*e,d+2*e);}}}
- const dk=darkness(hour),step2=(frame>>2)%2;
+ const dk=darkness(hour),step2=(frame>>2)%2,sk0=skyNow();
  if(!lowZoom){
   /* festival pole and dancers, harvest crews, market stalls and crowd */
   if(festival()&&seen(FEST.x*T,FEST.y*T,80)){const fx=FEST.x*T,fy=FEST.y*T;ctx.fillStyle='#6d4a2a';ctx.fillRect(fx,fy-22,2,24);ctx.fillStyle='#c2412b';ctx.fillRect(fx+2,fy-22,6,8);ctx.fillStyle='#f1c232';ctx.fillRect(fx+2,fy-14,6,2);
    for(let i=0;i<26;i++){const a=i/26*6.283+frame*0.05,r=(i%2?20:28);drawPerson(ctx,Math.round(fx+Math.cos(a)*r),Math.round(fy+Math.sin(a)*r*0.6)+4,CLOTH[i%CLOTH.length],i%3?'#1b1b1b':'#c2412b',(frame+i)%2);}}
   if(harvesting())for(const c of crews){const px=Math.round(c.x*T),py=Math.round(c.y*T);if(!seen(px,py,20))continue;drawPerson(ctx,px,py+(((frame>>1)+Math.floor(c.ph))%3?0:1),c.body,'#e9cd6a',0);if(month===10&&(c.ph|0)%2){ctx.fillStyle='#e9cd6a';ctx.fillRect(px+3,py-2,3,2);}}
-  for(const st of stalls){if(!st.base&&!marketBusy(st.id))continue;drawStall(ctx,Math.round(st.x*T),Math.round(st.y*T),st.i);}
-  for(const sh of shoppers){if(!sh.base&&!marketBusy(sh.id))continue;drawPerson(ctx,Math.round(sh.x*T),Math.round(sh.y*T),sh.body,sh.head,step2);}
+  /* Sapa Market always has a few stalls and people; the night market is there only on its evenings */
+  for(const st of stalls){if((!st.base||st.id==='nightmarket')&&!marketBusy(st.id))continue;drawStall(ctx,Math.round(st.x*T),Math.round(st.y*T),st.i);}
+  for(const sh of shoppers){if((!sh.base||sh.id==='nightmarket')&&!marketBusy(sh.id))continue;drawPerson(ctx,Math.round(sh.x*T),Math.round(sh.y*T),sh.body,sh.head,step2);}
+  /* Saturday evening: the love market in the church square. Two khèn players in the middle, a ring of dancers round them */
+  if(marketBusy('church')&&seen(SQ.x*T,SQ.y*T,60)){const fx=Math.round(SQ.x*T),fy=Math.round(SQ.y*T);
+   for(let i=0;i<16;i++){const a=i/16*6.283+frame*0.04,r=i%2?11:15;drawPerson(ctx,Math.round(fx+Math.cos(a)*r),Math.round(fy+Math.sin(a)*r*0.6)+3,CLOTH[i%CLOTH.length],i%3?'#1b1b1b':'#c2412b',(frame+i)%2);}
+   for(const o of [-3,3]){const sway=((frame>>2)+(o>0?1:0))%2;drawPerson(ctx,fx+o,fy+2,'#2a3f8a','#1b1b1b',sway);ctx.fillStyle='#8a6238';ctx.fillRect(fx+o+(o<0?-3:1),fy-5+sway,3,1);ctx.fillRect(fx+o+(o<0?-4:3),fy-7+sway,1,3);}}
   /* everyone and everything that moves */
   for(const a of amb){const px=Math.round(a.px),py=Math.round(a.py);if(!seen(px,py,20))continue;
    if(a.kind==='person'){drawPerson(ctx,px,py,a.body,a.head,step2);if(a.load){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}}
    else if(a.kind==='moto')drawMoto(ctx,px,py);
    else if(a.kind==='buffalo')drawBuffalo(ctx,px,py,a.flip);
    else if(a.kind==='child')drawChild(ctx,px,py,a.body);
-   else if(a.kind==='train')drawTrain(ctx,px,py);}}
+   else if(a.kind==='train')drawTrain(ctx,px,py);
+   else if(a.kind==='chicken'){const peck=!a.moving&&(frame+a.ph)%9<2;ctx.fillStyle=a.body;ctx.fillRect(px-1,py-2,2,2);ctx.fillStyle='#c2412b';ctx.fillRect(a.flip?px-2:px+1,py-(peck?1:3),1,1);}
+   else if(a.kind==='dog'){ctx.fillStyle=a.body;ctx.fillRect(px-2,py-2,4,2);ctx.fillRect(a.flip?px-4:px+2,py-3,2,2);ctx.fillRect(a.flip?px+2:px-3,py-3,1,1);}
+   else if(a.kind==='pig'){ctx.fillStyle=a.body;ctx.fillRect(px-2,py-3,5,3);ctx.fillStyle='#e8b8b8';ctx.fillRect(a.flip?px-3:px+3,py-2,1,1);}}
+  /* kitchen smoke at breakfast and supper time: from about one roof in six a thin pale wisp, one art pixel wide, that
+     thins as it climbs, bends over at the top and wavers */
+  const smk=smokeAmt(hour);if(smk>0)for(let i=0;i<windowTiles.length;i+=2){const x=windowTiles[i],y=windowTiles[i+1];if(x*T<vx0-T||x*T>vx1+T||y*T<vy0-T||y*T>vy1+3*T)continue;if(kind[y*W+x]!==KI.village)continue;const hv=hash(x+5,y+11);if(hv>0.17*smk)continue;
+   const ph=(frame+Math.floor(hv*5871))>>2,bx=x*T+S*(Math.floor(hv*5871)%3),lean=Math.floor(hv*5871)%2?1:-1,len=4+(ph%2);
+   for(let j=0;j<len;j++){ctx.fillStyle='rgba(240,240,232,'+(0.88-j*0.15).toFixed(2)+')';ctx.fillRect(bx+lean*S*(j>=3?1+((ph+j)%2):j===2?(ph%2):0),y*T-S*(j+1),S,S);}}}
  /* you: the same size as everyone else, in gold, under a small bobbing marker so you can find yourself */
  {const hx=Math.round(hero.rx*T+T/2),hy=Math.round(hero.ry*T+T);
   if(hero.riding){if(hero.riding.sprite==='train')drawTrain(ctx,hx,hy-2);else drawGondola(ctx,hx,hy-10);}
@@ -1160,13 +1278,26 @@ function render(){
   ctx.fillStyle='#f4f4f0';ctx.fillRect(gx,gy-10*m,m,10*m);ctx.fillStyle='#c2412b';ctx.fillRect(gx+m,gy-11*m-bob*m,4*m,4*m);ctx.fillStyle=YOU_COL;ctx.fillRect(gx+2*m,gy-10*m-bob*m,2*m,2*m);}
  /* cloud shadows: blocky, snapped to the cloud cell */
  ctx.fillStyle='rgba(10,20,10,.13)';for(const c of clouds){const cell=c.cell,ox=Math.round((c.x-c.shape.cw*cell/2)/cell)*cell,oy=Math.round((c.y-c.shape.chh*cell/2)/cell)*cell;if(ox>vx1||ox+c.shape.cw*cell<vx0||oy>vy1||oy+c.shape.chh*cell<vy0)continue;for(const [j,i0,n] of c.shape.runs)ctx.fillRect(ox+i0*cell,oy+j*cell,n*cell,cell);}
+ /* hoarfrost on the fields, January mornings */
+ {const fr=frostAmt(hour);if(fr>0){ctx.globalAlpha=fr;ctx.drawImage(frostMask(),0,0,W*T,H*T);ctx.globalAlpha=1;}}
  /* valley fog: one flat block per tile, in four density steps */
  const fl=fogLevel(hour);if(fl>1150)ctx.drawImage(fogMask(fl),0,0,W*T,H*T);
+ /* the sea of clouds: from above the fog, the same valleys are a white floor with the ridges standing out of it */
+ {const sf=seaAmt(fl);if(sf>0){ctx.globalAlpha=sf;ctx.drawImage(seaMask(fl),0,0,W*T,H*T);ctx.globalAlpha=1;}}
+ /* birds, above the fog */
+ if(!lowZoom&&dk<0.3&&sk0!==3){ctx.fillStyle='#1b1b1b';const flap=(frame>>1)%2;for(const f of flocks){if(!seen(f.x,f.y,80))continue;const l=Math.hypot(f.vx,f.vy),ux=f.vx/l,uy=f.vy/l;
+   for(let k=0;k<f.n;k++){const row=Math.ceil(k/2),side=k%2?1:-1,bx=Math.round(f.x-ux*row*6-uy*side*row*5),by=Math.round(f.y-uy*row*6+ux*side*row*5),w=(flap+k)%2;ctx.fillRect(bx-2,by-w,1,1);ctx.fillRect(bx-1,by+w-1,1,1);ctx.fillRect(bx,by,1,1);ctx.fillRect(bx+1,by+w-1,1,1);ctx.fillRect(bx+2,by-w,1,1);}}}
  ctx.setTransform(1,0,0,1,0,0);
  const h=hour,sk=skyNow();if(h>16.5&&h<19.5){ctx.fillStyle='rgba(230,120,50,'+(0.18*(1-Math.abs(h-18)/1.5))+')';ctx.fillRect(0,0,cv.width,cv.height);}
  if(dk>0){ctx.fillStyle='rgba(12,18,52,'+dk+')';ctx.fillRect(0,0,cv.width,cv.height);}
  const centerE=eAt(Math.floor(cam.x/T),Math.floor(cam.y/T));const snowing=sk===3&&winterSnow()&&centerE>1800;
  if(sk===3&&!snowing){ctx.fillStyle='rgba(40,60,90,.18)';ctx.fillRect(0,0,cv.width,cv.height);ctx.strokeStyle='rgba(200,225,255,.6)';ctx.lineWidth=1;ctx.beginPath();for(const r of rain){const x=((r[0]+frame*0.004)%1)*cv.width,y=((r[1]+frame*0.03)%1)*cv.height;ctx.moveTo(x,y);ctx.lineTo(x-3,y+12);}ctx.stroke();}
+ /* a rainbow for a little while after the rain stops, when the sun is low enough to make one: blocky bands on the side
+    of the view away from the sun */
+ {const left=rainbowUntil-performance.now();if(left>0&&dk===0&&sk!==3){const sn=sunAt(hour,month);if(sn.alt>0.03&&sn.alt<0.73){const b=Math.max(3,Math.round(cv.height/170)),R=cv.height*0.62,cx=cv.width*(0.5-0.28*Math.sin(sn.az)),cy=cv.height*0.98,cols=['#e0453a','#f08a2a','#f1c232','#58b55a','#4a8ee0','#8a5ad0'];
+   ctx.globalAlpha=0.42*Math.min(1,left/4000)*Math.min(1,(RAINBOW_MS-left)/2500+0.2);
+   for(let c=0;c<cols.length;c++){ctx.fillStyle=cols[c];const r=R-c*b,n=Math.ceil(r*2.2/b);for(let i=0;i<=n;i++){const a=-Math.PI*0.86+Math.PI*0.72*i/n;ctx.fillRect(Math.round((cx+Math.cos(a)*r)/b)*b,Math.round((cy+Math.sin(a)*r)/b)*b,b,b);}}
+   ctx.globalAlpha=1;}}}
  if(snowing){ctx.fillStyle='rgba(200,210,230,.15)';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='rgba(255,255,255,.9)';for(const r of rain){const x=((r[0]+frame*0.0015+Math.sin(frame*0.2+r[1]*20)*0.004)%1)*cv.width,y=((r[1]+frame*0.008)%1)*cv.height;ctx.fillRect(x,y,3,3);}}
  if(dk>0.12){const al=Math.min(1,(dk-0.1)/0.45);setWorld();ctx.globalCompositeOperation='lighter';
   if(lowZoom){/* zoomed out: every settlement shows as a cluster of lights with a soft blocky glow */
@@ -1186,6 +1317,7 @@ function render(){
     ctx.fillStyle='rgba(255,190,80,'+(0.05*al)+')';pixelDisc(ctx,l.x*T+wp/2,l.y*T+wp*0.62,7);ctx.fillStyle='rgba(255,200,100,'+(0.07*al)+')';pixelDisc(ctx,l.x*T+wp/2,l.y*T+wp*0.62,3);}}
    /* the busy market glows a little warmer */
    for(const id of ['market','nightmarket'])if(marketBusy(id)){const l=byId(id);ctx.fillStyle='rgba(255,170,70,'+(0.07*al)+')';pixelDisc(ctx,(l.x+l.w/2)*T,(l.y+l.w+1.5)*T,24);}
+   if(marketBusy('church')){/* lanterns round the love market, and the square lit warm inside them */ctx.fillStyle='rgba(255,170,70,'+(0.12*al)+')';pixelDisc(ctx,SQ.x*T,SQ.y*T,13);ctx.fillStyle='rgba(255,210,120,'+(0.14*al)+')';pixelDisc(ctx,SQ.x*T,SQ.y*T,6);ctx.fillStyle='rgba(255,226,150,'+al+')';for(let i=0;i<8;i++){const a=i/8*6.283+0.39;ctx.fillRect(Math.round((SQ.x*T+Math.cos(a)*21)/S)*S,Math.round((SQ.y*T+Math.sin(a)*13)/S)*S,S,S);}}
    ctx.fillStyle='rgba(255,220,120,'+(0.08*al)+')';for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(townDist(x,y)<TOWN_R&&((x+y+frame)%3===0)&&(wMask[y*W+x]&0x60)===0x60)ctx.fillRect(x*T+S,y*T+S,2*S,S);}}
   ctx.globalCompositeOperation='source-over';ctx.setTransform(1,0,0,1,0,0);}
  /* cloud haze above the land: only when zoomed out, fading away as you zoom into town */
@@ -1197,6 +1329,7 @@ function render(){
   /* the range and the valley, named while zoomed out, after the places so they give way to them */
   if(cam.z<6){areaLabel(placed,U().ridge,196,128,232,330,font);areaLabel(placed,U().valleyName,470,292,725,424,font);}
   if(festival()&&cam.z>=3){const [sx,sy]=scr(FEST.x*T,FEST.y*T+14);if(sx>-80&&sx<cv.width+80&&sy>-20&&sy<cv.height+20)placeLabel(placed,U().festival,sx,sy,'',font);}
+  if(marketBusy('church')&&cam.z>=6){const [sx,sy]=scr(SQ.x*T-26,SQ.y*T-8);if(sx>-80&&sx<cv.width+80&&sy>-20&&sy<cv.height+20)placeLabel(placed,U().love,sx,sy,'',font);}
   /* reservoirs, then peaks with their heights, from mid zoom; street names closer in; shop names only on request */
   if(cam.z>=4.5)for(const k of LAKES){const [sx,sy]=scr(k.x*T,k.y*T);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,(lang==='vi'?k.vi:k.en).toUpperCase(),sx,sy,'peak',font);}
   if(cam.z>=4.5)for(const f of FEAT){if(f.k!=='peak')continue;const [sx,sy]=scr(f.x*T,f.y*T+5);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;const nm=(lang==='vi'?f.n:(f.ne||f.n));placeLabel(placed,(nm?nm.toUpperCase()+' ':'')+f.e.toLocaleString('en')+' m',sx,sy,'peak',font);}
@@ -1207,7 +1340,7 @@ function render(){
  /* keyboard aim: a cross in the middle of the view, where Enter will walk to */
  if(kbAim){const ax=Math.round(cv.width/2),ay=Math.round(cv.height/2);ctx.fillStyle='#1b1b1b';ctx.fillRect(ax-10,ay-2,20,4);ctx.fillRect(ax-2,ay-10,4,20);ctx.fillStyle=YOU_COL;ctx.fillRect(ax-9,ay-1,6,2);ctx.fillRect(ax+3,ay-1,6,2);ctx.fillRect(ax-1,ay-9,2,6);ctx.fillRect(ax-1,ay+3,2,6);}
  /* overview map in the side panel: whole region, places, lights at night, your position and the current view */
- mc.imageSmoothingEnabled=false;mc.globalCompositeOperation='source-over';mc.drawImage(miniImage(),0,0);
+ mc.imageSmoothingEnabled=false;mc.globalCompositeOperation='source-over';mc.drawImage(miniImage(),0,0);drawLight(mc,1);
  if(dk>0){mc.fillStyle='rgba(8,12,40,'+dk*0.75+')';mc.fillRect(0,0,W,H);if(dk>0.12){const L=lightsImages();mc.globalCompositeOperation='lighter';mc.drawImage(L.glow,0,0,W,H);mc.drawImage(L.dots,0,0);mc.globalCompositeOperation='source-over';}}
  mc.fillStyle='#f4f4f0';for(const l of LM)mc.fillRect(l.x,l.y,3,3);
  mc.strokeStyle='#f4f4f0';mc.lineWidth=3;mc.strokeRect(Math.max(2,vx0/T),Math.max(2,vy0/T),Math.min(W-4,viewW()/T),Math.min(H-4,viewH()/T));
@@ -1259,7 +1392,7 @@ function renderCard(){const u=U(),l=sel;
  else{const f=l.f[lang],ri=routeInfo(l);
   /* the route the walker will really take: walking legs timed on the path, rides at their real duration */
   const etaHtml=ri.parts.length?'<ul class="eta">'+ri.parts.map(p=>'<li>'+u.legs[p.k]+' ~'+trv(fmtMin(p.min))+'</li>').join('')+(ri.parts.length>1?'<li class="sum">'+u.total+' ~'+trv(fmtMin(ri.total))+'</li>':'')+'</ul>':'';
-  const busyHtml=u.busyWhen[l.id]?'<p class="tipline">'+(marketBusy(l.id)?u.busy[l.id]:u.busyWhen[l.id])+'</p>':'';
+  const busyHtml=(u.busyWhen[l.id]?'<p class="tipline">'+(marketBusy(l.id)?u.busy[l.id]:u.busyWhen[l.id])+'</p>':'')+(RIDE_CARDS.has(l.id)?'<p class="tipline">'+rideLine(ridesOpen()?u.rideOpen:u.rideClosed)+'</p>':'');
   const hs=STAYS.filter(h=>h.v===l.id).slice(0,4),extraHtml=(l.eat?'<p class="tipline">'+l.eat[lang]+'</p>':'')+(hs.length?'<p class="tipline">'+u.stayLine+hs.map(h=>h.n).join(', ')+'.</p>':'');
   card.innerHTML='<canvas class="sketch" width="112" height="56" aria-hidden="true"></canvas><p class="kicker"><span>'+l.km.toFixed(1)+' km '+u.fromChurch+'</span>'+(visited.has(l.id)?'<span class="stamp">'+u.stamp+'</span>':'')+'</p><h2>'+nameOf(l)+'</h2><p class="vi">'+altOf(l)+'</p>'+etaHtml+'<ul class="facts">'+f.map(x=>'<li>'+x+'</li>').join('')+'</ul><ul class="times"><li><span>'+u.walkT+'</span>'+trv(l.walk)+'</li><li><span>'+u.bikeT+'</span>'+trv(l.bike)+'</li><li><span>'+u.guideT+'</span>'+u.guide[l.guide]+'</li></ul><p>'+l.d[lang]+'</p>'+busyHtml+'<p class="tipline">'+l.t[lang]+'</p>'+extraHtml+'<p class="src">'+u.src[l.src]+' · '+(lang==='vi'?'độ cao trên lưới ':'grid elevation ')+elevOf(l).toLocaleString(lang==='vi'?'vi-VN':'en-US')+' m</p>';const sk=card.querySelector&&card.querySelector('.sketch');if(sk)drawSketch(l,sk);} /* the grid averages the ground over each cell, so a sharp summit reads a little low */
  [...list.children].forEach(li=>li.firstChild.setAttribute('aria-current',li.firstChild.dataset.id===(l&&l.id)?'true':'false'));
@@ -1295,7 +1428,7 @@ function updateStatus(){const u=U(),e=eAt(hero.x,hero.y),sk=skyNow();stIcon.clas
  /* on a narrow phone the row can still be too long: then the rain goes, whole, so a figure is never cut in half */
  if(PHONE()&&stClim.scrollWidth>stClim.clientWidth+1)stClim.textContent=tempTxt;
  /* say so once when a market fills up */
- const busy=['market','nightmarket'].filter(marketBusy).join(',');if(busy!==lastBusy){lastBusy=busy;if(busy){say(u.busy[busy.split(',')[0]]);}if(sel&&u.busyWhen[sel.id])renderCard();}}
+ const open=ridesOpen(),busy=['church','market','nightmarket'].filter(marketBusy).join(',')+(open?'|open':'');if(busy!==lastBusy){const was=lastBusy.split('|')[0].split(','),now=busy.split('|')[0].split(',').filter(id=>id&&!was.includes(id));lastBusy=busy;if(now.length)say(u.busy[now[0]]);if(sel&&(u.busyWhen[sel.id]||RIDE_CARDS.has(sel.id)))renderCard();}}
 monthEl.addEventListener('input',()=>setMonth(parseInt(monthEl.value,10)));
 dayBtn.addEventListener('click',()=>{day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];updateStatus();});
 document.getElementById('labels').addEventListener('click',e=>{showLabels=!showLabels;e.currentTarget.setAttribute('aria-pressed',String(showLabels));});
@@ -1325,7 +1458,12 @@ function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioCon
  /* cable car: a low two-note hum with a slow wobble */
  const hum=ac.createGain();hum.gain.value=0;hum.connect(master);for(const [f,type,g] of [[92,'sine',1],[184,'triangle',0.35],[276,'sine',0.12]]){const o=ac.createOscillator(),og=ac.createGain();o.type=type;o.frequency.value=f;og.gain.value=g;o.connect(og).connect(hum);o.start();}
  const wob=ac.createOscillator(),wobG=ac.createGain();wob.frequency.value=0.7;wobG.gain.value=0.02;wob.connect(wobG).connect(hum.gain);wob.start();
- mix={river,wind,chatter,rattle,hum,chatterLevel:0,forest:0,ride:null};
+ /* the khèn at the love market: two reed drones a fifth apart and a slow tune of five notes over them */
+ const khen=ac.createGain();khen.gain.value=0;const kf=ac.createBiquadFilter();kf.type='lowpass';kf.frequency.value=1500;khen.connect(kf).connect(master);
+ for(const f of [196,294]){const o=ac.createOscillator(),og=ac.createGain();o.type='sawtooth';o.frequency.value=f;og.gain.value=0.1;o.connect(og).connect(khen);o.start();}
+ const tune=ac.createOscillator(),tuneG=ac.createGain();tune.type='square';tune.frequency.value=392;tuneG.gain.value=0.14;tune.connect(tuneG).connect(khen);tune.start();
+ const KHEN=[392,440,523,587,523,440,392,330,392,523];let kn=0;setInterval(()=>{if(!soundOn||!mix||mix.khenLevel<=0)return;tune.frequency.setValueAtTime(KHEN[kn++%KHEN.length],ac.currentTime);},430);
+ mix={river,wind,chatter,rattle,hum,khen,khenLevel:0,chatterLevel:0,forest:0,ride:null};
  setInterval(()=>{if(!soundOn||!mix)return;const t=ac.currentTime;mix.chatter.gain.linearRampToValueAtTime(mix.chatterLevel*(0.5+Math.random()),t+0.3);},350);
  /* mountain train: clack-clack over the rail joints, twice every beat */
  setInterval(()=>{if(!soundOn||!mix||mix.ride!=='train')return;const t=ac.currentTime,g=mix.rattle.gain;for(const d of [0,0.09]){g.setValueAtTime(0.0001,t+d);g.linearRampToValueAtTime(0.5,t+d+0.012);g.exponentialRampToValueAtTime(0.0001,t+d+0.07);}},260);}
@@ -1334,7 +1472,9 @@ function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioCon
 function rideSound(kind){if(!mix||!ac)return;mix.ride=soundOn?kind:null;const t=ac.currentTime;mix.hum.gain.cancelScheduledValues(t);mix.hum.gain.linearRampToValueAtTime(mix.ride==='gondola'?0.16:0,t+0.35);if(mix.ride!=='train'){mix.rattle.gain.cancelScheduledValues(t);mix.rattle.gain.linearRampToValueAtTime(0,t+0.1);}}
 /* samples the land around you on a 77 m lattice, so distances read in the same units at any tile size */
 function updateMix(){if(!soundOn||!mix)return;let dW=12,forest=0,n=0;for(let dy=-8;dy<=8;dy++)for(let dx=-8;dx<=8;dx++){const x=hero.x+dx*K,y=hero.y+dy*K;n++;if(x<0||y<0||x>=W||y>=H)continue;const k=kind[y*W+x];if(k===KI.water)dW=Math.min(dW,Math.hypot(dx,dy));if(k===KI.forest)forest++;}
- const e=eAt(hero.x,hero.y),td=townDist(hero.x,hero.y)/K,t=ac.currentTime,night=darkness(hour)>0.3,crowd=(marketBusy('market')||marketBusy('nightmarket'))?2:1;
+ const e=eAt(hero.x,hero.y),td=townDist(hero.x,hero.y)/K,t=ac.currentTime,night=darkness(hour)>0.3,crowd=(marketBusy('market')||marketBusy('nightmarket')||marketBusy('church'))?2:1;
+ /* the khèn carries about twelve tiles from the square */
+ mix.khenLevel=marketBusy('church')?Math.max(0,1-Math.hypot(hero.x-SQ.x,hero.y-SQ.y)/(12*K)):0;mix.khen.gain.linearRampToValueAtTime(0.3*mix.khenLevel,t+0.8);
  mix.river.gain.linearRampToValueAtTime(0.32*Math.max(0,1-dW/10),t+0.8);
  mix.wind.gain.linearRampToValueAtTime(e>2300?0.3:e>1900?0.14:0.03,t+0.8);
  mix.chatterLevel=(td<14&&!night?0.12*(1-td/14):td<14?0.04*(1-td/14):0)*crowd;
@@ -1410,7 +1550,8 @@ function loop(ts){requestAnimationFrame(loop);
  if(autoTime){const nh=hour+dt/7500;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);}
  autoSkyT+=dt;if(autoSkyT>180000){autoSkyT=0;pickAutoSky();}
  for(const c of clouds){c.x+=c.v*dt/16;if(c.x>W*T+c.r)c.x=-c.r;}
- tick(dt);tickAmb(dt);tickShoppers(dt);render();
+ {const s=skyNow();if(lastSkyR===3&&s!==3&&darkness(hour)===0){rainbowUntil=ts+RAINBOW_MS;const sn=sunAt(hour,month);if(sn.alt>0.03&&sn.alt<0.73)say(U().toast.rainbow);}lastSkyR=s;if(HASH.rainbow)rainbowUntil=performance.now()+RAINBOW_MS/2;}
+ tick(dt);tickAmb(dt);tickFlocks(dt);tickShoppers(dt);render();
  statusAcc+=dt;if(statusAcc>250){statusAcc=0;updateStatus();}
  skyAcc+=dt;if(skyAcc>400||skyDirty||lastSkyCol!==hero.y*W+hero.x){skyAcc=0;skyDirty=false;lastSkyCol=hero.y*W+hero.x;renderSky();}}
 tickAmb(0);applyLang();loadingEl.hidden=true;
@@ -1425,7 +1566,7 @@ if(HASH.tab&&TABS.includes(HASH.tab)){showTab(HASH.tab);if(PHONE())openSheet(tru
 if(Object.keys(HASH).some(k=>k!=='worker'))document.getElementById('intro').hidden=true;
 document.fonts&&document.fonts.load('9px "Press Start 2P"').then(()=>{skyDirty=true;}).catch(()=>{});
 booted=true;requestAnimationFrame(loop);
-globalThis.__T={walkTo,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,damAt,POWER,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
+globalThis.__T={walkTo,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,damAt,POWER,sunAt,castShadows,lightLayers,setClock:(h,d,m)=>{hour=h;if(d!==undefined)day=d;if(m)month=m;},planLegs,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
 })();
 </script>
 </body>

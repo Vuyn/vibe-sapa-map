@@ -1,7 +1,8 @@
 // Headless sanity test for the built map: runs the page script with DOM stubs in Node 20+.
 // Usage: node test-headless.js <index.html>
 // Checks: script runs, data unpacks, every place is reachable on foot from the church, the route plans use the
-// mountain train and cable car, the walker really makes those trips, nobody stands on water, no trek line runs over a
+// mountain train and cable car (and go on foot after hours), the walker really makes those trips, the sun stands where it
+// should and casts long shadows only when it is low, nobody and no animal stands on water, no trek line runs over a
 // lake or reservoir, lakes and reservoirs lie on level ground, the dams are there, a click on the lake goes to the
 // nearest shore, and no Vietnamese is garbled.
 // There is no Worker in Node, so the land is built on the main thread here. For how it looks, use shot.ps1.
@@ -38,6 +39,16 @@ new Function(m[1])();
  const r1=await go('cable');console.log('church -> cable car base: ended',r1.d,'tiles away, rides:',r1.rides);if(r1.d>8||!/train/.test(r1.rides))bad++;
  const r2=await go('fansipan');console.log('cable car base -> Fansipan: ended',r2.d,'tiles away, rides:',r2.rides);if(r2.d>8||!/gondola/.test(r2.rides))bad++;
  const r3=await go('church');console.log('Fansipan -> church: ended',r3.d,'tiles away, rides:',r3.rides);if(r3.d>8||!/gondola/.test(r3.rides)||!/train/.test(r3.rides))bad++;
+ // after hours the cable car and the mountain train stand still: the plan to Fansipan is all on foot at 22:00, and
+ // uses both rides again at 9:00
+ {T.setClock(22,2);const late=T.routeInfo(by('fansipan')).parts.map(p=>p.k).join('>');T.setClock(9,2);const open=T.routeInfo(by('fansipan')).parts.map(p=>p.k).join('>');
+  console.log('plan to Fansipan at 22:00:',late,'| at 9:00:',open);if(/train|cable/.test(late)||!/train/.test(open)||!/cable/.test(open))bad++;}
+ // the sun: in the south-east on a December morning, about 44 degrees up at noon in December, and shadows that are long
+ // early in the day and nearly gone by noon
+ {const pct=(h,m)=>{const s=T.sunAt(h,m),d=T.castShadows(Math.sin(s.az),-Math.cos(s.az),Math.tan(s.alt));let n=0;for(let i=0;i<d.length;i++)if(d[i]>6)n++;return 100*n/d.length;};
+  const a=T.sunAt(8,12),b=T.sunAt(12,12),early=pct(7.5,9),noon=pct(12,9);
+  console.log('sun: December 8:00 bearing',Math.round(a.az*180/Math.PI),'| December noon altitude',Math.round(b.alt*180/Math.PI),'| land in shadow at 7:30',early.toFixed(1)+'%','at noon',noon.toFixed(1)+'%');
+  if(!(a.az>1.75&&a.az<2.45)||!(b.alt>0.72&&b.alt<0.82)||!(early>10&&noon<3))bad++;T.lightLayers();}
  // nobody stands or walks on water: sample every walker's whole line, and everyone who stands still
  {let wet=0;const dry=T.dryAt;for(const a of T.amb){if(a.kind==='train')continue;if(a.path){for(const q of a.path)if(!dry(q[0],q[1]))wet++;for(let i=0;i<a.path.length-1;i++)for(let k=1;k<8;k++)if(!dry(a.path[i][0]+(a.path[i+1][0]-a.path[i][0])*k/8,a.path[i][1]+(a.path[i+1][1]-a.path[i][1])*k/8))wet++;}else if(a.px!==undefined&&!dry(a.px/8,a.py/8))wet++;}
   for(const s of T.shoppers)if(!dry(s.x,s.y))wet++;for(const c of T.crews)if(!dry(c.x,c.y))wet++;for(const s of T.stalls)if(!dry(s.x,s.y))wet++;

@@ -22,10 +22,11 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 ## What you can do
 
 - **Walk:** click or tap anywhere and the walker finds a way there along roads and trails. A flag marks the destination and dots show the path. A click on water or a cliff goes to the nearest spot that can be reached.
-- **Ride:** trips between town and the cable car base take the Mường Hoa mountain train, and the cable car goes up to Fansipan.
+- **Ride:** trips between town and the cable car base take the Mường Hoa mountain train, and the cable car goes up to Fansipan. Both keep their real opening hours; after the last car the walker goes on foot.
 - **Change the month:** the terraces flood in May, turn green in summer and gold in September. February brings peach blossom and the Hmong Gầu Tào festival, September and October bring harvest crews, and January and February bring snow on the high ridge.
-- **Change the time and the sky:** day and night with lit windows and street lamps, morning valley fog, rain, and clouds.
-- **Visit on market day:** Sapa Market fills up on Sunday morning and the night market on Saturday night.
+- **Change the time and the sky:** the sun crosses the sky as it does at Sa Pa's latitude, so the mountains throw long shadows in the morning and evening and almost none at noon. Night brings lit windows and street lamps; there is morning valley fog, a sea of clouds seen from Fansipan and the pass, rain with a rainbow after it, and hoarfrost on the fields on January mornings.
+- **Visit on market day:** Sapa Market fills up on Sunday morning, the night market sets up on Friday, Saturday and Sunday evenings, and the love market fills the church square on Saturday evening.
+- **Watch village life:** kitchen smoke at breakfast and supper time, chickens, dogs and pigs in the yards, buffalo in the fields, birds over the valley.
 - **Keep a journal:** places you have walked to are ticked off. Your position and journal are saved in the browser.
 - **Read the weather:** the status bar shows the typical temperature and rainfall for the chosen month, adjusted to the height where the walker stands.
 - **Listen:** optional sound of river, wind, birds, market chatter, the train and the cable car.

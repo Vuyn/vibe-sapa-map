@@ -11,7 +11,7 @@ node build.js data template.html ..\index.html
 node test-headless.js ..\index.html
 ```
 
-The test runs the page script in Node with a stubbed DOM. It checks that the data unpacks, every landmark is reachable on foot from the church, the mountain train and cable car rides work in both directions, no person, animal or stall stands on water, no trek line runs over a lake or reservoir, lakes and reservoirs lie on level ground, the dams are there, a click on the lake walks to the nearest shore, and no Vietnamese text is garbled. There is no worker in Node, so the test builds the land on the main thread. It cannot check how the page looks. Use the screenshot tools for that.
+The test runs the page script in Node with a stubbed DOM. It checks that the data unpacks, every landmark is reachable on foot from the church, the mountain train and cable car rides work in both directions and the trip is planned on foot after hours, the sun stands where it should and casts long shadows only when low, no person, animal or stall stands on water, no trek line runs over a lake or reservoir, lakes and reservoirs lie on level ground, the dams are there, a click on the lake walks to the nearest shore, and no Vietnamese text is garbled. There is no worker in Node, so the test builds the land on the main thread. It cannot check how the page looks. Use the screenshot tools for that.
 
 ## See what it looks like
 
@@ -29,7 +29,7 @@ Each view is `name=#settings`. The same settings work in a normal browser, so th
 | --- | --- |
 | `h` | Hour, 0 to 24. Stops the clock. |
 | `m` | Month, 1 to 12 |
-| `d` | Weekday, 0 Sunday to 6 Saturday. Sapa Market fills on Sunday 6 to 11, the night market on Saturday 18 to 23. |
+| `d` | Weekday, 0 Sunday to 6 Saturday. Sapa Market fills on Sunday 6 to 11; the night market is there on Friday, Saturday and Sunday 16 to 22; the love market is in the church square on Saturday 19 to 22. |
 | `z` | Zoom, 1 to 16 |
 | `at` | Centre of the view as tile `x,y`. The church is at 406,199. |
 | `sel` | Place id to open, for example `laochai` |
@@ -37,6 +37,19 @@ Each view is `name=#settings`. The same settings work in a normal browser, so th
 | `lang` | `en` or `vi` |
 | `sky` | 0 automatic, 1 clear, 2 fog, 3 rain |
 | `worker` | `0` builds the land on the main thread instead of a background worker |
+| `rainbow` | `1` keeps a rainbow up, for checking it. Normally it shows for under a minute after rain turns to a dry sky. |
+
+Views that show the effects tied to the clock and the calendar:
+
+| To see | Use |
+| --- | --- |
+| Long morning and evening shadows | `h=7.5` or `h=16.5` with `sky=1`; `h=12` for almost none |
+| Love market in the church square | `d=6&h=20&z=16&at=404,198` |
+| Night market open, or absent | `d=5&h=20` against `d=2&h=20`, at `at=428,190` |
+| Kitchen smoke | `h=17.6` over any village (the morning smoke is under the valley fog) |
+| Cable car and train stopped | `h=20&sel=cable` |
+| Sea of clouds | `h=7&at=228,292` (Fansipan) or `h=7&at=200,149` (the pass), not in rain |
+| Hoarfrost | `m=1&h=8.8` over fields |
 
 Opening the page with any setting skips the welcome box. The first frames build terrain a few chunks at a time, so the tool waits 15 seconds of page time by default (`-Budget`). Headless page time runs ahead of a background worker, so `shot.ps1` adds `worker=0` to every view.
 
@@ -103,6 +116,25 @@ What passes has its shore rounded on the art grid, so it does not show as square
 Dams (`waterway=dam` ways) and power plants (`power=plant`) come from OpenStreetMap, fetched into `raw\dams.json` and stored in `osm2-out.json`. A dam is drawn as a pale crest two art pixels wide, a plant as a small powerhouse with a blue-grey roof. Those with a name get the usual boxed label once you zoom in to street-name level. OpenStreetMap has the names in Vietnamese only, so the English label is the same name turned round ("Đập thủy điện Sử Pán 2" becomes "Sử Pán 2 dam"). A dam is walkable only where a mapped road runs along its crest, as at Séo Mý Tỷ and Sử Pán 1. Hồ Séo Mý Tỷ is a place with a card. Two more reservoirs carry a label only (`LAKES` in the template): Sử Pán 1, named by its dam in OpenStreetMap, and Nậm Củn. The Nậm Củn outline has no name in OpenStreetMap; it is identified from the operator's flood notices in Báo Lào Cai, which place the reservoir in Mường Bo commune with a full level of 385 m, the height of the ground under this outline. Check that name if better data turns up.
 
 Terraces are drawn from the same idea: every art pixel takes the height of the ground under it, in 10 m levels, so the steps follow the real contours.
+
+## How the light follows the sun
+
+The slopes are not shaded in the terrain tiles. A separate light layer, one pixel per tile (one per half tile in the town box, from the finer elevation there), is stretched over the terrain and worked out again whenever the sun has moved a fifth of an hour, or the month or the sky changes. That takes about 25 ms on a desktop.
+
+- **Where the sun is:** `sunAt(hour, month)` gives its height and compass bearing for the latitude of Sa Pa on the middle day of the month. In December it rises in the south-east and reaches 44 degrees at noon; in June it passes almost overhead.
+- **Relief:** slopes facing the light are brightened and slopes facing away darkened. The light is the sun mixed with a steady glow from the north-west, the usual mapmaker's light, which takes over at noon and at night so the mountains never go flat.
+- **Cast shadows:** one sweep across the grid from the sun's side. Each tile remembers how high the shadow of everything behind it stands, and a tile below that line is in shadow. About a fifth of the land is in shadow at 7:30 in September and none at noon. Shadows are weak in fog and absent in rain.
+
+## Life tied to the clock
+
+- **Cable car and mountain train** run only in opening hours: first car 8:00 (7:30 on Saturday and Sunday), last car down 16:00 (17:00 on Friday and Saturday), from Sun World's notice of 28 September 2026. No timetable was found for the mountain train, so it keeps the same hours. Outside them the cars wait at the stations, the train waits at Sun Plaza, every trip is planned on foot, and the cards of the four places involved say so.
+- **Night market:** stalls and crowd only on Friday, Saturday and Sunday from 16 to 22.
+- **Love market:** a ring of dancers, two khèn players, lanterns and a label in the church square on Saturday from 19 to 22, with a khèn tune when sound is on.
+- **Kitchen smoke:** thin wisps from about one village roof in six around 7:00 and 18:00.
+- **Yard animals:** chickens, dogs and pigs on village and garden tiles, each within two tiles of home and moving only to a neighbouring tile, so the "nobody on water" check covers them. Birds cross the map along the valley by day in dry weather; they fly, so they are kept in a list of their own.
+- **Sea of clouds:** when the middle of the view is above the morning fog (Fansipan, the pass), the valleys below the fog top become a white floor.
+- **Rainbow:** for 50 seconds after rain turns to a dry sky by day, if the sun is lower than 42 degrees.
+- **Hoarfrost:** pale fields above 900 m on January mornings, gone by 10:00.
 
 ## How roads, the town and villages are drawn
 
