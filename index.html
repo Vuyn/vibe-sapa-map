@@ -637,7 +637,15 @@ function buildTerrain(U,P,HP){
  out.transfer=[elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
  return out;
 }
-const {hash,polyLen,polyAt,nz}=sharedHelpers();
+const {hash,nz}=sharedHelpers();
+/* on the page, the running length along a line is kept with the line, so finding a point on it is a short search and
+   not a walk along the whole of it (dozens of figures ask for their place on a long road every frame). A line is
+   never changed in place here; one that grows or shrinks is measured again. */
+const polyCum=new WeakMap();
+function polyRun(pts){let c=polyCum.get(pts);if(!c||c.length!==pts.length){c=new Float64Array(pts.length);for(let i=1;i<pts.length;i++)c[i]=c[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);polyCum.set(pts,c);}return c;}
+function polyLen(pts){return pts.length?polyRun(pts)[pts.length-1]:0;}
+function polyAt(pts,t){const n=pts.length;if(n<2)return pts[n-1];const c=polyRun(pts),L=c[n-1]*t;if(L>c[n-1])return pts[n-1];let lo=0,hi=n-2;while(lo<hi){const m=(lo+hi)>>1;if(c[m+1]<L)lo=m+1;else hi=m;}
+ const d=c[lo+1]-c[lo],k=d?(L-c[lo])/d:0;return[pts[lo][0]+(pts[lo+1][0]-pts[lo][0])*k,pts[lo][1]+(pts[lo+1][1]-pts[lo][1])*k];}
 
 /* =====================================================================
    3. TERRAIN: built in a background worker when the browser allows it,
@@ -728,7 +736,10 @@ const SPR={
  pass:['........','..YYYY..','..YKKY..','..YYYY..','...BB...','...BB...','GGGBBGGG','GGGGGGGG'],
  glass:['........','L......L','LLLLLLLL','SWSWSWSW','LLLLLLLL','.G....G.','.G....G.','GG....GG'],
 };
-function drawSprite(c,name,px,py,z){const s=SPR[name];for(let r=0;r<s.length;r++)for(let col=0;col<s[r].length;col++){const ch=s[r][col];if(ch!=='.'){c.fillStyle=PAL[ch];c.fillRect(px+col*z,py+r*z,z,z);}}}
+/* each sprite is painted once into a small canvas and stamped from there */
+const sprC=new Map();
+function sprLo(name){let c=sprC.get(name);if(c)return c;const s=SPR[name];c=document.createElement('canvas');c.width=s[0].length;c.height=s.length;const g=c.getContext('2d');for(let r=0;r<s.length;r++)for(let col=0;col<s[r].length;col++){const ch=s[r][col];if(ch!=='.'){g.fillStyle=PAL[ch];g.fillRect(col,r,1,1);}}sprC.set(name,c);return c;}
+function drawSprite(c,name,px,py,z){const im=sprLo(name);c.imageSmoothingEnabled=false;c.drawImage(im,px,py,im.width*z,im.height*z);}
 /* a place is drawn at one art pixel per sprite pixel: 16 px for most, 24 px for the six big ones */
 /* ---- CLOSE-UP FIGURES ----
    Small pictures in micro pixels (three to a world pixel). Each is drawn once per colouring into a tiny canvas and then
@@ -754,6 +765,11 @@ const FIG={
  car:['.RRRRRRRRRRRR.','RRRRRRRRRRRRRR','RWWRWWRRWWRWWR','RWWRWWRRWWRWWR','RRRRRRRRRRRRRR','CCCCCCCCCCCCCC','RRRRRRRRRRRRRR','.KK........KK.'],
  gondola:['...K...','...K...','.RRRRR.','RRRRRRR','RSSRSSR','RSSRSSR','RRRRRRR','.RRRRR.'],
  stall:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','B................B','B................B','B..Y.R.E.Y.O.R.E.B','BMMMMMMMMMMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
+ /* four kinds of stall, by what lies on the table: greens, fruit, indigo cloth and brocade, a charcoal grill */
+ stall0:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','B................B','B..E...E....E..E.B','B.ETE.EEO.ETE.EEEB','BMMMMMMMMMMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
+ stall1:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','B................B','B..R....Y....O...B','B.RRO.RYYR.YOO.RRB','BMMMMMMMMMMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
+ stall2:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','BI.IR.I..I.RI.I..B','BI.IR.I..I.RI.I..B','BIIRRIIYIIRRIIYIIB','BMMMMMMMMMMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
+ stall3:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','B...X.....X......B','B....X...X.......B','B.KRKOKRK..YOYOY.B','BDDDDDDDDDMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
  birdA:['K.....K','.KK.KK.','...K...'],birdB:['...K...','.KK.KK.','K.....K'],
  basket:['MMMMM','MNMNM','MMMMM','.MMM.'],
  umbrella:['..aaaaa..','.aaaaaaa.','aaaaaaaaa','....K....','....K....'],
@@ -766,19 +782,161 @@ const FIG={
 const figCache=new Map();
 function fig(name,cols){const key=name+(cols?'|'+cols.b+'|'+cols.h+'|'+cols.a:'');let c=figCache.get(key);if(c)return c;const rows=FIG[name];c=mkCanvas(rows[0].length,rows.length);const g=c.getContext('2d');
  for(let r=0;r<rows.length;r++)for(let q=0;q<rows[r].length;q++){const ch=rows[r][q];if(ch==='.')continue;g.fillStyle=ch==='b'?cols.b:ch==='h'?cols.h:ch==='a'?cols.a:PAL[ch];g.fillRect(q,r,1,1);}
- figCache.set(key,c);return c;}
+ c.sh=!/^(bird|m[A-Z]|basket|umbrella|gondola)/.test(name);figCache.set(key,c);return c;}
 /* stamp a figure with the middle of its feet at world x,y; dy lifts it (a basket, an umbrella) */
-function putFig(c,x,y,flip,dy){const w=c.width/HD,h=c.height/HD;y-=dy||0;if(flip){ctx.save();ctx.translate(x,y);ctx.scale(-1,1);ctx.drawImage(c,-w/2,-h,w,h);ctx.restore();}else ctx.drawImage(c,x-w/2,y-h,w,h);}
+function putFig(c,x,y,flip,dy){const w=c.width/HD,h=c.height/HD;if(c.sh&&!dy){/* a figure's own small shadow, so it stands on the ground */ctx.fillStyle='rgba(12,16,48,.22)';ctx.fillRect(x-w*0.4+1/HD,y-1/HD,w*0.8,2/HD);}y-=dy||0;if(flip){ctx.save();ctx.translate(x,y);ctx.scale(-1,1);ctx.drawImage(c,-w/2,-h,w,h);ctx.restore();}else ctx.drawImage(c,x-w/2,y-h,w,h);}
 /* landmarks keep their small sprites; in close-up they are smoothed to three times the pixels (the Scale3x rule), so
    their edges are rounded off without anything being redrawn by hand */
 const sprHiC=new Map();
-function sprHi(name){let c=sprHiC.get(name);if(c)return c;const s=SPR[name],h=s.length,w=s[0].length,P=(x,y)=>(x<0||y<0||x>=w||y>=h)?'.':s[y][x];c=mkCanvas(w*3,h*3);const g=c.getContext('2d');
+/* ---- LANDMARKS DRAWN FOR THE CLOSE-UP ----
+   Each place has its own picture here, three times the pixels of its small sprite and drawn rectangle by rectangle:
+   light from the upper left, a lit edge on top, a shaded right-hand side, a cool shadow on the ground. r(x,y,w,h,colour)
+   fills a rectangle; K is a small kit of shapes that many of them share. */
+function hiKit(r){const SHD='rgba(12,16,48,.3)';return{
+ sh:(x,y,w)=>{r(x,y,w,1,SHD);r(x+1,y+1,w-1,1,SHD);},
+ wl:(x,y,w,h,c)=>{r(x,y,w,h,c);const s=Math.max(1,w>>2);r(x+w-s,y,s,h,tone(c,-0.13));r(x,y,w,1,tone(c,0.25));},
+ rf:(x,y,w,h,c)=>{for(let j=0;j<h;j++){const k=h-1-j;r(x+k,y+j,w-2*k,1,j===0?tone(c,0.3):j===h-1?tone(c,-0.32):j%2?tone(c,-0.1):c);}},
+ tri:(cx,y,h,c,st)=>{for(let j=0;j<h;j++){const k=Math.round(j*st);r(cx-k,y+j,2*k+1,1,c);if(k>0){r(cx-k,y+j,1,1,tone(c,0.3));r(cx+k,y+j,1,1,tone(c,-0.3));}}},
+ tree:(cx,cy,rad,c)=>{r(cx,cy+rad,1,3,'#5d4037');for(let j=-rad;j<=rad;j++){const hw=Math.round(Math.sqrt(rad*rad-j*j+rad*0.6));r(cx-hw,cy+j,2*hw+1,1,j>rad*0.35?tone(c,-0.3):c);}r(cx-rad+1,cy-rad+1,Math.max(1,rad-1),Math.max(1,rad-2),tone(c,0.3));}};}
+const HSPR={
+ /* the stone church: bell tower with a slate spire and a cross, the nave behind it under a tiled roof */
+ church(r,K){K.sh(3,34,31);
+  r(12,13,23,7,'#a3412f');r(12,13,23,1,'#c9604a');r(12,19,23,1,'#74281c');for(let x=15;x<34;x+=4)r(x,14,1,5,'#8f3626');
+  K.wl(13,20,21,14,'#d2cbbb');for(let y=23;y<34;y+=4)r(13,y,21,1,'#bdb6a6');
+  for(let i=0;i<3;i++){r(17+i*6,24,2,6,'#3d4f6a');r(17+i*6,23,2,1,'#8fa9c9');r(17+i*6,24,1,6,'#566c8c');}
+  K.wl(3,10,10,24,'#e2dbcb');for(let y=14;y<34;y+=4)r(3,y,10,1,'#c9c2b2');
+  r(6,13,4,5,'#3a3a44');r(7,12,2,1,'#3a3a44');r(6,18,4,1,'#8a8474');r(7,21,2,2,'#3d4f6a');r(6,28,4,6,'#4a3524');r(7,27,2,1,'#4a3524');r(6,28,1,6,'#6d4a2a');
+  K.tri(8,3,7,'#6a6a74',1);r(8,0,1,3,'#3a2a1a');r(7,1,3,1,'#3a2a1a');},
+ /* a cable car station: the rope and a cabin above, a glass front under a long roof */
+ station(r,K){K.sh(1,34,34);
+  r(0,2,36,1,'#1b1b1b');r(13,2,2,3,'#4a4a42');r(9,5,10,7,'#c2412b');r(9,5,10,1,'#e06a52');r(9,11,10,1,'#8f2c1c');r(11,7,2,3,'#b9dcff');r(15,7,2,3,'#b9dcff');
+  r(3,13,30,2,'#6a7890');r(1,15,34,3,'#4a5566');r(1,15,34,1,'#8a9ab0');r(1,17,34,1,'#333c4a');
+  K.wl(2,18,32,16,'#dcd6c8');
+  for(const x of [4,28]){r(x,20,5,9,'#5aa0ec');r(x,20,5,2,'#b9dcff');r(x+2,20,1,9,'#3d6a9a');r(x,24,5,1,'#3d6a9a');}
+  r(11,20,14,14,'#2f3a4a');r(12,21,12,13,'#4f86c6');r(12,21,12,2,'#9fc8f0');r(17,21,2,13,'#2f3a4a');r(11,19,14,1,'#c2412b');r(9,34,18,1,'#b9b2a2');},
+ /* Sun Plaza: an ochre front in the French manner, slate roof with dormers, a clock tower under a dome */
+ sunplaza(r,K){K.sh(1,34,34);K.rf(1,11,34,5,'#5c6b7a');
+  for(const x of [6,27]){r(x,12,3,3,'#f4ecd0');r(x+1,13,1,2,'#3d4f6a');}
+  r(17,0,2,2,'#c9a227');r(16,2,4,1,'#8a9ab0');r(15,3,6,1,'#5c6b7a');r(14,4,8,2,'#5c6b7a');r(14,4,3,1,'#8a9ab0');
+  r(14,6,8,10,'#e8c45a');r(20,6,2,10,'#cba64a');r(16,7,4,4,'#f4f4f0');r(17,8,1,2,'#1b1b1b');r(18,9,1,1,'#1b1b1b');r(16,12,4,3,'#3d4f6a');
+  K.wl(2,16,32,18,'#e8c45a');r(1,16,34,1,'#f4f4f0');for(const x of [2,10,25,33])r(x,17,1,17,'#f4ecd0');
+  for(const x of [4,7,12,21,27,30]){r(x,19,2,5,'#3d4f6a');r(x,18,2,1,'#f4ecd0');r(x,27,2,5,'#3d4f6a');r(x,26,2,1,'#f4ecd0');r(x,19,1,5,'#566c8c');r(x,27,1,5,'#566c8c');}
+  r(14,23,8,11,'#f4ecd0');r(15,25,6,9,'#4a3524');r(15,24,6,1,'#3d4f6a');r(18,25,1,9,'#6d4a2a');r(12,34,12,1,'#b9b2a2');},
+ /* the summit of Fansipan: bare rock, the steel pyramid that marks the top, and the flag beside it */
+ peak(r,K){const w=[10,16,22,26,30,33,36,36,36,36];for(let j=0;j<10;j++){r(18-(w[j]>>1),26+j,w[j],1,'#8d8d7a');r(18-(w[j]>>1),26+j,w[j]>>2,1,'#a3a390');r(18+(w[j]>>1)-(w[j]>>2),26+j,w[j]>>2,1,'#77776a');}
+  r(9,29,6,1,'#b0b09c');r(15,31,1,4,'#6b6b5b');r(24,30,1,5,'#6b6b5b');r(4,33,8,1,'#b0b09c');r(21,33,10,1,'#6b6b5b');
+  for(let j=0;j<11;j++){r(12-j,15+j,j+1,1,'#e6edf4');r(13,15+j,j,1,'#9fb0c2');}r(12,14,2,1,'#f4f8fb');r(2,25,22,1,'#77776a');
+  r(27,1,1,26,'#4a4a42');r(28,2,8,6,'#c2412b');r(28,2,8,1,'#e06a52');r(31,4,2,2,'#f1c232');r(30,5,4,1,'#f1c232');},
+ /* the monastery: three tiers of red roof with upturned eaves over gilded walls and red pillars */
+ pagoda(r,K){K.sh(4,34,29);const RD='#a83a28',GD='#d9b23a';r(17,0,2,3,'#c9a227');
+  const tier=(y,w,h)=>{const x=18-(w>>1);for(let j=0;j<h;j++){const ww=w-4*(h-1-j);r(18-(ww>>1),y+j,ww,1,j===0?tone(RD,0.25):j===h-1?tone(RD,-0.35):RD);}r(x-1,y+h-2,2,1,RD);r(x+w-1,y+h-2,2,1,RD);r(x-2,y+h-3,1,1,tone(RD,0.2));r(x+w+1,y+h-3,1,1,tone(RD,0.2));};
+  tier(3,16,4);r(13,7,10,3,GD);r(15,8,2,2,'#5a2a1a');r(19,8,2,2,'#5a2a1a');
+  tier(10,24,5);r(10,15,16,4,GD);for(let x=11;x<26;x+=4)r(x,15,1,4,RD);
+  tier(19,32,6);K.wl(6,25,24,9,GD);for(let x=6;x<30;x+=5)r(x,25,1,9,RD);r(16,27,4,7,'#5a2a1a');r(17,28,2,6,'#7a3a22');r(9,28,3,3,'#5a2a1a');r(24,28,3,3,'#5a2a1a');r(4,34,28,1,'#b9b2a2');},
+ /* the museum: a wooden house on posts, a balcony all along the front and stairs up the middle */
+ museum(r,K){K.sh(2,22,21);K.rf(1,3,22,7,'#7a5230');for(let x=4;x<21;x+=3)r(x,5,1,4,'#644226');
+  K.wl(3,10,18,6,'#c9a070');for(const x of [5,10,16])r(x,10,2,2,'#3d4f6a');r(3,12,18,1,'#8a6238');for(let x=4;x<21;x+=2)r(x,13,1,2,'#8a6238');r(3,15,18,1,'#6d4a2a');
+  r(4,16,16,6,'#5a4630');for(const x of [3,8,14,20])r(x,16,1,6,'#6d4a2a');r(10,16,4,6,'#8a6238');for(let y=17;y<22;y+=2)r(10,y,4,1,'#b59a72');},
+ hotel(r,K){K.sh(3,22,20);K.rf(2,0,20,4,'#4a5566');K.wl(3,4,18,18,'#f0ece2');
+  for(let f=0;f<3;f++){for(let i=0;i<4;i++){r(5+i*4,6+f*5,2,3,'#5aa0ec');r(5+i*4,6+f*5,2,1,'#b9dcff');}r(3,9+f*5,18,1,'#cfc9bb');}
+  r(9,17,6,5,'#3a2a1a');r(10,18,4,4,'#c9a227');r(12,18,1,4,'#8a641c');r(8,16,8,1,'#a83a28');},
+ /* the market hall: a striped awning along the front and tables of greens, cloth and fruit under it */
+ market(r,K){K.sh(1,22,23);K.rf(0,2,24,6,'#8a5a3a');r(0,7,24,1,'#5a3a22');
+  for(let x=0;x<24;x+=2)r(x,8,2,4,(x>>1)%2?'#f4f4f0':'#c2412b');r(0,12,24,1,'rgba(0,0,0,.3)');
+  r(1,13,22,9,'#b8a98a');for(const x of [1,8,15,22])r(x,13,1,9,'#6d4a2a');
+  r(2,17,5,2,'#8a6238');r(3,16,1,1,'#3b8a3f');r(4,16,1,1,'#f1c232');r(5,16,1,1,'#c2412b');
+  r(10,17,5,2,'#8a6238');r(10,16,2,1,'#22306e');r(12,16,2,1,'#c2412b');r(14,16,1,1,'#f1c232');
+  r(17,17,5,2,'#8a6238');r(17,16,1,1,'#e07b2a');r(19,16,1,1,'#3b8a3f');r(20,16,1,1,'#e07b2a');
+  r(3,20,3,2,'#9a7b5a');r(11,20,3,2,'#9a7b5a');r(18,20,3,2,'#9a7b5a');r(4,20,1,1,'#3b8a3f');r(12,20,1,1,'#c2412b');r(19,20,1,1,'#f1c232');},
+ /* the night market: a string of lanterns over three stalls, the middle one a charcoal grill */
+ stalls(r,K){K.sh(1,22,23);r(0,1,24,1,'#3a2a1a');for(let x=1;x<24;x+=4){r(x,2,2,2,x%8===1?'#f1c232':'#e06a52');r(x,2,1,1,'#fff2b0');}
+  for(let i=0;i<3;i++){const x=i*8+(i?1:0);for(let c=0;c<7;c++)r(x+c,7,1,4,c%2?'#f4f4f0':(i%2?'#e07b2a':'#c2412b'));r(x,11,7,1,'rgba(0,0,0,.3)');r(x,12,1,9,'#6d4a2a');r(x+6,12,1,9,'#6d4a2a');r(x+1,16,5,2,'#8a6238');
+   if(i===1){r(x+1,15,2,1,'#1b1b1b');r(x+3,15,2,1,'#e07b2a');r(x+2,13,1,1,'#dcd6c8');r(x+3,12,1,1,'#dcd6c8');}else{r(x+1,15,1,1,'#f1c232');r(x+3,15,1,1,'#c2412b');r(x+5,15,1,1,'#3b8a3f');}}},
+ /* the bus station: a coach under the canopy */
+ bus(r,K){K.sh(1,22,23);r(0,3,24,3,'#5c6b7a');r(0,3,24,1,'#8a9ab0');r(0,5,24,1,'#3a4452');for(const x of [1,22])r(x,6,1,16,'#4a4a42');
+  r(9,6,6,3,'#f1c232');r(10,7,4,1,'#1b1b1b');
+  r(3,11,18,8,'#c2412b');r(3,11,18,3,'#f4f4f0');for(let i=0;i<5;i++)r(4+i*3,12,2,2,'#3a4a5a');r(19,12,2,3,'#3a4a5a');r(3,16,18,1,'#8f2c1c');r(3,19,18,1,'rgba(0,0,0,.3)');r(5,18,3,3,'#1b1b1b');r(15,18,3,3,'#1b1b1b');r(6,19,1,1,'#8d8d7a');r(16,19,1,1,'#8d8d7a');r(20,16,1,2,'#f1c232');},
+ /* the island in the lake */
+ isle(r,K){r(2,17,20,6,'#5a95e0');r(0,19,24,3,'#5a95e0');r(3,15,18,5,'#7cb342');r(5,14,14,1,'#7cb342');r(3,19,18,1,'#5f9a2e');r(4,15,8,1,'#9ad058');r(6,21,6,1,'#b9dcff');r(15,22,5,1,'#b9dcff');
+  K.tree(8,8,4,'#2e7d32');K.tree(15,10,3,'#3b8a3f');K.tree(19,9,2,'#2e5e32');},
+ /* a mountain lake: pines on the shore, water in front */
+ tarn(r,K){r(0,16,24,8,'#3a7bd5');r(0,16,24,1,'#2f66b8');r(2,19,5,1,'#8fc3ff');r(12,21,6,1,'#8fc3ff');r(18,18,4,1,'#8fc3ff');r(0,13,24,3,'#3b8a3f');r(0,13,24,1,'#5f9a2e');
+  const pine=(cx,y)=>{r(cx,y+9,1,3,'#4a3524');const wv=[1,3,3,5,5,7,7,9];for(let j=0;j<8;j++)r(cx-(wv[j]>>1),y+j+1,wv[j],1,j%2?'#1f4a26':'#2e5e32');r(cx-1,y+3,1,2,'#3b8a3f');r(cx-2,y+5,1,2,'#3b8a3f');};pine(5,1);pine(18,3);pine(11,4);},
+ /* on the way up from the top station: the bell tower, the bronze Buddha and a pagoda */
+ tower(r,K){K.sh(4,22,11);const RD='#a83a28';r(8,0,2,2,'#c9a227');
+  for(let i=0;i<3;i++){const y=2+i*7,w=10+i*2,x=9-(w>>1);r(x+2,y,w-4,1,tone(RD,0.25));r(x+1,y+1,w-2,1,RD);r(x,y+2,w,1,tone(RD,-0.3));r(x-1,y+1,1,1,RD);r(x+w,y+1,1,1,RD);r(x+2,y+3,w-4,4,'#e8dcc0');r(x+w-4,y+3,2,4,'#cfc3a7');r(8,y+4,2,3,'#3a2a1a');}
+  r(4,23,10,1,'#b9b2a2');},
+ buddha(r,K){const B='#b8892a',L='#e0b84a',D='#8a641c';K.sh(2,22,15);
+  r(7,1,4,1,D);r(6,2,6,4,B);r(6,2,2,2,L);r(8,6,2,1,D);
+  r(4,7,10,3,B);r(4,7,3,1,L);r(3,10,12,5,B);r(3,10,2,3,L);r(12,10,3,5,D);r(7,11,4,3,L);
+  r(1,15,16,3,B);r(1,15,5,1,L);r(13,16,4,2,D);
+  r(2,18,14,2,'#e8a0c0');r(3,18,2,1,'#f6d0e0');r(8,18,2,1,'#f6d0e0');r(13,18,2,1,'#f6d0e0');
+  r(1,20,16,3,'#a3a390');r(1,20,16,1,'#c5c5b5');r(13,21,4,2,'#7a7a69');},
+ temple(r,K){K.sh(2,16,21);const RD='#a83a28',GD='#d9b23a';r(11,0,2,1,'#c9a227');
+  for(let j=0;j<6;j++){const w=10+j*2+(j===5?2:0);r(12-(w>>1),1+j,w,1,j===0?tone(RD,0.25):j===5?tone(RD,-0.35):RD);}r(0,5,1,1,RD);r(23,5,1,1,RD);
+  K.wl(3,7,18,9,GD);for(const x of [3,8,15,20])r(x,7,1,9,RD);r(10,9,4,7,'#5a2a1a');r(11,10,2,6,'#7a3a22');r(5,10,2,3,'#5a2a1a');r(17,10,2,3,'#5a2a1a');r(2,16,20,1,'#b9b2a2');},
+ /* Hàm Rồng: a green hill with grey rock breaking through and a path of steps up it */
+ hill(r,K){const G='#4f9a3a';for(let j=0;j<=20;j++){const hw=Math.round(12*Math.sqrt(1-Math.pow((20-j)/20,2)));if(!hw)continue;r(12-hw,3+j,2*hw,1,G);r(12-hw,3+j,Math.max(1,hw>>1),1,tone(G,0.22));r(12+hw-Math.max(1,hw>>1),3+j,Math.max(1,hw>>1),1,tone(G,-0.22));}
+  r(9,5,3,2,'#b0b09c');r(11,6,2,2,'#8d8d7a');r(14,9,4,3,'#8d8d7a');r(14,9,2,1,'#c5c5b5');r(16,11,2,1,'#6b6b5b');r(5,13,3,2,'#b0b09c');r(6,14,2,1,'#77776a');
+  for(const p of [[11,21,2,3],[12,18,1,3],[9,18,4,1],[9,15,1,3],[9,14,5,1],[13,11,1,3]])r(p[0],p[1],p[2],p[3],'#d9cba8');
+  r(5,18,1,1,'#e86a8f');r(17,16,1,1,'#f0c04c');r(8,21,1,1,'#f4f4f0');r(18,20,1,1,'#e86a8f');r(3,20,1,1,'#f0c04c');},
+ /* a Hmong house: a shingle roof low over plank walls, maize drying under the eaves */
+ house(r,K){K.sh(2,22,21);K.rf(0,5,24,8,'#4a3a2c');for(let x=3;x<22;x+=3)r(x,7,1,5,'#3a2c20');r(0,12,24,1,'#2c2018');
+  K.wl(2,13,20,9,'#8a6238');for(let x=4;x<22;x+=3)r(x,14,1,8,'#6d4a2a');
+  r(10,15,4,7,'#2c2018');r(11,16,2,6,'#4a3524');r(4,16,3,3,'#2c2018');r(17,16,3,3,'#2c2018');
+  for(let x=3;x<9;x+=2)r(x,13,1,2,'#f1c232');for(let x=16;x<22;x+=2)r(x,13,1,2,'#e9a23a');
+  r(19,2,1,3,'rgba(240,240,240,.55)');r(20,0,1,3,'rgba(240,240,240,.4)');},
+ /* a Red Dao house, a red cloth at the door, and the wooden tub of a herbal bath steaming beside it */
+ dao(r,K){K.sh(2,22,21);K.rf(1,4,18,7,'#7a4030');for(let x=4;x<17;x+=3)r(x,6,1,4,'#5f3024');
+  K.wl(2,11,16,11,'#9a7450');for(let x=4;x<18;x+=3)r(x,12,1,10,'#7c5a3a');r(8,14,4,8,'#2c2018');r(9,15,2,7,'#4a3524');r(4,14,2,3,'#2c2018');
+  r(13,13,4,3,'#a83a28');r(13,13,4,1,'#f4f4f0');
+  r(19,17,5,5,'#8a6238');r(19,17,5,1,'#b59a72');r(20,18,3,1,'#3d6a5a');r(19,19,1,3,'#6d4a2a');r(23,19,1,3,'#6d4a2a');r(20,14,1,2,'rgba(240,240,240,.6)');r(22,12,1,3,'rgba(240,240,240,.5)');},
+ /* the old carved stones: boulders with lines and steps cut into them */
+ rocks(r,K){K.sh(1,20,22);const st=(x,y,w,h)=>{r(x+1,y,w-2,1,'#b0b09c');r(x,y+1,w,h-1,'#8d8d7a');r(x,y+1,w>>1,1,'#b0b09c');r(x+w-2,y+2,2,h-2,'#6b6b5b');r(x,y+h-1,w,1,'#6b6b5b');};
+  st(6,4,7,6);st(1,8,14,12);st(13,12,10,8);
+  for(let i=0;i<4;i++)r(3+i,11+i*2,6-i,1,'#d8d8c8');r(4,18,7,1,'#d8d8c8');r(15,15,5,1,'#d8d8c8');r(15,17,4,1,'#d8d8c8');r(17,14,1,4,'#d8d8c8');r(8,6,3,1,'#d8d8c8');},
+ falls(r,K){r(0,0,24,20,'#7a7a69');r(0,0,9,20,'#8d8d7a');r(2,3,4,2,'#a3a390');r(17,6,5,2,'#6b6b5b');r(1,11,5,2,'#a3a390');r(18,13,4,3,'#6b6b5b');
+  r(0,0,5,3,'#3b8a3f');r(19,0,5,4,'#2e7d32');r(21,4,3,2,'#3b8a3f');r(0,3,2,2,'#58a65c');
+  r(9,0,7,20,'#8fc3ff');r(10,0,4,20,'#dcecff');r(11,0,1,20,'#ffffff');r(14,2,1,5,'#5aa0ec');r(9,8,1,6,'#5aa0ec');r(13,10,1,7,'#b9dcff');
+  r(0,20,24,4,'#3a7bd5');r(5,19,15,2,'#dcecff');r(7,18,3,1,'#ffffff');r(15,18,3,1,'#ffffff');r(3,22,5,1,'#8fc3ff');r(16,22,6,1,'#8fc3ff');},
+ /* the park gate at Trạm Tôn: stone posts, a roofed beam, the green signboard and a barrier */
+ gate(r,K){K.sh(1,22,23);r(2,6,3,16,'#8d8d7a');r(2,6,1,16,'#b0b09c');r(19,6,3,16,'#8d8d7a');r(21,6,1,16,'#6b6b5b');
+  r(0,3,24,2,'#7a5230');r(0,3,24,1,'#9a6a40');r(1,5,22,1,'#4a3524');
+  r(5,7,14,5,'#2e5e32');r(5,7,14,1,'#3b8a3f');r(7,9,10,1,'#f4f4f0');r(8,10,7,1,'#f1c232');
+  r(5,17,14,1,'#c2412b');for(let x=7;x<19;x+=4)r(x,17,2,1,'#f4f4f0');r(5,16,1,3,'#4a4a42');},
+ /* the pass: ridges falling away on both sides, the road winding up to the sign at the top */
+ pass(r,K){for(let j=0;j<8;j++){r(0,6+j,5+j,1,j?'#5f7f55':'#7f9f70');const w=6+Math.floor(j*1.5);r(24-w,5+j,w,1,j?'#4d6b4a':'#6d8b66');}
+  r(0,13,24,11,'#7fae48');r(0,13,24,1,'#9ad058');
+  for(const p of [[10,13,4],[8,15,6],[9,17,8],[13,19,7],[14,21,10]]){r(p[0],p[1],p[2],2,'#6f6f78');r(p[0]+1,p[1]+1,p[2]-2,1,'#55555c');}r(12,16,2,1,'#f4f4f0');r(15,20,2,1,'#f4f4f0');r(18,22,2,1,'#f4f4f0');
+  r(4,9,1,11,'#6d4a2a');r(1,5,8,5,'#2a6fd6');r(1,5,8,1,'#5aa0ec');r(2,7,6,1,'#f4f4f0');r(3,8,4,1,'#f4f4f0');r(3,20,4,1,'rgba(12,16,48,.3)');},
+ /* the glass bridge: a deck of glass reaching out from the cliff over the drop, the lift tower behind */
+ glass(r,K){r(20,0,3,9,'#8a9ab0');r(20,0,1,9,'#b9c9dc');
+  r(0,6,9,18,'#7a7a69');r(0,7,4,17,'#8d8d7a');r(5,10,3,4,'#6b6b5b');r(1,14,3,2,'#a3a390');r(0,5,7,2,'#2e7d32');r(0,5,4,1,'#58a65c');
+  r(10,21,14,3,'rgba(255,255,255,.35)');for(let j=0;j<7;j++)r(8+j*2,19-j,2,1,'#4a5566');
+  r(7,9,17,2,'#b9dcff');r(7,9,17,1,'#e6f3ff');r(7,11,17,1,'#5aa0ec');r(7,6,17,1,'#f4f4f0');for(let x=8;x<24;x+=3)r(x,7,1,2,'#dcd6c8');
+  r(13,7,1,2,'#c2412b');r(13,6,1,1,'#f0c8a0');r(17,7,1,2,'#f1c232');r(17,6,1,1,'#f0c8a0');},
+ /* a Tày house on posts, thatched with palm, a ladder up to the door */
+ stilt(r,K){K.sh(2,22,21);K.rf(0,3,24,7,'#6a5a3a');for(let x=2;x<23;x+=2)r(x,5,1,4,'#54472c');
+  K.wl(2,10,20,6,'#a07848');for(let x=4;x<22;x+=3)r(x,11,1,5,'#80603a');r(6,11,3,3,'#2c2018');r(15,11,3,3,'#2c2018');r(2,15,20,1,'#5a4028');
+  r(4,17,16,5,'rgba(0,0,0,.25)');for(const x of [3,9,15,20])r(x,16,1,6,'#5a4028');
+  r(10,16,1,6,'#b59a72');r(13,16,1,6,'#b59a72');for(let y=17;y<22;y+=2)r(10,y,4,1,'#b59a72');},
+ /* Cát Cát: a Hmong house by the stream and the water wheel beside it */
+ mill(r,K){K.sh(1,22,14);K.rf(0,5,15,7,'#4a3a2c');for(let x=3;x<13;x+=3)r(x,7,1,4,'#3a2c20');K.wl(1,12,13,10,'#8a6238');for(let x=3;x<14;x+=3)r(x,13,1,9,'#6d4a2a');r(5,15,3,7,'#2c2018');r(10,15,2,3,'#2c2018');
+  r(14,20,10,4,'#3a7bd5');r(15,20,4,1,'#dcecff');r(20,22,3,1,'#8fc3ff');
+  const cx=19,cy=14;for(let a=0;a<32;a++){const an=a/32*6.283;r(Math.round(cx+Math.cos(an)*5),Math.round(cy+Math.sin(an)*5),1,1,a%4?'#6d4a2a':'#b59a72');}
+  r(cx-4,cy,9,1,'#8a6238');r(cx,cy-4,1,9,'#8a6238');for(let k=1;k<4;k++){r(cx-k,cy-k,1,1,'#8a6238');r(cx+k,cy+k,1,1,'#8a6238');r(cx+k,cy-k,1,1,'#8a6238');r(cx-k,cy+k,1,1,'#8a6238');}r(cx-1,cy-1,3,3,'#3a2a1a');r(cx,cy+5,1,6,'#5a4028');},
+};
+/* two places have a picture of their own up close */
+const SP_HI={catcat:'mill',banho:'stilt'};
+function sprHi(name){let c=sprHiC.get(name);if(c)return c;
+ if(HSPR[name]){const s0=SPR[name]||SPR.house;c=mkCanvas(s0[0].length*3,s0.length*3);const g=c.getContext('2d');HSPR[name]((x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h);},hiKit((x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h);}));sprHiC.set(name,c);return c;}
+ const s=SPR[name],h=s.length,w=s[0].length,P=(x,y)=>(x<0||y<0||x>=w||y>=h)?'.':s[y][x];c=mkCanvas(w*3,h*3);const g=c.getContext('2d');
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const A=P(x-1,y-1),B=P(x,y-1),C=P(x+1,y-1),D=P(x-1,y),E=P(x,y),F=P(x+1,y),G=P(x-1,y+1),Hh=P(x,y+1),I=P(x+1,y+1);let o=[E,E,E,E,E,E,E,E,E];
   if(B!==Hh&&D!==F)o=[D===B?D:E,(D===B&&E!==C)||(B===F&&E!==A)?B:E,B===F?F:E,(D===B&&E!==G)||(D===Hh&&E!==A)?D:E,E,(B===F&&E!==I)||(Hh===F&&E!==C)?F:E,D===Hh?D:E,(D===Hh&&E!==I)||(Hh===F&&E!==G)?Hh:E,Hh===F?F:E];
   for(let q=0;q<9;q++){if(o[q]==='.')continue;g.fillStyle=PAL[o[q]];g.fillRect(x*3+q%3,y*3+(q/3|0),1,1);}}
  sprHiC.set(name,c);return c;}
 function drawSpr(c,name,px,py){if(hiTier&&c===ctx){const im=sprHi(name);c.drawImage(im,px,py,im.width*S/3,im.height*S/3);}else drawSprite(c,name,px,py,S);}
-function drawLandmark(c,l){drawSpr(c,l.sp,l.x*T,l.y*T);}
+function drawLandmark(c,l){drawSpr(c,(hiTier&&c===ctx&&SP_HI[l.id])||l.sp,l.x*T,l.y*T);}
 /* people, animals and vehicles: a handful of art pixels each. x,y is where their feet touch the ground. */
 function drawPerson(c,x,y,body,head,step,hat){if(hiTier&&c===ctx){putFig(fig((hat?'f':'p')+(step?'B':'A'),{b:body,h:head}),x,y);return;}c.fillStyle=head;c.fillRect(x-1,y-6,2,2);c.fillStyle=body;c.fillRect(x-1,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(step?x-1:x,y-2,1,2);c.fillRect(step?x:x-1,y-2,1,1);}
 function drawChild(c,x,y,body){if(hiTier&&c===ctx){putFig(fig('child',{b:body,h:'#1b1b1b'}),x,y);return;}c.fillStyle='#f0c8a0';c.fillRect(x-1,y-4,2,2);c.fillStyle=body;c.fillRect(x-1,y-2,2,2);}
@@ -788,7 +946,7 @@ function drawBus(c,x,y,flip){if(hiTier&&c===ctx){putFig(fig('bus'),x,y,flip);ret
 function drawUmbrella(c,x,y,col){if(hiTier&&c===ctx){putFig(fig('umbrella',{a:col}),x,y,false,3.6);return;}c.fillStyle=col;c.fillRect(x-3,y-8,6,1);c.fillRect(x-2,y-9,4,1);c.fillStyle='#1b1b1b';c.fillRect(x,y-7,1,1);}
 function drawTrain(c,x,y){if(hiTier&&c===ctx){const im=fig('car');putFig(im,x-2.4,y);putFig(im,x+2.4,y);return;}c.fillStyle='#c2412b';c.fillRect(x-6,y-5,12,4);c.fillStyle='#f4f4f0';c.fillRect(x-4,y-4,2,2);c.fillRect(x-1,y-4,2,2);c.fillRect(x+2,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(x-5,y-1,2,1);c.fillRect(x+3,y-1,2,1);}
 function drawGondola(c,x,y){if(hiTier&&c===ctx){const im=fig('gondola');c.drawImage(im,x+0.5-im.width/HD/2,y,im.width/HD,im.height/HD);return;}c.fillStyle='#1b1b1b';c.fillRect(x,y,1,2);c.fillStyle='#c2412b';c.fillRect(x-1,y+2,3,3);c.fillStyle='#f4f4f0';c.fillRect(x,y+3,1,1);}
-function drawStall(c,x,y,i){if(hiTier&&c===ctx){putFig(fig('stall',{a:i%2?'#e07b2a':'#c2412b'}),x,y);return;}c.fillStyle=i%2?'#e07b2a':'#c2412b';c.fillRect(x-3,y-5,6,2);c.fillStyle='#f4f4f0';c.fillRect(x-2,y-5,1,2);c.fillRect(x+1,y-5,1,2);c.fillStyle='#6d4a2a';c.fillRect(x-3,y-3,1,3);c.fillRect(x+2,y-3,1,3);c.fillStyle='#f1c232';c.fillRect(x-1,y-2,2,1);}
+function drawStall(c,x,y,i){if(hiTier&&c===ctx){putFig(fig('stall'+(i%4),{a:i%2?'#e07b2a':'#c2412b'}),x,y);return;}c.fillStyle=i%2?'#e07b2a':'#c2412b';c.fillRect(x-3,y-5,6,2);c.fillStyle='#f4f4f0';c.fillRect(x-2,y-5,1,2);c.fillRect(x+1,y-5,1,2);c.fillStyle='#6d4a2a';c.fillRect(x-3,y-3,1,3);c.fillRect(x+2,y-3,1,3);c.fillStyle='#f1c232';c.fillRect(x-1,y-2,2,1);}
 
 const MONTH_FIELD={1:['#a88a5a','#8a6d40','#bfa070'],2:['#a88a5a','#8a6d40','#bfa070'],3:['#b09660','#8f7345','#c8ab78'],4:['#9fa060','#7f7f45','#b8b878'],5:['#7f9fb0','#5f8090','#9fbfcf'],6:['#8fd060','#5f9a3a','#b0e080'],7:['#7cb342','#558b2f','#9ccc65'],8:['#6faa3a','#4d8028','#8fc050'],9:['#d9b23a','#a7832a','#e9cd6a'],10:['#c9a65a','#9a7a38','#e0c070'],11:['#a88a5a','#8a6d40','#bfa070'],12:['#a08258','#7f6240','#b89a6a']};
 const POI_COL={cafe:'#8a5a2b',food:'#c2412b',bar:'#7a3fa0',pharmacy:'#2e7d32',hospital:'#e04040',atm:'#2a6fd6',fuel:'#e07b2a',school:'#f1c232',police:'#2a3f8a',post:'#f1c232',shop:'#2a9d8f'};
@@ -805,10 +963,20 @@ const TSTEP=10; // metres between terrace levels
 const pop16=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;};
 /* the land beside a water tile, for the art pixels its water does not cover; null on an island */
 function bankCol(x,y){for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]){const k=at(x+dx,y+dy).k;if(k==='water'||k==='bridge')continue;return k==='town'||k==='market'||k==='busyard'||k==='plaza'?'#b8a98a':k==='village'?(dry()?'#8fa558':'#7fb84e'):k==='park'?'#7cb342':flatColor(x+dx,y+dy);}return null;}
+/* the plain colour of a tile of natural ground, in the 8-pixel art or the close-up art; null for everything else.
+   Where two sides of a tile meet the same other ground, that corner is rounded off in the other ground's colour, so
+   forest edges, clearings and rock do not break into squares. */
+const CATCAT=byId('catcat');
+function groundCol(x,y,hi){if(x<0||y<0||x>=W||y>=H)return null;const t=at(x,y);let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';
+ switch(k){case 'grass':case 'orchard':case 'hut':return dry()?'#9aa65a':'#8bc34a';case 'scrub':return dry()?'#8e9a52':'#7aa844';case 'forest':return hi?(t.e>2000?'#174d22':'#256b2a'):(t.e>2000?'#1f5e2a':'#2e7d32');case 'rock':return '#8d8d7a';case 'snow':return '#e8eef5';case 'bare':return '#c2ad84';case 'garden':case 'village':return dry()?'#8fa558':'#7fb84e';case 'park':return '#7cb342';}
+ return null;}
 function drawTile(oc,x,y,t){
  const px=x*T,py=y*T,v=t.v,C=fieldPal(x,y),i=y*W+x;
  const sub=(c,r,col)=>{oc.fillStyle=col;oc.fillRect(px+c*S,py+r*S,S,S);};
- const fill=col=>{oc.fillStyle=col;oc.fillRect(px,py,T,T);};
+ let cornered=false;
+ const fill=col=>{oc.fillStyle=col;oc.fillRect(px,py,T,T);if(cornered)return;cornered=true;const me=groundCol(x,y,0);if(!me)return;
+  const N=groundCol(x,y-1,0),S2=groundCol(x,y+1,0),Wd=groundCol(x-1,y,0),E=groundCol(x+1,y,0);
+  if(N&&N===Wd&&N!==me)sub(0,0,N);if(N&&N===E&&N!==me)sub(3,0,N);if(S2&&S2===Wd&&S2!==me)sub(0,3,S2);if(S2&&S2===E&&S2!==me)sub(3,3,S2);};
  let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';
  const grassCol=dry()?'#9aa65a':'#8bc34a',gardenCol=dry()?'#8fa558':'#7fb84e';
  switch(k){
@@ -889,12 +1057,22 @@ const HWIN={1:[[1,6,2,2],[7,6,2,2]],2:[[1,4,2,2],[4,4,2,2],[7,4,2,2],[1,7,2,2],[
 const hiWins=(st,w)=>w<10?(st===3?[[1,5,w-2,1]]:[[w-3,6,2,2]]):HWIN[st];
 function drawTileHi(oc,x,y,t){
  const ox=x*HT,oy=y*HT,i=y*W+x,v=t.v,C=fieldPal(x,y),n=HT;
- const R=(a,b,w,h,c)=>{oc.fillStyle=c;oc.fillRect(ox+a,oy+b,w,h);};
+ let cornered=false;
+ const R=(a,b,w,h,c)=>{oc.fillStyle=c;oc.fillRect(ox+a,oy+b,w,h);if(w===n&&h===n&&!cornered){cornered=true;corners();}};
+ const corners=()=>{const me=groundCol(x,y,1);if(!me)return;const N=groundCol(x,y-1,1),S2=groundCol(x,y+1,1),Wd=groundCol(x-1,y,1),E=groundCol(x+1,y,1),ws=[6,4,3,2,1,1];
+  const cut=(col,right,bottom)=>{oc.fillStyle=col;for(let j=0;j<6;j++)oc.fillRect(ox+(right?n-ws[j]:0),oy+(bottom?n-1-j:j),ws[j],1);};
+  if(N&&N===Wd&&N!==me)cut(N,0,0);if(N&&N===E&&N!==me)cut(N,1,0);if(S2&&S2===Wd&&S2!==me)cut(S2,0,1);if(S2&&S2===E&&S2!==me)cut(S2,1,1);};
  const hq=q=>hash(x*13+q*7+1,y*11+q*5+2); /* more random numbers for this tile */
+ /* everything that stands up throws a small cool shadow down and to the right: the light of this map comes from the
+    upper left, and shade is blue, not black */
+ const SH='rgba(12,16,48,.24)';
  let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';
  const grassCol=dry()?'#9aa65a':'#8bc34a',gardenCol=dry()?'#8fa558':'#7fb84e';
  /* a round tree crown, lit from the upper left and shaded below, kept inside the tile */
- const crown=(cx,cy,r,col,lt,dk)=>{cx=Math.max(r,Math.min(n-1-r,cx));cy=Math.max(r,Math.min(n-1-r,cy));for(let j=-r;j<=r;j++){const hw=Math.round(Math.sqrt(r*r-j*j+r*0.6));R(cx-hw,cy+j,hw*2+1,1,j>r*0.35?dk:col);}R(cx-r+1,cy-r+1,Math.max(1,r-1),Math.max(1,r-2),lt);};
+ const crown=(cx,cy,r,col,lt,dk,drop)=>{cx=Math.max(r,Math.min(n-1-r,cx));cy=Math.max(r,Math.min(n-1-r,cy));{const sy=cy+r+(drop||0);if(sy<n)R(cx-r+2,sy,2*r,1,SH);if(sy+1<n)R(cx-r+3,sy+1,2*r-2,1,SH);}for(let j=-r;j<=r;j++){const hw=Math.round(Math.sqrt(r*r-j*j+r*0.6));R(cx-hw,cy+j,hw*2+1,1,j>r*0.35?dk:col);}R(cx-r+1,cy-r+1,Math.max(1,r-1),Math.max(1,r-2),lt);};
+ /* a fir: tiers of branches, light on the left */
+ const fir=(cx,cy,col,lt,dk)=>{cx=Math.max(4,Math.min(n-5,cx));cy=Math.max(4,Math.min(n-7,cy));R(cx-2,cy+5,6,1,SH);R(cx,cy+4,1,2,'#4a3524');const wv=[1,3,3,5,5,7,7];for(let j=0;j<7;j++){const w=wv[j];R(cx-(w>>1),cy-3+j,w,1,j%2?dk:col);}R(cx-1,cy-2,1,2,lt);R(cx-2,cy,1,2,lt);R(cx-3,cy+2,1,2,lt);};
+ const TV=[-0.07,0,0.08];
  const tufts=(num,col,lt)=>{for(let q=0;q<num;q++){const a=2+Math.floor(hq(q)*20),b=2+Math.floor(hq(q+20)*19);R(a,b,1,2,col);if(lt)R(a+1,b,1,1,lt);}};
  switch(k){
   case 'water':case 'bridge':{const m=swell(wMask[i]||0xFFFF),wet=b=>(m>>b)&1,bank=bankCol(x,y),rapid=(flags[i]&4)||(wetSeason()&&m!==0xFFFF&&pop16(m)<12);
@@ -922,19 +1100,24 @@ function drawTileHi(oc,x,y,t){
     for(let r=0;r<HT;r++){let run=0,rc=null;for(let c=0;c<=HT;c++){let col=null;if(c<HT){const j=(r+1)*g+c+1,l=L[j];
        if(L[j+g]<l||L[j+1]<l||L[j-g]<l||L[j-1]<l)col=C[1];
        else{col=(l&1)?C[0]:C[2];const a=x*HT+c,b=y*HT+r;
-        if(flooded){if((a+b*3)%11===0)col='#d8ecf5';else if(a%4===1&&b%4===2)col='#6f9a55';}
-        else if(young){if(a%3===1&&b%3===1)col='#4d8028';}
-        else if(ripe){if(b%3===0&&a%2===0)col='#b8902a';else if(a%5===2&&b%3===1)col='#f3de86';}
-        else if(stub){if(a%3===0&&b%3===0)col=C[1];}
-        else if((a*7+b*13)%29===0)col=C[1];}}
+        /* the crop is a quiet weave of short strokes a shade off the ground, not a grid of dark dots: a busy
+           texture over a whole valley tires the eye and hides the people in it */
+        if(flooded){if((a+b*5)%19===0)col='#d8ecf5';else if(a%4===1&&b%4===2)col='#6f9a55';}
+        else if(young){if(b%3===1&&(a+(b/3|0)*2)%5<2)col=tone(col,-0.1);else if(b%3===2&&(a+(b/3|0)*3)%7===0)col=tone(col,0.14);}
+        else if(ripe){if(b%3===0&&(a+(b/3|0)*2)%5<2)col=tone(col,-0.1);else if(a%7===3&&b%3===1)col='#f3de86';}
+        else if(stub){if(a%4===0&&b%3===0)col=tone(col,-0.14);}
+        else if((a*7+b*13)%29===0)col=tone(col,-0.12);}}
       if(col!==rc){if(rc)R(c-run,r,run,1,rc);rc=col;run=1;}else run++;}}
     break;}
-  case 'grass':R(0,0,n,n,grassCol);tufts(7,'#689f38','#a5d660');if(v>0.6){const fc=month===3||month===4?'#e86a8f':'#f0c04c';R(3+Math.floor(hq(1)*17),4+Math.floor(hq(2)*16),1,1,fc);R(5+Math.floor(hq(3)*15),3+Math.floor(hq(4)*17),1,1,fc);if(v>0.85)R(8+Math.floor(hq(6)*10),8+Math.floor(hq(7)*10),1,1,'#f4f4f0');}break;
+  case 'grass':R(0,0,n,n,grassCol);for(let q=0;q<2;q++)R(1+Math.floor(hq(q+50)*16),2+Math.floor(hq(q+53)*18),6,2,tone(grassCol,q?-0.05:0.06));tufts(5,'#689f38','#a5d660');if(v>0.6){const fc=month===3||month===4?'#e86a8f':'#f0c04c';R(3+Math.floor(hq(1)*17),4+Math.floor(hq(2)*16),1,1,fc);R(5+Math.floor(hq(3)*15),3+Math.floor(hq(4)*17),1,1,fc);if(v>0.85)R(8+Math.floor(hq(6)*10),8+Math.floor(hq(7)*10),1,1,'#f4f4f0');}break;
   case 'scrub':R(0,0,n,n,dry()?'#8e9a52':'#7aa844');for(let q=0;q<4;q++){const a=2+Math.floor(hq(q)*16),b=2+Math.floor(hq(q+8)*16);R(a,b+1,5,3,'#3f6325');R(a,b,5,3,'#4e7a2e');R(a+1,b,2,1,'#6a9a3e');}tufts(3,'#5f8a36');break;
   case 'orchard':{R(0,0,n,n,grassCol);tufts(3,'#689f38');const col=blossom()?'#f2a0b8':month>=3&&month<=4?'#e8a0c0':'#3b8a3f',lt=blossom()?'#f8e0e8':month>=3&&month<=4?'#f6d0e0':'#58a65c',dk=blossom()?'#d77f9c':month>=3&&month<=4?'#c97fa0':'#2a6b30';
-    for(let q=0;q<4;q++){const cx=6+(q&1)*12+Math.round(hq(q)*2-1),cy=5+(q>>1)*12+Math.round(hq(q+4)*2-1);R(cx,cy+3,1,3,'#5d4037');R(cx-2,cy+6,5,1,'rgba(0,0,0,.14)');crown(cx,cy,2,col,lt,dk);if(!blossom()&&month>=6&&month<=8&&hq(q+9)>0.4)R(cx+1,cy+1,1,1,'#c2412b');}break;}
+    for(let q=0;q<4;q++){const cx=6+(q&1)*12+Math.round(hq(q)*2-1),cy=5+(q>>1)*12+Math.round(hq(q+4)*2-1);R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,2,col,lt,dk,4);if(!blossom()&&month>=6&&month<=8&&hq(q+9)>0.4)R(cx+1,cy+1,1,1,'#c2412b');}break;}
   case 'forest':{const dark=t.e>2000,col=dark?'#1f5e2a':'#2e7d32',lt=dark?'#2e7d32':'#43a047',dk=dark?'#123f1b':'#1f5c24';R(0,0,n,n,dark?'#174d22':'#256b2a');
-    const pts=[[6,6],[18,5],[5,18],[17,17],[12,12]];for(let q=0;q<5;q++){const h1=hq(q),h2=hq(q+9);if(q===4&&h1<0.35)continue;crown(pts[q][0]+Math.round(h1*4-2),pts[q][1]+Math.round(h2*4-2),h1>0.5?4:3,col,lt,dk);}
+    for(let q=0;q<3;q++)R(1+Math.floor(hq(q+40)*18),2+Math.floor(hq(q+44)*19),4,2,dark?'#1c5727':'#2b7430'); /* the forest floor between the trees */
+    /* five trees a tile, each a little off its place and a shade off its neighbours; firs take over above 2,000 m */
+    const pts=[[6,6],[18,5],[5,18],[17,17],[12,12]];for(let q=0;q<5;q++){const h1=hq(q),h2=hq(q+9);if(q===4&&h1<0.35)continue;const tx=pts[q][0]+Math.round(h1*4-2),ty=pts[q][1]+Math.round(h2*4-2),tv=TV[Math.floor(hq(q+30)*3)];
+     if(hq(q+20)<(dark?0.72:t.e>1700?0.22:0))fir(tx,ty,tone(col,tv),lt,dk);else crown(tx,ty,h1>0.5?4:3,tone(col,tv),tone(lt,tv),dk);}
     if(dark&&(month===3||month===4)&&v>0.6){R(4+Math.floor(v*14),6+Math.floor(hq(3)*12),2,2,'#e86a8f');R(8+Math.floor(hq(5)*10),4+Math.floor(v*14),1,1,'#f2a0b8');}break;}
   case 'rock':R(0,0,n,n,'#8d8d7a');for(let q=0;q<3;q++){const a=1+Math.floor(hq(q)*15),b=1+Math.floor(hq(q+3)*16);R(a,b,6,3,'#a3a390');R(a+1,b+3,6,1,'#7a7a69');}
     for(let q=0;q<3;q++){const a=2+Math.floor(hq(q+6)*17),b=2+Math.floor(hq(q+9)*14);R(a,b,1,3,'#6b6b5b');R(a+1,b+3,1,2,'#6b6b5b');R(a+2,b+5,1,2,'#6b6b5b');}
@@ -945,21 +1128,26 @@ function drawTileHi(oc,x,y,t){
   /* garden: two vegetable beds in rows, a fruit tree, pink with blossom in February */
   case 'garden':{R(0,0,n,n,gardenCol);const soil=dry()?'#8a7450':'#7a6444',leaf=dry()?'#7a8f4a':'#4f8a2e';
     for(let q=0;q<2;q++){const a=1+q*12+Math.floor(hq(q)*2),b=(v<0.5?2:13)+Math.floor(hq(q+2)*2);R(a,b,9,8,soil);for(let r=0;r<8;r+=2)for(let c=0;c<9;c+=2)R(a+c,b+r,1,1,(c+r)%4?leaf:tone(leaf,0.25));}
-    {const cx=v>0.45?6+Math.floor(hq(5)*12):-9,cy=v<0.5?17:6;if(cx>0){R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,3,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30');}}
+    {const cx=v>0.45?6+Math.floor(hq(5)*12):-9,cy=v<0.5?17:6;if(cx>0){R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,3,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',3);}}
     if(v<0.18){R(18,v<0.09?4:16,4,3,'#d9b23a');R(19,v<0.09?3:15,2,1,'#e9cd6a');} /* a haystack */
     break;}
   case 'road':R(0,0,n,n,'#e3d8bd');break;
   case 'track':R(0,0,n,n,'#b8a070');break;
   case 'plaza':R(0,0,n,n,'#ddd0b0');for(let r=0;r<4;r++){R(0,r*6,n,1,'#cdbf9f');for(let c=0;c<4;c++)R(c*6+(r%2?3:0),r*6,1,6,'#cdbf9f');}
-    if(v<0.1){R(11,15,2,4,'#5d4037');crown(12,10,4,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30');}else if(v>0.93){R(6,10,10,2,'#8a6238');R(6,12,1,2,'#5d4037');R(15,12,1,2,'#5d4037');}break;
-  case 'park':R(0,0,n,n,'#7cb342');tufts(4,'#5f9a2e','#9ad058');for(let q=0;q<2;q++){const cx=6+q*11+Math.round(hq(q)*3),cy=7+Math.round(hq(q+2)*9),bl=blossom()&&hq(q+4)>0.4;R(cx,cy+3,1,3,'#5d4037');R(cx-2,cy+6,5,1,'rgba(0,0,0,.14)');crown(cx,cy,3,bl?'#f2a0b8':'#3b8a3f',bl?'#f8e0e8':'#58a65c',bl?'#d77f9c':'#2a6b30');}
+    if(v<0.1){R(11,15,2,4,'#5d4037');crown(12,10,4,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',5);}else if(v>0.93){R(6,10,10,2,'#8a6238');R(6,12,1,2,'#5d4037');R(15,12,1,2,'#5d4037');}break;
+  case 'park':R(0,0,n,n,'#7cb342');tufts(4,'#5f9a2e','#9ad058');for(let q=0;q<2;q++){const cx=6+q*11+Math.round(hq(q)*3),cy=7+Math.round(hq(q+2)*9),bl=blossom()&&hq(q+4)>0.4;R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,3,bl?'#f2a0b8':'#3b8a3f',bl?'#f8e0e8':'#58a65c',bl?'#d77f9c':'#2a6b30',3);}
     if(v>0.6){const a=3+Math.floor(hq(6)*14),b=17+Math.floor(hq(7)*3);R(a,b,6,3,'#5f9a2e');for(let c=0;c<6;c+=2)R(a+c,b+1,1,1,v>0.8?'#f1c232':'#e07b2a');}break;
   case 'busyard':R(0,0,n,n,'#55555c');for(let c=0;c<4;c++)R(c*6,0,1,n,'#66666e');
     if(v<0.3){R(3,8,17,9,'#c2412b');R(3,8,17,4,'#f4f4f0');for(let c=0;c<5;c++)R(5+c*3,9,2,2,'#3a4a5a');R(3,17,17,1,'rgba(0,0,0,.25)');R(5,16,3,2,'#1b1b1b');R(15,16,3,2,'#1b1b1b');R(19,13,1,2,'#f1c232');}
     else if((x+y)%2)R(8,12,8,1,'#f4f4f0');break;
   /* the market: two rows of stalls under striped awnings, with a table of goods in front of each */
   case 'market':R(0,0,n,n,'#b8a98a');for(let r=0;r<2;r++){const b=1+r*12,cA=(x+y+r)%2?'#e07b2a':'#c2412b';for(let c=0;c<22;c+=2)R(1+c,b,2,5,(c>>1)%2?'#f4f4f0':cA);R(1,b+5,22,1,'rgba(0,0,0,.28)');R(1,b+6,1,4,'#6d4a2a');R(22,b+6,1,4,'#6d4a2a');R(3,b+8,18,2,'#8a6238');
-     for(let c=0;c<8;c++)R(4+c*2,b+7,1,1,['#f1c232','#c2412b','#3b8a3f','#e07b2a','#f4f4f0'][Math.floor(hq(c+r*8)*5)]);}break;
+     /* what each stall sells: greens, fruit, folded brocade, baskets */
+     for(let c=0;c<4;c++){const g=4+c*4+(c>1?1:0),ty=Math.floor(hq(c+r*8)*4);
+      if(ty===0){R(g,b+7,3,1,'#3b8a3f');R(g+1,b+6,1,1,'#8fd060');R(g+2,b+7,1,1,'#2e5e32');}
+      else if(ty===1){R(g,b+7,1,1,'#c2412b');R(g+1,b+7,1,1,'#f1c232');R(g+2,b+7,1,1,'#e07b2a');R(g+1,b+6,1,1,'#c2412b');}
+      else if(ty===2){R(g,b+6,3,2,'#22306e');R(g,b+6,3,1,'#c2412b');R(g+1,b+6,1,1,'#f1c232');}
+      else{R(g,b+7,3,1,'#9a7b5a');R(g,b+6,3,1,'#c9a227');R(g+1,b+6,1,1,'#e9cd6a');}}}break;
   /* town and village: a real little house in each quarter that has one, a yard or a tree in the others */
   case 'town':case 'village':{const vil=k==='village';R(0,0,n,n,vil?gardenCol:'#b8a98a');
     if(vil){for(let q=0;q<3;q++)R(2+Math.floor(hq(q+20)*19),2+Math.floor(hq(q+23)*19),2,1,dry()?'#9a8a5a':'#8a7a4a');}else for(let q=0;q<5;q++)R(1+Math.floor(hq(q+20)*21),1+Math.floor(hq(q+25)*21),2,1,'#a8997a');
@@ -967,10 +1155,17 @@ function drawTileHi(oc,x,y,t){
     for(let qi=0;qi<4;qi++){const st=q4[qi],qx=(qi&1)*2,qy=(qi>>1)*2,hv=hash(x*3+qi,y*7+qi);
      if(!st){const free=!(stMask[i]&((3<<(qy*4+qx))|(3<<((qy+1)*4+qx)))),h=hash(x*5+qi,y*3+1),a=qx*6,b=qy*6;
       if(free&&h<(vil?0.6:0.35)){if(vil&&h>0.3){R(a+2,b+3,8,6,dry()?'#8a7450':'#7a6444');for(let r=0;r<6;r+=2)for(let c=0;c<8;c+=2)R(a+2+c,b+3+r,1,1,dry()?'#7a8f4a':'#4f8a2e');}
-       else{R(a+6,b+7,1,3,'#5d4037');crown(a+6,b+5,3,blossom()&&h<0.2?'#f2a0b8':'#3b8a3f','#58a65c','#2a6b30');}}
-      else if(free&&vil&&h>0.88){R(a+4,b+5,4,3,'#d9b23a');R(a+5,b+4,2,1,'#e9cd6a');}
+       else{R(a+6,b+7,1,3,'#5d4037');crown(a+6,b+5,3,blossom()&&h<0.2?'#f2a0b8':'#3b8a3f','#58a65c','#2a6b30',2);}}
+      else if(free&&vil&&h>0.9){R(a+4,b+8,5,1,SH);R(a+4,b+5,4,3,'#d9b23a');R(a+5,b+4,2,1,'#e9cd6a');R(a+4,b+7,4,1,'#b8902a');}
+      /* yards: lengths of indigo cloth hung out to dry on a bamboo rail, round Cát Cát above all, where the Hmong
+         dye it; elsewhere a washing line */
+      else if(free&&(vil?(h<0.64||h>0.82||Math.hypot(x-CATCAT.x,y-CATCAT.y)<16):h>0.9)){const cat=Math.hypot(x-CATCAT.x,y-CATCAT.y)<16;
+       if(vil&&(cat?h<0.8:h<0.64)){R(a+2,b+10,9,1,SH);R(a+1,b+3,1,8,'#8a6238');R(a+10,b+3,1,8,'#8a6238');R(a+1,b+3,10,1,'#b59a72');
+        for(let c=0;c<3;c++){const cx=a+2+c*3,len=5+Math.floor(hash(x*7+qi+c,y*5+c)*2);R(cx,b+4,2,len,'#22306e');R(cx,b+4,1,len,'#2c3f8c');R(cx,b+4+len-1,2,1,'#161f4a');}}
+       else{/* a washing line: two thin posts, a cord, three things pegged to it */R(a+1,b+10,2,1,SH);R(a+10,b+10,2,1,SH);R(a+1,b+4,1,6,'#8a6238');R(a+10,b+4,1,6,'#8a6238');R(a+2,b+4,8,1,'#6b6b5b');
+        const cl=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'];for(let c=0;c<3;c++){const cx=a+2+c*3,col=cl[Math.floor(hash(x*3+qi*5+c,y*7+c)*cl.length)],len=2+(c===1?1:0);R(cx,b+5,2,len,col);R(cx,b+4+len,2,1,tone(col,-0.22));}}}
       continue;}
-     const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],wins=hiWins(st,w);R(X+1,Y+10,w-1,1,'rgba(0,0,0,.2)');
+     const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],wins=hiWins(st,w);R(X+1,Y+10,w,1,SH);if(X+w<n)R(X+w,Y+2,1,8,SH);
      if(st===2){R(X,Y,w,3,'#4a5566');R(X,Y,w,1,'#6a7890');R(X,Y+3,w,7,'#dcd6c8');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#5aa0ec');R(X+(w>>1)-1,Y+8,2,2,'#4a4a42');}
      else if(st===3){R(X,Y,w,4,'#7d7d85');R(X,Y,w,1,'#9a9aa2');R(X+1,Y+2,2,1,'#55555c');R(X,Y+4,w,6,'#c9c4b6');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}
      else if(st>=4){const set=ROOFS[st],roof=set[Math.floor(hv*set.length)];R(X,Y,w,6,roof);
@@ -996,17 +1191,36 @@ function drawTileHi(oc,x,y,t){
 }
 
 /* =====================================================================
-   5. TERRAIN CACHE: 64x64-tile chunks drawn a few per frame and kept in
-   a small cache (every canvas stays small enough for Safari). The cache
-   is dropped when the month changes.
+   5. TERRAIN CACHE: 16x16-tile chunks, painted a few per frame within a
+   budget of 6 ms and kept in a cache (every canvas stays small enough
+   for Safari). The cache is dropped when the month changes.
    ===================================================================== */
-const MAXC=48; // chunks kept; the least recently drawn is dropped beyond this
-const CH_T=64,CHW=Math.ceil(W/CH_T),CHH=Math.ceil(H/CH_T);const chunks=new Map();
+const MAXC=300; // chunks kept at least (more when the view needs more); the least recently drawn is dropped beyond this
+const mkCanvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
+const CH_T=16,CHW=Math.ceil(W/CH_T),CHH=Math.ceil(H/CH_T);const chunks=new Map();
 /* drawTile draws at gx*T, so the chunk context is translated to make that land at the local tile */
-function buildChunk(cx,cy){const c=document.createElement('canvas');c.width=CH_T*T;c.height=CH_T*T;const oc=c.getContext('2d');oc.translate(-cx*CH_T*T,-cy*CH_T*T);for(let y=0;y<CH_T;y++)for(let x=0;x<CH_T;x++){const gx=cx*CH_T+x,gy=cy*CH_T+y;if(gx>=W||gy>=H)continue;drawTile(oc,gx,gy,at(gx,gy));}return c;}
-/* the close-up cache: smaller chunks of 16 x 16 tiles at 24 px a tile */
-const CH_HI=16,MAXC_HI=40,chunksHi=new Map();
-function buildChunkHi(cx,cy){const c=document.createElement('canvas');c.width=CH_HI*HT;c.height=CH_HI*HT;const oc=c.getContext('2d');oc.translate(-cx*CH_HI*HT,-cy*CH_HI*HT);for(let y=0;y<CH_HI;y++)for(let x=0;x<CH_HI;x++){const gx=cx*CH_HI+x,gy=cy*CH_HI+y;if(gx>=W||gy>=H)continue;drawTileHi(oc,gx,gy,at(gx,gy));}return c;}
+/* ---- THE FAST PAINTER ----
+   Tile art is nothing but filled rectangles on whole pixels, so a chunk is painted into a plain pixel buffer and copied
+   to its canvas in one go. That is many times quicker than one canvas call per rectangle, which used to hold a frame up
+   for a tenth of a second whenever new land came into view. The painter answers to fillStyle and fillRect like a
+   canvas, so drawTile and drawTileHi do not know the difference. */
+const colC=new Map();
+function colOf(s){let v=colC.get(s);if(v!==undefined)return v;let r,g,b,a=255;
+ if(s[0]==='#'){r=parseInt(s.slice(1,3),16);g=parseInt(s.slice(3,5),16);b=parseInt(s.slice(5,7),16);}
+ else{const m=s.match(/[\d.]+/g);r=+m[0];g=+m[1];b=+m[2];if(m.length>3)a=Math.round(parseFloat(m[3])*255);}
+ v=((a<<24)|(b<<16)|(g<<8)|r)>>>0;colC.set(s,v);return v;}
+const paintBufs=new Map();
+function painter(w,h,ox,oy){let buf=paintBufs.get(w*65536+h);if(buf)buf.fill(0);else{buf=new Uint32Array(w*h);paintBufs.set(w*65536+h,buf);}
+ let col=0xFF000000,al=255;
+ return{set fillStyle(s){col=colOf(s);al=col>>>24;},
+  fillRect(x,y,rw,rh){x=(x-ox)|0;y=(y-oy)|0;let x1=x+(rw|0),y1=y+(rh|0);if(x<0)x=0;if(y<0)y=0;if(x1>w)x1=w;if(y1>h)y1=h;if(x>=x1||y>=y1)return;
+   if(al===255){if(x1-x>12)for(let j=y;j<y1;j++)buf.fill(col,j*w+x,j*w+x1);else for(let j=y;j<y1;j++)for(let o=j*w+x,e=j*w+x1;o<e;o++)buf[o]=col;}
+   else{const a=al/255,ia=1-a,r=(col&255)*a,g=((col>>8)&255)*a,b=((col>>16)&255)*a;for(let j=y;j<y1;j++)for(let o=j*w+x,e=j*w+x1;o<e;o++){const p=buf[o];buf[o]=(0xFF000000|(((p>>16&255)*ia+b)<<16)|(((p>>8&255)*ia+g)<<8)|((p&255)*ia+r))>>>0;}}},
+  canvas(){const c=mkCanvas(w,h),g=c.getContext('2d'),img=g.createImageData(w,h);img.data.set(new Uint8ClampedArray(buf.buffer,0,w*h*4));g.putImageData(img,0,0);return c;}};}
+function buildChunk(cx,cy){const n=CH_T*T,p=painter(n,n,cx*n,cy*n);for(let y=0;y<CH_T;y++)for(let x=0;x<CH_T;x++){const gx=cx*CH_T+x,gy=cy*CH_T+y;if(gx>=W||gy>=H)continue;drawTile(p,gx,gy,at(gx,gy));}return p.canvas();}
+/* the close-up cache: chunks of 8 x 8 tiles at 24 px a tile */
+const CH_HI=8,MAXC_HI=160,chunksHi=new Map();
+function buildChunkHi(cx,cy){const n=CH_HI*HT,p=painter(n,n,cx*n,cy*n);for(let y=0;y<CH_HI;y++)for(let x=0;x<CH_HI;x++){const gx=cx*CH_HI+x,gy=cy*CH_HI+y;if(gx>=W||gy>=H)continue;drawTileHi(p,gx,gy,at(gx,gy));}return p.canvas();}
 function invalidateTerrain(){chunks.clear();chunksHi.clear();miniDirty=true;}
 let miniDirty=true;const miniCache=document.createElement('canvas');miniCache.width=W;miniCache.height=H;
 /* one flat colour per tile: used for the overview map, the zoomed-out view and the section strip */
@@ -1014,9 +1228,14 @@ const FLAT={bare:'#c2ad84',water:'#3a7bd5',bridge:'#8a6238',grass:'#8bc34a',scru
 function flatColor(x,y){const t=at(x,y);let k=t.k;if((flags[y*W+x]&2)&&k!=='water'&&k!=='bridge'&&k!=='plaza')return FLAT.road;if(k==='town'){const q=quad[y*W+x],n=(q&7?1:0)+(q&56?1:0)+(q&448?1:0)+(q&3584?1:0);return n>=3?'#a8644e':n===2?'#b9806a':'#c4b08e';}if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';if(k==='terrace'){const F=fieldPal(x,y);return Math.floor(t.e/25)%2?F[0]:F[2];}if(k==='forest'&&t.e>2000)return '#1f5e2a';if(dry()){if(k==='grass')return '#9aa65a';if(k==='garden')return '#8fa558';}return FLAT[k]||'#000';}
 const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];rgbCache.set(c,v);}return v;};
 /* written straight into pixel data in one pass over the grid; the light layer below goes on top of it */
-function miniImage(){if(miniDirty){const mcx=miniCache.getContext('2d'),img=mcx.createImageData(W,H),d=img.data;
- for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y));d[i*4]=c[0];d[i*4+1]=c[1];d[i*4+2]=c[2];d[i*4+3]=255;}
- mcx.putImageData(img,0,0);miniDirty=false;}return miniCache;}
+/* The first time it is done in one go. After a change of month it is redone a few rows a frame (5 ms at most), and the
+   old picture stays up until the new one is whole, so the page never stops for it. */
+let miniJob=null,miniReady=false;
+function miniImage(){if(miniDirty){miniDirty=false;miniJob={y:0,img:miniCache.getContext('2d').createImageData(W,H)};}
+ if(miniJob){const d=miniJob.img.data,t0=performance.now();
+  for(;miniJob.y<H;miniJob.y++){if(miniReady&&(miniJob.y&3)===0&&performance.now()-t0>5)break;const y=miniJob.y;for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y));d[i*4]=c[0];d[i*4+1]=c[1];d[i*4+2]=c[2];d[i*4+3]=255;}}
+  if(miniJob.y>=H){miniCache.getContext('2d').putImageData(miniJob.img,0,0);miniJob=null;miniReady=true;}else lastInput=performance.now();}
+ return miniCache;}
 /* ---- THE SUN ----
    The light on the land follows the sun through the day. sunAt gives its height and compass bearing for the hour and the
    month at this latitude. lightLayers turns that into two small images, one pixel per tile (and one per half tile in
@@ -1032,7 +1251,6 @@ function sunAt(h,m){const dec=23.44*Math.PI/180*Math.sin(2*Math.PI*(284+MID_DAY[
  const alt=Math.asin(Math.sin(LAT_R)*Math.sin(dec)+Math.cos(LAT_R)*Math.cos(dec)*Math.cos(w));
  /* bearing clockwise from north: 90 east, 180 south, 270 west */
  return{alt,az:Math.atan2(Math.sin(w),Math.cos(w)*Math.sin(LAT_R)-Math.tan(dec)*Math.cos(LAT_R))+Math.PI};}
-const mkCanvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
 const lightMain=mkCanvas(W,H),lightDet=mkCanvas(DN,DN),shadowTop=new Float32Array(W*H),shadowDepth=new Float32Array(W*H);
 let lightKey='';
 /* how far the terrain towards the sun stands above each tile, in metres (0 where the sun reaches the ground) */
@@ -1047,27 +1265,46 @@ function castShadows(sx,sy,tanAlt){const lx=-sx,ly=-sy,hs=shadowTop,out=shadowDe
     hs[i]=h>e?h:e;out[i]=h>e?h-e:0;}}}
  return out;}
 const dAt=(i,j)=>detail[Math.min(DN-1,Math.max(0,j))*DN+Math.min(DN-1,Math.max(0,i))];
-function lightLayers(){const s=sunAt(hour,month),deg=s.alt*180/Math.PI,sk=skyNow(),key=(deg>-3?Math.round(hour*5):'night')+'|'+month+'|'+sk;
- if(key===lightKey)return LIGHT;lightKey=key;
- const up=Math.max(0,Math.min(1,deg/8)),sx=Math.sin(s.az),sy=-Math.cos(s.az); /* sx,sy: the way to the sun on the map, x east and y south */
- const wS=0.75*up*Math.cos(s.alt),wN=1-wS; /* how much of the relief the sun models, and how much the north-west glow */
- const cast=Math.max(0,Math.min(1,(deg-2)/8))*(sk===1?1:sk===2?0.3:0),depth=cast>0?castShadows(sx,sy,Math.tan(Math.max(0.035,s.alt))):null;
- const weak=new Uint8Array(KINDS.length);weak[KI.water]=weak[KI.bridge]=weak[KI.plaza]=weak[KI.busyard]=1;
+const LIGHT_WEAK=new Uint8Array(KINDS.length);LIGHT_WEAK[KI.water]=LIGHT_WEAK[KI.bridge]=LIGHT_WEAK[KI.plaza]=LIGHT_WEAK[KI.busyard]=1;
+/* the two pictures for one position of the sun, as plain pixel data. It reads only the grids and the few numbers named
+   in lightWorker below, so the same text runs in a background worker. The colours follow the painter's rule that light
+   is warm and shade is cool: lit slopes lean to yellow, shaded slopes and cast shadows to blue. */
+function lightCore(P){const sx=P.sx,sy=P.sy,wS=P.wS,wN=P.wN,cast=P.cast,depth=cast>0?castShadows(sx,sy,P.tanAlt):null;
+ const d=new Uint8ClampedArray(W*H*4),dd=new Uint8ClampedArray(DN*DN*4);
  const put=(d,j,sh,str,a)=>{/* a: shadow strength 0-1 */
-  sh*=str;if(a>0.02){d[j]=10;d[j+1]=16;d[j+2]=40;d[j+3]=Math.round(255*(a+(sh<0?0.28*-sh*(1-a):0)));}
-  else if(sh>0.02){d[j]=d[j+1]=d[j+2]=255;d[j+3]=Math.round(255*0.2*sh);}
-  else if(sh<-0.02){d[j]=d[j+1]=d[j+2]=0;d[j+3]=Math.round(255*0.28*-sh);}
+  sh*=str;if(a>0.02){d[j]=10;d[j+1]=16;d[j+2]=44;d[j+3]=Math.round(255*(a+(sh<0?0.28*-sh*(1-a):0)));}
+  else if(sh>0.02){d[j]=255;d[j+1]=240;d[j+2]=204;d[j+3]=Math.round(255*0.24*sh);}
+  else if(sh<-0.02){d[j]=12;d[j+1]=16;d[j+2]=48;d[j+3]=Math.round(255*0.3*-sh);}
   else d[j+3]=0;};
- const mcx=lightMain.getContext('2d'),img=mcx.createImageData(W,H),d=img.data;
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,gx=(eAt(x+1,y)-eAt(x-1,y))/2,gy=(eAt(x,y+1)-eAt(x,y-1))/2;
   const sh=inDetail(x,y)?0:Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/(55/K)));
-  put(d,i*4,sh,weak[kind[i]]?0.35:1,depth?cast*0.3*Math.min(1,depth[i]/12):0);}
- mcx.putImageData(img,0,0);
+  put(d,i*4,sh,LIGHT_WEAK[kind[i]]?0.35:1,depth?cast*0.3*Math.min(1,depth[i]/12):0);}
  /* the town box: the same relief from the finer elevation there; its shadows are already in the main layer */
- const dcx=lightDet.getContext('2d'),dim=dcx.createImageData(DN,DN),dd=dim.data;
  for(let j=0;j<DN;j++)for(let i=0;i<DN;i++){const gx=(dAt(i+1,j)-dAt(i-1,j))/2,gy=(dAt(i,j+1)-dAt(i,j-1))/2,k=kind[(DBY+Math.floor(j/DF))*W+DBX+Math.floor(i/DF)];
-  put(dd,(j*DN+i)*4,Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/14)),weak[k]?0.35:1,0);}
- dcx.putImageData(dim,0,0);
+  put(dd,(j*DN+i)*4,Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/14)),LIGHT_WEAK[k]?0.35:1,0);}
+ return{key:P.key,main:d,det:dd};}
+function lightParams(){const s=sunAt(hour,month),deg=s.alt*180/Math.PI,sk=skyNow(),up=Math.max(0,Math.min(1,deg/8)),wS=0.75*up*Math.cos(s.alt);
+ /* sx,sy: the way to the sun on the map, x east and y south; wS, wN: how much of the relief the sun models, and how much the north-west glow */
+ return{key:(deg>-3?Math.round(hour*5):'night')+'|'+month+'|'+sk,sx:Math.sin(s.az),sy:-Math.cos(s.az),wS,wN:1-wS,cast:Math.max(0,Math.min(1,(deg-2)/8))*(sk===1?1:sk===2?0.3:0),tanAlt:Math.tan(Math.max(0.035,s.alt))};}
+function lightShow(r){LIGHT.main=lightMain;LIGHT.det=lightDet;const mcx=lightMain.getContext('2d'),img=mcx.createImageData(W,H);img.data.set(r.main);mcx.putImageData(img,0,0);
+ const dcx=lightDet.getContext('2d'),dim=dcx.createImageData(DN,DN);dim.data.set(r.det);dcx.putImageData(dim,0,0);}
+/* Working the light out takes 40 to 100 ms, which used to stop the page for that long every second and a half while
+   the clock ran. It is now done in a worker; the map keeps the light it has until the new one arrives, a frame or two
+   later. Without a worker (old browsers, the test, shot.ps1) it is worked out here as before. */
+let lightW=null,lightWTried=false,lightBusy=false;
+function lightWorker(){if(lightWTried)return lightW;lightWTried=true;
+ if(HASH.worker==='0'||typeof Worker==='undefined'||typeof Blob==='undefined'||typeof URL==='undefined'||!URL.createObjectURL)return null;
+ try{const src='let W,H,DN,DF,DBX,DBY,DBS,MPT,K,elev,detail,kind,LIGHT_WEAK,shadowTop,shadowDepth;const eAt='+eAt.toString()+';const dAt='+dAt.toString()+';const inDetail='+inDetail.toString()+';'+castShadows.toString()+';'+lightCore.toString()+';onmessage=e=>{const d=e.data;if(d.init){({W,H,DN,DF,DBX,DBY,DBS,MPT,K,elev,detail,kind,LIGHT_WEAK}=d.init);shadowTop=new Float32Array(W*H);shadowDepth=new Float32Array(W*H);return;}const r=lightCore(d);if(self.createImageBitmap&&typeof ImageData!==\'undefined\'){Promise.all([createImageBitmap(new ImageData(r.main,W,H)),createImageBitmap(new ImageData(r.det,DN,DN))]).then(b=>postMessage({key:r.key,bm:b[0],bd:b[1]},[b[0],b[1]]),()=>postMessage(r,[r.main.buffer,r.det.buffer]));}else postMessage(r,[r.main.buffer,r.det.buffer]);};';
+  const w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+  /* the worker hands back finished pictures where the browser can make them there, so showing them costs nothing here */
+  w.onmessage=e=>{const r=e.data;lightBusy=false;lightKey=r.key;if(r.bm){for(const k of ['main','det'])if(LIGHT[k]!==lightMain&&LIGHT[k]!==lightDet&&LIGHT[k].close)LIGHT[k].close();LIGHT.main=r.bm;LIGHT.det=r.bd;}else lightShow(r);};
+  w.onerror=()=>{lightW=null;lightBusy=false;};
+  w.postMessage({init:{W,H,DN,DF,DBX,DBY,DBS,MPT,K,elev,detail,kind,LIGHT_WEAK}});lightW=w;}catch(e){lightW=null;}
+ return lightW;}
+function lightLayers(){const P=lightParams();if(P.key===lightKey)return LIGHT;
+ const w=lightKey?lightWorker():null; /* the very first light is worked out here, so the map never opens without it */
+ if(!w){lightKey=P.key;lightShow(lightCore(P));return LIGHT;}
+ if(!lightBusy){lightBusy=true;w.postMessage(P);}
  return LIGHT;}
 const LIGHT={main:lightMain,det:lightDet};
 /* drawn over the terrain in map pixels, by the main view and by the overview (scale 1 there) */
@@ -1079,14 +1316,18 @@ let frostC=null;function frostMask(){if(frostC)return frostC;frostC=mkCanvas(W,H
  fc.putImageData(img,0,0);return frostC;}
 /* the sea of clouds seen from above the morning fog: everything below the fog top is a white floor in four soft tones,
    thin at its shore and solid over the deep valleys. A few levels are kept, like the fog masks. */
-const seaMasks=new Map();
+const seaMasks=new Map();let seaNz=null; /* the cloud texture is the same at every level, so it is worked out once */
 function seaMask(level){const key=Math.round(level/40);let c=seaMasks.get(key);if(c)return c;c=mkCanvas(W,H);const sx=c.getContext('2d'),img=sx.createImageData(W,H),d=img.data;
- for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,dep=key*40-elev[i];if(dep<=0)continue;const n=nz(x/9+3,y/9+7)*0.6+nz(x/3+11,y/3+5)*0.4,v=228+Math.round(n*3)*9;
+ if(!seaNz){seaNz=new Float32Array(W*H);for(let y=0;y<H;y++)for(let x=0;x<W;x++)seaNz[y*W+x]=nz(x/9+3,y/9+7)*0.6+nz(x/3+11,y/3+5)*0.4;}
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,dep=key*40-elev[i];if(dep<=0)continue;const n=seaNz[i],v=228+Math.round(n*3)*9;
   d[i*4]=v;d[i*4+1]=v;d[i*4+2]=Math.min(255,v+5);d[i*4+3]=Math.round(255*Math.min(0.92,0.45+Math.round(Math.min(1,dep/240)*4)/4*0.4+(n>0.55?0.07:0)));}
  sx.putImageData(img,0,0);if(seaMasks.size>=4)seaMasks.delete(seaMasks.keys().next().value);seaMasks.set(key,c);return c;}
 /* valley fog masks: one pixel per tile, alpha from how far below the fog level the ground is */
 const fogMasks=new Map();
-function fogMask(level){const key=Math.round(level/40);let c=fogMasks.get(key);if(c)return c;c=document.createElement('canvas');c.width=W;c.height=H;const fc=c.getContext('2d');const img=fc.createImageData(W,H);for(let i=0;i<W*H;i++){const a=Math.round(Math.max(0,Math.min(1,(key*40-elev[i])/220))*4)/4*0.45;img.data[i*4]=235;img.data[i*4+1]=240;img.data[i*4+2]=245;img.data[i*4+3]=Math.round(a*255);}fc.putImageData(img,0,0);fogMasks.set(key,c);return c;}
+const FOG_LUT=[0,1,2,3,4].map(q=>((Math.round(q/4*0.45*255)<<24)|(245<<16)|(240<<8)|235)>>>0);
+function fogMask(level){const key=Math.round(level/40);let c=fogMasks.get(key);if(c)return c;c=mkCanvas(W,H);const fc=c.getContext('2d'),img=fc.createImageData(W,H),u=new Uint32Array(img.data.buffer),lv=key*40;
+ for(let i=0;i<W*H;i++){const dep=lv-elev[i];if(dep>0)u[i]=FOG_LUT[dep>=220?4:Math.round(dep/55)];} /* whole pixels at a time: a new level every few seconds of a foggy morning must not hold a frame up */
+ fc.putImageData(img,0,0);fogMasks.set(key,c);return c;}
 /* settlement lights for the zoomed-out night view: a lit pixel on most built tiles, and a soft blocky glow from a quarter-size density map */
 let lightsCache=null;
 function lightsImages(){if(lightsCache)return lightsCache;const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
@@ -1181,14 +1422,18 @@ function world(sx,sy){const s=fitScale*cam.z;return[(sx-cv.width/2)/s+cam.x,(sy-
    8. PATHFINDING (A*, 4-neighbour, cost read from the precomputed grid)
    ===================================================================== */
 const walkCost=(x,y)=>(x<0||y<0||x>=W||y>=H)?1e9:costGrid[y*W+x];
+const fpG=new Float32Array(W*H),fpFrom=new Int32Array(W*H),fpSeen=new Uint32Array(W*H),fpDone=new Uint32Array(W*H);let fpGen=0,hpK=new Float32Array(1<<14),hpI=new Int32Array(1<<14);
 function findPath(sx,sy,tx,ty){
- if(!passable(tx,ty))return null;const N=W*H,g=new Float32Array(N).fill(1e9),from=new Int32Array(N).fill(-1),closed=new Uint8Array(N);
- const heap=[];const push=(f,i)=>{heap.push([f,i]);let k=heap.length-1;while(k>0){const p=(k-1)>>1;if(heap[p][0]<=heap[k][0])break;[heap[p],heap[k]]=[heap[k],heap[p]];k=p;}};
- const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let k=0;for(;;){let l=2*k+1,r=l+1,m=k;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===k)break;[heap[m],heap[k]]=[heap[k],heap[m]];k=m;}}return top;};
- const s=sy*W+sx,t=ty*W+tx;g[s]=0;push(Math.abs(tx-sx)+Math.abs(ty-sy),s);let it=0;
- while(heap.length&&it++<2500000){const [,i]=pop();if(closed[i])continue;closed[i]=1;if(i===t)break;const x=i%W,y=(i/W)|0;
-  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const j=ny*W+nx,c=costGrid[j];if(c>=1e9)continue;const ng=g[i]+c;if(ng<g[j]){g[j]=ng;from[j]=i;push(ng+Math.abs(tx-nx)+Math.abs(ty-ny),j);}}}
- if(from[t]<0&&t!==s)return null;const path=[];let c=t;while(c!==s&&c>=0){path.push([c%W,(c/W)|0]);c=from[c];}return path.reverse();
+ /* the working arrays are kept between searches and marked with the number of the search, so nothing is allocated or
+    cleared per click; the queue is a binary heap in two flat arrays */
+ if(!passable(tx,ty))return null;const g=fpG,from=fpFrom,seen=fpSeen,done=fpDone,gen=++fpGen;let n=0,K_=hpK,I_=hpI;
+ const push=(f,i)=>{if(n===K_.length){const k2=new Float32Array(n*2),i2=new Int32Array(n*2);k2.set(K_);i2.set(I_);K_=hpK=k2;I_=hpI=i2;}let k=n++;while(k>0){const p=(k-1)>>1;if(K_[p]<=f)break;K_[k]=K_[p];I_[k]=I_[p];k=p;}K_[k]=f;I_[k]=i;};
+ const pop=()=>{const top=I_[0];n--;if(n>0){const f=K_[n],id=I_[n];let k=0;for(;;){let l=2*k+1;if(l>=n)break;if(l+1<n&&K_[l+1]<K_[l])l++;if(K_[l]>=f)break;K_[k]=K_[l];I_[k]=I_[l];k=l;}K_[k]=f;I_[k]=id;}return top;};
+ const s=sy*W+sx,t=ty*W+tx;g[s]=0;seen[s]=gen;from[s]=-1;push(Math.abs(tx-sx)+Math.abs(ty-sy),s);let it=0;
+ const relax=(i,j,nx,ny)=>{const c=costGrid[j];if(c>=1e9)return;const ng=g[i]+c;if(seen[j]!==gen||ng<g[j]){g[j]=ng;seen[j]=gen;from[j]=i;push(ng+Math.abs(tx-nx)+Math.abs(ty-ny),j);}};
+ while(n&&it++<2500000){const i=pop();if(done[i]===gen)continue;done[i]=gen;if(i===t)break;const x=i%W,y=(i/W)|0;
+  if(x+1<W)relax(i,i+1,x+1,y);if(x>0)relax(i,i-1,x-1,y);if(y+1<H)relax(i,i+W,x,y+1);if(y>0)relax(i,i-W,x,y-1);}
+ if(seen[t]!==gen)return null;const path=[];let c=t;while(c!==s&&c>=0){path.push([c%W,(c/W)|0]);c=from[c];}return path.reverse();
 }
 /* walking time from the real path: 4.5 km/h on roads, slower by terrain cost and, off-road, by slope */
 function estimate(path){let min=0;for(const [x,y] of path){const i=y*W+x,paved=stMask[i]||isPaved(KINDS[kind[i]]),steep=paved?1:1+slopeAt(x,y)/35;min+=(MPT/1000)/(4.5/(costGrid[i]*steep))*60;}return{min,tiles:path.length};}
@@ -1322,6 +1567,17 @@ function groupAt(g,k,h){if(!VAL_LINE||h<g.dep||h>g.dep+7.2)return null;const p=p
    dates, so it is every Friday and Saturday in September, from five in the morning to five in the afternoon. */
 const RUNNERS=[];{const t=TREKS.find(t=>t.id==='vmm');if(t)for(const ln of t.lines)for(const q of dryRuns(ln)){const L=polyLen(q);if(L<8)continue;for(let i=0,n=Math.min(7,Math.max(2,Math.round(L/30)));i<n;i++)RUNNERS.push({path:q,len:L,ph:rnd(),spd:4+rnd()*3,body:pick(['#f1c232','#e07b2a','#2a9d8f','#c2412b','#5aa0ec','#f4f4f0'])});}}
 const raceOn=()=>month===9&&(day===5||day===6)&&hour>=5&&hour<17;
+/* children at play in the village yards, three to a game: a ball kicked round, a chase in a ring, a skipping rope.
+   They are out all day at the weekend and, on school days, at midday and after the walk home. Each game keeps to the
+   middle of one village tile with no lane through it, so it is always on dry ground. */
+const PLAYS=[];{let tries=0;while(PLAYS.length<40&&tries++<20000){const x=2+Math.floor(rnd()*(W-4)),y=2+Math.floor(rnd()*(H-4)),i=y*W+x;if(kind[i]!==KI.village||stMask[i]||!dryAt(x+0.5,y+0.5))continue;if(PLAYS.some(p=>Math.abs(p.x-x)<5&&Math.abs(p.y-y)<5))continue;PLAYS.push({x:x+0.5,y:y+0.5,game:PLAYS.length%3,ph:rnd()*6.283,cols:[pick(CLOTH),pick(CLOTH),pick(CLOTH)]});}}
+const playOn=()=>hour>=7&&hour<17.8&&skyNow()!==3&&(day===0||day===6||(hour>=11.2&&hour<13)||hour>=17.1);
+/* where the three children of a game are at this moment, and the ball or the rope with them: [x,y] in tiles */
+function playAt(p,tm){const a=tm/1000,o=[];
+ if(p.game===0){for(let k=0;k<3;k++){const an=p.ph+k*2.094;o.push([p.x+Math.cos(an)*0.3,p.y+Math.sin(an)*0.22]);}const leg=Math.floor(a/0.9+p.ph)%3,f=(a/0.9+p.ph)%1,A=o[leg],B=o[(leg+1)%3];o.ball=[A[0]+(B[0]-A[0])*f,A[1]+(B[1]-A[1])*f-Math.sin(f*3.1416)*0.08];}
+ else if(p.game===1){for(let k=0;k<3;k++){const an=p.ph+a*1.6+k*2.094;o.push([p.x+Math.cos(an)*0.32,p.y+Math.sin(an)*0.2]);}}
+ else{o.push([p.x-0.3,p.y],[p.x+0.3,p.y],[p.x,p.y+0.04]);o.jump=Math.abs(Math.sin(a*5+p.ph))*0.1;o.rope=Math.sin(a*5+p.ph);}
+ return o;}
 const runnerAt=r=>polyAt(r.path,(r.ph+performance.now()/1000*r.spd/r.len)%1);
 /* sleeper buses: three come up road 4D from the Lào Cai side before dawn, wait at the bus station, and leave in the
    afternoon. Their road is found once, from Trung Chải, where the road to Lào Cai leaves the map. */
@@ -1335,6 +1591,7 @@ function clockFigures(){const o=[];if(day===0&&hour>=4.5&&hour<14.5){if(!goersRe
  for(const g of TREK_GROUPS)for(let k=0;k<5;k++){const p=groupAt(g,k,hour);if(p)o.push([p[0],p[1],'trekker']);}
  if(raceOn())for(const r of RUNNERS){const p=runnerAt(r);o.push([p[0],p[1],'runner']);}
  for(let b=0;b<BUSES.length;b++){const p=busAt(b,hour);if(p)o.push([p.x,p.y,'bus']);}
+ if(playOn())for(const p of PLAYS)for(const q of playAt(p,0))o.push([q[0],q[1],'player']);
  return o;}
 /* footprints: the walker leaves them in snow and in hoarfrost, and they fade in a minute and a half */
 const prints=[];
@@ -1438,27 +1695,27 @@ function render(){
  const ppt=pxPerTile(),lowZoom=ppt<6;hiTier=ppt>=HI_PPT;
  if(lowZoom)ctx.drawImage(miniImage(),0,0,W*T,H*T);
  else if(hiTier){/* close-up: the fine chunks, a few built per frame; until one is ready the coarser art stands in for it */
-  const t0=performance.now(),G=CH_HI*T;let waiting=0;
-  for(let cy=Math.max(0,Math.floor(vy0/G));cy<=Math.min(Math.ceil(H/CH_HI)-1,Math.floor(vy1/G));cy++)for(let cx=Math.max(0,Math.floor(vx0/G));cx<=Math.min(Math.ceil(W/CH_HI)-1,Math.floor(vx1/G));cx++){const key=cx+','+cy;let c=chunksHi.get(key);
+  const t0=performance.now(),G=CH_HI*T,hy0=Math.max(0,Math.floor(vy0/G)),hy1=Math.min(Math.ceil(H/CH_HI)-1,Math.floor(vy1/G)),hx0=Math.max(0,Math.floor(vx0/G)),hx1=Math.min(Math.ceil(W/CH_HI)-1,Math.floor(vx1/G)),cap=Math.max(MAXC_HI,(hx1-hx0+1)*(hy1-hy0+1)*2);let waiting=0;
+  for(let cy=hy0;cy<=hy1;cy++)for(let cx=hx0;cx<=hx1;cx++){const key=cx+','+cy;let c=chunksHi.get(key);
    if(c){chunksHi.delete(key);chunksHi.set(key,c);}
-   else if(performance.now()-t0<12){c=buildChunkHi(cx,cy);chunksHi.set(key,c);if(chunksHi.size>MAXC_HI)chunksHi.delete(chunksHi.keys().next().value);}
+   else if(performance.now()-t0<6){c=buildChunkHi(cx,cy);chunksHi.set(key,c);if(chunksHi.size>cap)chunksHi.delete(chunksHi.keys().next().value);}
    if(c)ctx.drawImage(c,cx*G,cy*G,G,G);
    else{waiting++;const mk=Math.floor(cx*CH_HI/CH_T)+','+Math.floor(cy*CH_HI/CH_T),mc2=chunks.get(mk);if(mc2)ctx.drawImage(mc2,(cx*CH_HI%CH_T)*T,(cy*CH_HI%CH_T)*T,G,G,cx*G,cy*G,G,G);else ctx.drawImage(miniImage(),cx*CH_HI,cy*CH_HI,CH_HI,CH_HI,cx*G,cy*G,G,G);}}
   if(waiting)lastInput=performance.now();}
  else{/* terrain chunks are drawn a few per frame; until one is ready its area shows the flat overview, and the loop stays awake */
-  const t0=performance.now();let waiting=0;
+  const t0=performance.now(),cap=Math.max(MAXC,(c1x-c0x+1)*(c1y-c0y+1)*2);let waiting=0;
   for(let cy=c0y;cy<=c1y;cy++)for(let cx=c0x;cx<=c1x;cx++){const key=cx+','+cy;let c=chunks.get(key);
    if(c){chunks.delete(key);chunks.set(key,c);}
-   else if(performance.now()-t0<14){c=buildChunk(cx,cy);chunks.set(key,c);if(chunks.size>MAXC)chunks.delete(chunks.keys().next().value);}
+   else if(performance.now()-t0<6){c=buildChunk(cx,cy);chunks.set(key,c);if(chunks.size>cap)chunks.delete(chunks.keys().next().value);}
    else{waiting++;ctx.drawImage(miniImage(),cx*CH_T,cy*CH_T,CH_T,CH_T,cx*CH_T*T,cy*CH_T*T,CH_T*T,CH_T*T);continue;}
    ctx.drawImage(c,cx*CH_T*T,cy*CH_T*T);}
   if(waiting)lastInput=performance.now();}
  /* the light of the hour on the slopes, and the shadows of the mountains */
  drawLight(ctx,T);
- ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c)))ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}
+ ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c))){if(hiTier)ctx.fillRect(x*T+c*S,y*T+r*S+1,S,1/HD);/* close-up: a glint is a thin stroke, not a block */else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}}
   /* rapids flicker white */
-  if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
- if(showRoutes){ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.lineDashOffset=-frame;for(const r of TREKS){ctx.strokeStyle=r.col;for(const ln of r.lines){ctx.beginPath();ln.forEach((p,i)=>i?ctx.lineTo(p[0]*T,p[1]*T):ctx.moveTo(p[0]*T,p[1]*T));ctx.stroke();}}ctx.setLineDash([]);}
+  if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';if(hiTier){ctx.fillRect(x*T+c*S,y*T+r*S+1/HD,S*2/3,1/HD);ctx.fillRect(x*T+c*S+2/HD,y*T+r*S+1,S*2/3,1/HD);}else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
+ if(showRoutes){ctx.lineWidth=hiTier?1:2;ctx.setLineDash(hiTier?[2,3]:[4,4]);ctx.lineDashOffset=-frame;for(const r of TREKS){ctx.strokeStyle=r.col;for(const ln of r.lines){ctx.beginPath();ln.forEach((p,i)=>i?ctx.lineTo(p[0]*T,p[1]*T):ctx.moveTo(p[0]*T,p[1]*T));ctx.stroke();}}ctx.setLineDash([]);}
  /* cable car: the real line from OSM, pylons and two gondolas */
  const ca=CABLE_LINE[0],cb=CABLE_LINE[CABLE_LINE.length-1],ax=ca[0]*T,ay=ca[1]*T-6,bx=cb[0]*T,by=cb[1]*T-4;
  ctx.strokeStyle='#1b1b1b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
@@ -1510,6 +1767,12 @@ function render(){
   /* by the clock: Sunday market-goers on the roads, pupils on weekdays, the morning trekking groups, marathon runners, buses */
   if(day===0&&hour>=4.5&&hour<14.5){if(!goersReady)setupGoers();for(const g of GOERS){const p=goerAt(g,hour);if(!p)continue;const px=Math.round(p[0]*T),py=Math.round(p[1]*T);if(!seen(px,py,20))continue;if(g.load&&hiTier)putFig(fig('basket'),px-1.4,py,false,2.4);drawPerson(ctx,px,py,g.body,g.head,step2);if(g.load&&!hiTier){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}}}
   for(const p of PUPILS){const q=pupilAt(p,hour);if(!q)continue;const px=Math.round(q[0]*T),py=Math.round(q[1]*T);if(seen(px,py,20))drawChild(ctx,px,py,p.body);}
+  /* children at play: a ball, a chase, a skipping rope */
+  if(playOn()&&dk<0.2){const tm=performance.now(),u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
+   for(const p of PLAYS){if(!seen(p.x*T,p.y*T,20))continue;const o=playAt(p,tm);
+    if(p.game===2){ctx.fillStyle='#f4f4f0';const x0=o[0][0]*T,x1=o[1][0]*T,yb=p.y*T-(hiTier?2.3:3);for(let k=0;k<=8;k++){const f=k/8;ctx.fillRect(sn(x0+(x1-x0)*f),sn(yb-Math.sin(f*3.1416)*o.rope*2.2),u,u);}}
+    for(let k=0;k<3;k++)drawChild(ctx,sn(o[k][0]*T),sn(o[k][1]*T-(k===2&&o.jump?o.jump*T:0)),p.cols[k]);
+    if(o.ball){const bx=sn(o.ball[0]*T),by=sn(o.ball[1]*T-1);ctx.fillStyle='#f4f4f0';ctx.fillRect(bx,by,2*u,2*u);ctx.fillStyle='#c2412b';ctx.fillRect(bx,by,u,u);}}}
   for(const g of TREK_GROUPS)for(let m=0;m<5;m++){const p=groupAt(g,m,hour);if(!p)continue;const px=Math.round(p[0]*T),py=Math.round(p[1]*T);if(!seen(px,py,20))continue;if(m&&hiTier)putFig(fig('basket'),px-1.4,py,false,2.4);drawPerson(ctx,px,py,m?g.cols[m][0]:'#c2412b',m?g.cols[m][1]:'#f1c232',(step2+m)%2);if(m&&!hiTier){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}}
   if(raceOn())for(const r of RUNNERS){const p=runnerAt(r),px=Math.round(p[0]*T),py=Math.round(p[1]*T);if(seen(px,py,20))drawPerson(ctx,px,py,r.body,'#f4f4f0',((frame>>1)+Math.floor(r.ph*10))%2);}
   for(let b=0;b<BUSES.length;b++){const p=busAt(b,hour);if(!p)continue;const px=Math.round(p.x*T),py=Math.round(p.y*T);if(seen(px,py,30))drawBus(ctx,px,py,p.fl);}
@@ -1527,12 +1790,14 @@ function render(){
      thins as it climbs, bends over at the top and wavers */
   const smk=smokeAmt(hour);if(smk>0)for(let i=0;i<windowTiles.length;i+=2){const x=windowTiles[i],y=windowTiles[i+1];if(x*T<vx0-T||x*T>vx1+T||y*T<vy0-T||y*T>vy1+3*T)continue;if(kind[y*W+x]!==KI.village)continue;const hv=hash(x+5,y+11);if(hv>0.17*smk)continue;
    const ph=(frame+Math.floor(hv*5871))>>2,bx=x*T+S*(Math.floor(hv*5871)%3),lean=Math.floor(hv*5871)%2?1:-1,len=4+(ph%2);
-   for(let j=0;j<len;j++){ctx.fillStyle='rgba(240,240,232,'+(0.88-j*0.15).toFixed(2)+')';ctx.fillRect(bx+lean*S*(j>=3?1+((ph+j)%2):j===2?(ph%2):0),y*T-S*(j+1),S,S);}}}
+   const su=hiTier?S*2/3:S; /* close-up: a finer wisp */
+   for(let j=0;j<len;j++){ctx.fillStyle='rgba(240,240,232,'+(0.88-j*0.15).toFixed(2)+')';ctx.fillRect(bx+lean*su*(j>=3?1+((ph+j)%2):j===2?(ph%2):0),y*T-su*(j+1),su,su);}}}
  /* you: the same size as everyone else, in gold, under a small bobbing marker so you can find yourself */
  {const hx=Math.round(hero.rx*T+T/2),hy=Math.round(hero.ry*T+T);
   if(hero.riding){if(hero.riding.sprite==='train')drawTrain(ctx,hx,hy-2);else drawGondola(ctx,hx,hy-10);}
   else if(!lowZoom){drawPerson(ctx,hx,hy,YOU_COL,'#f4f4f0',hero.moving&&hero.step);if(sk0===3)drawUmbrella(ctx,hx,hy,'#c2412b');}
-  const bob=(frame>>2)%2,my=hy-(lowZoom?6:12)-bob;ctx.fillStyle='#1b1b1b';ctx.fillRect(hx-3,my-1,6,3);ctx.fillRect(hx-2,my+2,4,2);ctx.fillStyle=YOU_COL;ctx.fillRect(hx-2,my,4,2);ctx.fillRect(hx-1,my+2,2,1);}
+  /* the marker is half the size up close, where the gold figure is easy to see */
+  const u=hiTier?0.5:1,bob=(frame>>2)%2,my=hy-(lowZoom?6:hiTier?7.5:12)-bob*u;ctx.fillStyle='#1b1b1b';ctx.fillRect(hx-3*u,my-u,6*u,3*u);ctx.fillRect(hx-2*u,my+2*u,4*u,2*u);ctx.fillStyle=YOU_COL;ctx.fillRect(hx-2*u,my,4*u,2*u);ctx.fillRect(hx-u,my+2*u,2*u,u);}
  /* where you are going: a small flag on the tile you clicked */
  if(goal){const m=lowZoom?Math.max(1,Math.round(1.6/s)):1,gx=Math.round(goal[0]*T+T/2),gy=Math.round(goal[1]*T+T),bob=(frame>>2)%2;
   ctx.fillStyle='#1b1b1b';ctx.fillRect(gx-m,gy-11*m,3*m,12*m);ctx.fillRect(gx+m,gy-12*m-bob*m,6*m,6*m);
@@ -1862,7 +2127,7 @@ if(HASH.tab&&TABS.includes(HASH.tab)){showTab(HASH.tab);if(PHONE())openSheet(tru
 if(Object.keys(HASH).some(k=>k!=='worker'))document.getElementById('intro').hidden=true;
 document.fonts&&document.fonts.load('9px "Press Start 2P"').then(()=>{skyDirty=true;}).catch(()=>{});
 booted=true;requestAnimationFrame(loop);
-globalThis.__T={walkTo,crews,amb,render,clockFigures,GOERS,PUPILS,RUNNERS,buildChunkHi,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,damAt,POWER,sunAt,castShadows,lightLayers,setClock:(h,d,m)=>{hour=h;if(d!==undefined)day=d;if(m)month=m;},planLegs,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
+globalThis.__T={walkTo,crews,amb,render,PLAYS,sprHi,HSPR,clockFigures,GOERS,PUPILS,RUNNERS,buildChunkHi,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,damAt,POWER,sunAt,castShadows,lightLayers,setClock:(h,d,m)=>{hour=h;if(d!==undefined)day=d;if(m)month=m;},planLegs,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
 })();
 </script>
 </body>

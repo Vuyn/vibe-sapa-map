@@ -63,7 +63,7 @@ Views that show the effects tied to the clock and the calendar:
 
 Run `check-worker.js` after every change to drawing code: the logic test never calls `render`, so an error there shows only in a real browser, and `shot.ps1` cannot report page errors. Opening the page with any setting skips the welcome box. The first frames build terrain a few chunks at a time, so the tool waits 15 seconds of page time by default (`-Budget`). Headless page time runs ahead of a background worker, so `shot.ps1` adds `worker=0` to every view.
 
-`check-worker.js` covers what `shot.ps1` cannot. It opens the page in real time, checks that the background worker built the land and that the page is no wider than the window, and can save a screenshot. It also emulates phone sizes, which a browser window cannot reach (the minimum window width is about 500 px):
+`check-worker.js` covers what `shot.ps1` cannot. It opens the page in real time, checks that the background worker built the land (a second worker, for the light, starts only when the sun first moves, so a view with a fixed hour shows one worker) and that the page is no wider than the window, and can save a screenshot. It also emulates phone sizes, which a browser window cannot reach (the minimum window width is about 500 px):
 
 ```text
 node --experimental-websocket check-worker.js ..\index.html shots\phone.png 390 800 "#sel=fansipan&tab=place"
@@ -129,7 +129,7 @@ Terraces are drawn from the same idea: every art pixel takes the height of the g
 
 ## How the light follows the sun
 
-The slopes are not shaded in the terrain tiles. A separate light layer, one pixel per tile (one per half tile in the town box, from the finer elevation there), is stretched over the terrain and worked out again whenever the sun has moved a fifth of an hour, or the month or the sky changes. That takes about 25 ms on a desktop.
+The slopes are not shaded in the terrain tiles. A separate light layer, one pixel per tile (one per half tile in the town box, from the finer elevation there), is stretched over the terrain and worked out again whenever the sun has moved a fifth of an hour, or the month or the sky changes. That takes 40 to 100 ms, so it is done in a second background worker (`lightWorker`, `lightCore`), which hands back two finished bitmaps; the map keeps the light it has until they arrive. Only the very first light, and every light where there is no worker (old browsers, the test, `shot.ps1`), is worked out on the page itself. Lit slopes are tinted warm and shade cool, the painter's rule.
 
 - **Where the sun is:** `sunAt(hour, month)` gives its height and compass bearing for the latitude of Sa Pa on the middle day of the month. In December it rises in the south-east and reaches 44 degrees at noon; in June it passes almost overhead.
 - **Relief:** slopes facing the light are brightened and slopes facing away darkened. The light is the sun mixed with a steady glow from the north-west, the usual mapmaker's light, which takes over at noon and at night so the mountains never go flat.
@@ -155,17 +155,40 @@ The slopes are not shaded in the terrain tiles. A separate light layer, one pixe
 - **Fireflies and frogs:** over terraces on dry nights from May to August.
 - **Animals and the walker:** chickens scatter, a dog follows for a while, buffalo turn to look.
 - **Rain:** people carry umbrellas, the walker too.
+- **Children at play:** forty games of three children in village yards (a ball, a chase, a skipping rope), all day at the weekend and at midday and after school on school days, not in rain (`PLAYS`, `playOn`).
+- **Market stalls** come in four kinds by what is on the table: greens, fruit, indigo cloth and brocade, a charcoal grill.
 - **Sky strip:** stars and the moon in its phase at night.
 - **Sounds by the clock:** roosters at first light near villages, the church bell on the hour within earshot (three strokes at 6, 12 and 18), the monastery bell at dusk, rain, frogs on summer nights.
 
 All of these are worked out from the clock, not stored, so a shared link shows the same scene. `clockFigures()` lists every such figure for the test, which checks at each quarter hour of four weekdays that none stands on water.
 
+## Keeping it smooth
+
+The page used to stop for 60 to 140 ms at a time: every second and a half while the clock ran (the light), whenever new land came into view (a chunk of 4,096 tiles painted in one frame), on a far click (the route) and on a change of month (the overview picture). What was done about each:
+
+- **Chunks** are painted by `painter`, a plain pixel buffer that answers to `fillStyle` and `fillRect` like a canvas and is copied to the chunk's canvas in one go. Tile art must therefore use only those two, on whole pixels, with colours as `#rrggbb`, `rgb()` or `rgba()`.
+- **The light** is worked out in a worker (see above).
+- **The overview picture** is redone a few rows a frame after a change of month, and the old one stays up until the new one is whole.
+- **Route finding** keeps its working arrays between searches and uses a heap in two flat arrays.
+- **Points along a line** (`polyAt`) use a running length kept with the line.
+- **Fog masks** are written a whole pixel at a time; small sprites are stamped from a cached canvas.
+
+`perf.js` measures all of this. It drives the page through zoom, pan, clicks and changes of month and hour, and prints the slowest frames and the functions that took the time:
+
+```text
+node --experimental-websocket perf.js ..\index.html
+```
+
+On 2026-11-13 the slowest frame in each action fell from 36-136 ms to 3-18 ms (headless Edge, software drawing). Run it again after changes to drawing or to anything that runs every frame.
+
 ## The close-up tier
 
-Up to 22 screen pixels a tile the map is drawn from 8-pixel tiles (`drawTile`, chunks of 64 tiles). From there to the top zoom of 48 it is drawn again at three times the detail, 24 pixels a tile (`drawTileHi`, `chunksHi`, chunks of 16 tiles, at most 40 kept): houses with roofs, doors and windows, tree crowns, terrace edges with the month's crop, kerbs, bridges. A close-up chunk takes 3 to 9 ms to build; a frame builds for at most 12 ms and shows the coarser chunk underneath until the fine one is ready. Nothing new is stored: the close-up art reads the same per-tile arrays.
+Up to 22 screen pixels a tile the map is drawn from 8-pixel tiles (`drawTile`, chunks of 16 tiles). From there to the top zoom of 48 it is drawn again at three times the detail, 24 pixels a tile (`drawTileHi`, `chunksHi`, chunks of 8 tiles): houses with roofs, doors and windows, tree crowns, firs above 2,000 m, terrace edges with the month's crop, kerbs, bridges, washing lines, and lengths of indigo cloth drying in the yards round Cát Cát. A frame paints new chunks for at most 6 ms and shows the coarser picture underneath until the fine one is ready. Nothing new is stored: the close-up art reads the same per-tile arrays.
+
+- **How the art is kept easy on the eye** (both tiers where it applies): where two sides of a tile meet the same other ground, the corner is rounded off in that colour (`groundCol`), so forest edges and clearings do not break into squares; everything that stands up throws a small cool shadow down and to the right, because the map's light comes from the upper left; crops are a quiet weave of strokes a shade off the ground rather than a grid of dark dots; trees differ a little in place, size and tone.
 
 - **Figures** in close-up come from `FIG`, rows of small pixels, coloured through `fig(name, cols)` and stamped with `putFig`. The homestay, viewpoint, peak and power-plant signs have `FIG` versions too.
-- **Landmark sprites** are not redrawn: `sprHi` smooths the 12-pixel sprites with the Scale3x rule. They are the coarsest thing on screen at zoom 48.
+- **Landmarks** each have a picture drawn for the close-up, three times the pixels of the small sprite (`HSPR`, built from rectangles with the small kit in `hiKit`). Cát Cát and Bản Hồ have one of their own up close (`SP_HI`): a house with a water wheel, a Tày house on posts. A sprite with no entry in `HSPR` falls back to the small one smoothed by the Scale3x rule.
 - **Layers that hold one value a tile** (sun and shadow, frost, fog, the sea of clouds) are drawn with smoothing in close-up, where a tile would otherwise show as a square of 22 to 48 pixels. Night glows are cut from pixels a third the size (`pixelDisc`).
 - **Windows at night** use `houseBox` and `hiWins`, the same functions the close-up house art uses, so a lit window sits on a drawn window.
 

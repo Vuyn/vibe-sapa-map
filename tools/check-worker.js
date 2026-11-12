@@ -20,15 +20,16 @@ const pr=spawn(edge,['--headless=new','--disable-gpu','--hide-scrollbars','--no-
   await send('Runtime.enable');await send('Page.enable');
   // a browser window cannot be narrower than about 500 px, so phone sizes are emulated
   await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:width<700?2:1,mobile:width<700});
-  // count workers started and the answers they send back
-  await send('Page.addScriptToEvaluateOnNewDocument',{source:'window.__wk={made:0,ok:0,fail:0};{const W0=window.Worker;window.Worker=function(u,o){const w=new W0(u,o);window.__wk.made++;w.addEventListener("message",e=>{if(e.data&&e.data.ok)window.__wk.ok++;else window.__wk.fail++;});w.addEventListener("error",()=>{window.__wk.fail++;});return w;};}'});
+  // count workers started and the answers they send back: the terrain worker answers once with ok; the light worker,
+  // started when the sun first moves, answers with a key each time (counted as light)
+  await send('Page.addScriptToEvaluateOnNewDocument',{source:'window.__wk={made:0,ok:0,fail:0};{const W0=window.Worker;window.Worker=function(u,o){const w=new W0(u,o);window.__wk.made++;w.addEventListener("message",e=>{const d=e.data;if(d&&d.ok)window.__wk.ok++;else if(d&&d.key!==undefined)window.__wk.light=(window.__wk.light||0)+1;else window.__wk.fail++;});w.addEventListener("error",()=>{window.__wk.fail++;});return w;};}'});
   const t0=Date.now();await send('Page.navigate',{url:'file:///'+html.replace(/\\/g,'/').replace(/ /g,'%20')+(process.argv[6]||'')});
   let ready=false;for(let i=0;i<120&&!ready;i++){await sleep(250);ready=await ev('!!globalThis.__T');}
   const ms=Date.now()-t0,wk=await ev('JSON.stringify(window.__wk)'),size=await ev('innerWidth+"x"+innerHeight+" scrollWidth "+document.documentElement.scrollWidth');
   await sleep(2500); // let the first chunks paint
   if(out){const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(out,Buffer.from(shot.data,'base64'));}
   console.log('ready',ready,'after',ms,'ms | workers',wk,'| window',size,'| page errors',errors.length?errors.length+' in all, distinct: '+[...new Set(errors.map(e=>String(e).split('\n').slice(0,2).join(' ').replace(/file:\/\/\S*\//g,'')))].join(' / '):'none'); // an error in the frame loop repeats every frame: say each one once
-  const w=JSON.parse(wk||'{}');process.exitCode=ready&&w.made===1&&w.ok===1&&!errors.length?0:1;
+  const w=JSON.parse(wk||'{}');process.exitCode=ready&&w.made>=1&&w.ok===1&&!w.fail&&!errors.length?0:1;
  }catch(e){console.log('FAILED',e.message);process.exitCode=1;}
  finally{try{ws&&ws.close();}catch(e){}pr.kill();}
 })();
