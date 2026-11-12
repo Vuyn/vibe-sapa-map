@@ -1,0 +1,13 @@
+{
+  "comment": "The map frame. Every tool and the page read this. Tiles are ~38.6 m. elevStep 2 stores elevation at every second tile (the page smooths it back up); set 1 for full detail and a file about 250 KB larger. Change anything here, then re-run fetch-data, resample, parse-osm, parse-osm2, build.",
+  "W": 840,
+  "H": 472,
+  "LON0": 103.690,
+  "LON1": 104.005,
+  "LAT0": 22.240,
+  "LAT1": 22.405,
+  "MPT": 38.6,
+  "elevStep": 2,
+  "detail": { "x": 358, "y": 152, "size": 96, "factor": 2 },
+  "town": { "lat": 22.33512, "lon": 103.84228, "radiusKm": 1.6, "poiBox": [22.312, 103.812, 22.358, 103.872] }
+}

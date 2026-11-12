@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sapa Pixel Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Press Start 2P is embedded so the file works offline; IBM Plex Sans loads online and falls back to the system font. */
+__FONT_CSS__
+/* Layout: a game cartridge. Skyline strip under the title, viewport canvas with camera on the left, travel journal on the right; stacks on phones. */
+/* Colours come from the map itself: forest green for the accent, terrace gold for marks, sage and deep green for the page. */
+:root{
+  --bg:#e7ecd8; --panel:#f5f7ea; --ink:#1f2a1c; --muted:#5d6b55; --line:#bcc7a4;
+  --accent:#2e7d32; --accent-ink:#ffffff; --chip:#dde5c6; --focus:#1f5fbf; --ok:#8a6a12;
+  --display:'Press Start 2P',monospace; --body:'IBM Plex Sans',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#121812; --panel:#1b231b; --ink:#e6eedc; --muted:#9aa88f; --line:#33402f;
+  --accent:#6fbf73; --accent-ink:#0f1a10; --chip:#263226; --focus:#8fb8ff; --ok:#e3c35a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#121812; --panel:#1b231b; --ink:#e6eedc; --muted:#9aa88f; --line:#33402f;
+  --accent:#6fbf73; --accent-ink:#0f1a10; --chip:#263226; --focus:#8fb8ff; --ok:#e3c35a; color-scheme:dark }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.5;font-size:14px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 32px}
+img{max-width:100%}[hidden]{display:none!important}
+header{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-bottom:14px}
+.titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 20px}
+h1{font-family:var(--display);font-size:clamp(13px,2.2vw,20px);margin:0;line-height:1.5;text-wrap:balance}
+.sub{color:var(--muted);font-size:14px;margin:0}
+canvas#sky{display:block;width:100%;height:84px;image-rendering:pixelated;border:4px solid var(--ink);box-shadow:6px 6px 0 var(--line);background:#1d2a1d}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}}
+.stage{position:relative;background:#1d2a1d;border:4px solid var(--ink);box-shadow:6px 6px 0 var(--line);min-width:0;overflow:hidden;touch-action:none}
+canvas#map{display:block;width:100%;height:auto;aspect-ratio:4/3;max-height:80vh;image-rendering:pixelated;cursor:grab}
+canvas#map.drag{cursor:grabbing}
+canvas#map:focus-visible{outline:3px solid var(--focus);outline-offset:-3px}
+.hud{position:absolute;left:8px;top:8px;display:flex;gap:6px;flex-wrap:wrap;max-width:calc(100% - 60px)}
+.btn{font-family:var(--display);font-size:8px;padding:7px 9px;background:var(--panel);color:var(--ink);border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);cursor:pointer;line-height:1;white-space:nowrap}
+.btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible,.list button:focus-visible,.zoom button:focus-visible,#hour:focus-visible,#month:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.zoom{position:absolute;right:10px;top:10px;display:grid;gap:4px}
+.zoom button{width:34px;height:34px;background:var(--panel);color:var(--ink);border:2px solid var(--ink);font-family:var(--display);font-size:12px;cursor:pointer;padding:0;box-shadow:3px 3px 0 var(--ink)}
+canvas#mini{position:absolute;left:8px;bottom:8px;width:128px;height:118px;border:2px solid var(--ink);image-rendering:pixelated;cursor:pointer;background:#1d2a1d}
+.toast{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-family:var(--display);font-size:8px;padding:8px 12px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1}
+.tip{position:absolute;pointer-events:none;background:rgba(27,24,18,.9);color:#f4f4f0;font-size:12px;padding:4px 8px;border:2px solid #f4f4f0;max-width:220px;display:none;z-index:4}
+.intro{position:absolute;inset:0;background:rgba(27,24,18,.78);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}
+.intro div{background:var(--panel);color:var(--ink);border:4px solid var(--ink);box-shadow:6px 6px 0 var(--accent);padding:18px;max-width:380px;font-size:14px}
+.intro h2{font-family:var(--display);font-size:11px;margin:0 0 10px;line-height:1.6}
+.intro p{margin:0 0 8px}
+.intro .btn{margin-top:6px}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#f4f4f0;font-family:var(--display);font-size:9px;text-align:center;padding:16px;line-height:2}
+.panel{background:var(--panel);border:4px solid var(--ink);box-shadow:6px 6px 0 var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.topbar{display:grid;gap:8px}
+.visited{font-family:var(--display);font-size:8px;color:var(--muted)}
+.visited b{color:var(--ok)}
+.card .kicker{font-family:var(--display);font-size:8px;color:var(--accent);letter-spacing:.5px;text-transform:uppercase;margin:0 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stamp{display:inline-block;border:2px solid var(--ok);color:var(--ok);padding:2px 5px;transform:rotate(-4deg)}
+.card h2{font-family:var(--display);font-size:11px;line-height:1.6;margin:0 0 2px;text-wrap:balance}
+.card .vi{color:var(--muted);font-size:13px;margin:0 0 8px;font-style:italic}
+.eta{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;padding:0;list-style:none}
+.eta li{border:2px solid var(--accent);font-size:12px;padding:3px 8px;font-variant-numeric:tabular-nums}
+.facts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;padding:0;list-style:none}
+.facts li{background:var(--chip);font-size:12px;padding:3px 8px;font-variant-numeric:tabular-nums}
+.times{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 10px;padding:0;list-style:none}
+.times li{border:2px solid var(--line);padding:5px 6px;font-size:12px;line-height:1.3}
+.times li span{display:block;font-family:var(--display);font-size:7px;color:var(--muted);margin-bottom:3px}
+.card p{margin:0 0 8px;font-size:14px}
+.card .tipline{border-left:3px solid var(--accent);padding-left:8px;color:var(--muted);font-size:13px}
+.card .src{font-size:11px;color:var(--muted);margin:0}
+.card .sketch{display:block;width:100%;height:auto;aspect-ratio:2/1;image-rendering:pixelated;border:2px solid var(--line);margin:0 0 10px}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+.list{margin:0;padding:0;list-style:none;display:grid;gap:3px;max-height:260px;overflow:auto;border-top:2px dashed var(--line);padding-top:10px}
+.list button{width:100%;text-align:left;background:none;border:2px solid transparent;padding:4px 6px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;display:flex;gap:8px;align-items:center}
+.list button:hover{border-color:var(--line)}
+.list button[aria-current="true"]{border-color:var(--accent)}
+.list i{width:10px;height:10px;display:inline-block;flex:none}
+.list em{margin-left:auto;font-style:normal;color:var(--ok);font-family:var(--display);font-size:8px}
+.list small{color:var(--muted);font-variant-numeric:tabular-nums}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12px;color:var(--muted);margin:0;padding:0;list-style:none}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend b{width:12px;height:12px;display:inline-block;border:1px solid var(--ink);flex:none}
+.legend b.dash{background:repeating-linear-gradient(90deg,#c2412b 0 3px,transparent 3px 6px);border:0;height:3px}
+.help{font-size:12px;color:var(--muted);margin:0}
+kbd{font-family:var(--display);font-size:8px;background:var(--chip);padding:2px 4px;border:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.row input{flex:1;min-width:0;accent-color:var(--accent)}
+.row output{font-family:var(--display);font-size:8px;min-width:4ch;font-variant-numeric:tabular-nums}
+.row .lbl{min-width:3.5em}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+/* --- decluttered layout: controls live in the side panel, status in one strip --- */
+canvas#sky{height:48px}
+.stage{overflow:visible;touch-action:auto}
+.view{position:relative;overflow:hidden;touch-action:none}
+canvas#mini{bottom:42px}
+#miniBtn{position:absolute;left:8px;bottom:8px;width:28px;height:28px;background:var(--panel);color:var(--ink);border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);font-family:var(--display);font-size:10px;cursor:pointer;padding:0}
+#miniBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+#miniBtn:focus-visible,.tab:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.status{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:7px 10px;background:var(--ink);color:var(--bg);font-family:var(--display);font-size:8px;line-height:1.4;font-variant-numeric:tabular-nums}
+.status .sp{margin-left:auto}
+.status i{display:inline-block;width:8px;height:8px;margin-right:6px;vertical-align:middle}
+.status i.sun{background:#f1c232}.status i.moon{background:#b9dcff}
+.scale{display:inline-flex;align-items:center;gap:6px}
+.scale b{display:inline-block;height:4px;background:var(--bg);border-left:2px solid var(--bg);border-right:2px solid var(--bg);box-sizing:content-box}
+.tabs{display:flex;flex-wrap:wrap;gap:4px}
+.tab{flex:1 1 auto;font-family:var(--display);font-size:7px;padding:8px 6px;background:var(--chip);color:var(--ink);border:2px solid var(--ink);cursor:pointer;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.pane{display:flex;flex-direction:column;gap:12px;min-width:0}
+.list{max-height:min(60vh,520px);border-top:0;padding-top:0}
+.toggles{display:flex;flex-wrap:wrap;gap:8px}
+/* --- 2026-11-11 fixes: map-shaped canvas, overview in the panel, taller section strip, Vietnamese-safe type --- */
+canvas#sky{height:64px}
+canvas#map{aspect-ratio:__W__/__H__;max-height:none}
+:root{--mapw:calc(76vh * __W__ / __H__ + 8px)}
+@media (min-width:901px){.wrap{grid-template-columns:minmax(0,var(--mapw)) minmax(300px,440px);justify-content:center}header{max-width:calc(var(--mapw) + 16px + 440px);margin-inline:auto}}
+canvas#mini{position:static;display:block;width:100%;height:auto;aspect-ratio:__W__/__H__;border:2px solid var(--ink);image-rendering:pixelated;cursor:pointer;background:#1d2a1d}
+.zoom button svg{display:block;margin:auto}
+#lang{font-family:var(--body);font-size:11px;font-weight:600}
+.vi .btn,.vi .tab,.vi .visited,.vi .status,.vi .toast,.vi .loading,.vi .card .kicker,.vi .card h2,.vi .intro h2,.vi .times li span,.vi .row output{font-family:var(--body);font-weight:600;letter-spacing:0}
+.vi .btn,.vi .tab,.vi .status,.vi .toast,.vi .card .kicker,.vi .visited,.vi .row output{font-size:11px}
+.vi .times li span{font-size:10px}
+.vi .card h2,.vi .intro h2{font-size:15px}
+.eta li.sum{background:var(--accent);color:var(--accent-ink)}
+/* --- phone: the map has the whole screen. The title and section strip are hidden, and the panel is a sheet that
+   shows only its row of tabs until one is tapped. Canvases never set the page width. --- */
+@media (max-width:900px){
+  body{padding:0}
+  header{margin:0;gap:0}
+  .titlerow{display:none}
+  canvas#sky{height:44px;border-width:0 0 2px;box-shadow:none}
+  .wrap{display:block}
+  .stage{border-width:0;box-shadow:none}
+  canvas#map{aspect-ratio:auto;width:100%;height:calc(100vh - 78px);height:calc(100dvh - 78px)}
+  .status{padding:5px 8px;gap:4px 10px;flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+  .status>span:last-child,.status #stDay{display:none}
+  .panel{position:fixed;left:0;right:0;bottom:0;z-index:8;max-height:74vh;max-height:74dvh;overflow:auto;border-width:3px 0 0;box-shadow:none;padding:6px 10px 12px;gap:10px;transform:translateY(calc(100% - 46px));transition:transform .2s ease}
+  .panel.open{transform:none}
+  .tabs{position:sticky;top:0;z-index:1;background:var(--panel);padding:2px 0 6px}
+  .tab{padding:10px 4px}
+}
+@media (max-width:900px) and (prefers-reduced-motion:reduce){.panel{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="titlerow">
+    <h1>SAPA · LÀO CAI · 1,500 m</h1>
+    <p class="sub" id="subtitle"></p>
+  </div>
+  <canvas id="sky" width="512" height="84" aria-label="Mountain skyline from west to east with your position"></canvas>
+</header>
+
+<div class="wrap">
+  <div class="stage" id="stage">
+   <div class="view">
+    <canvas id="map" tabindex="0" aria-label="Bản đồ pixel Sa Pa. Bấm vào một điểm để đi tới, kéo để dời, lăn chuột hoặc chụm ngón tay để phóng. Trên bàn phím: phím mũi tên dời bản đồ, Enter đi tới dấu chữ thập giữa màn hình."></canvas>
+    <div class="zoom"><button id="zin" type="button" aria-label="Zoom in">+</button><button id="zout" type="button" aria-label="Zoom out">-</button><button id="zfit" type="button" aria-label="Fit whole map">□</button><button id="me" type="button" aria-label="Centre on me">◎</button><button id="gear" type="button" aria-label="Open settings">⚙</button></div>
+    <div class="tip" id="tip"></div>
+    <div class="toast" id="toast" role="status"></div>
+    <div class="loading" id="loading">ĐANG TẢI BẢN ĐỒ SA PA...</div>
+    <div class="intro" id="intro" hidden><div>
+      <h2 id="introTitle"></h2>
+      <p id="introBody"></p>
+      <button class="btn" id="introBtn" type="button"></button>
+    </div></div>
+   </div>
+   <div class="status" id="status"><span><i id="stIcon" class="sun"></i><span id="stClock">09:00</span></span><span id="stDay">SAT</span><span id="stMonth">SEP</span><span id="stClim"></span><span id="stSky"></span><span id="stElev"></span><span class="scale sp"><b id="scaleBar" style="width:60px"></b><span id="scaleTxt">1 km</span></span><span>N ▲</span></div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tab-place" role="tab" aria-selected="true" aria-controls="pane-place" type="button">PLACE</button>
+      <button class="tab" id="tab-list" role="tab" aria-selected="false" aria-controls="pane-list" type="button">PLACES</button>
+      <button class="tab" id="tab-settings" role="tab" aria-selected="false" aria-controls="pane-settings" type="button">SETTINGS</button>
+      <button class="tab" id="tab-about" role="tab" aria-selected="false" aria-controls="pane-about" type="button">LEGEND</button>
+    </div>
+    <section class="pane" id="pane-place" role="tabpanel" aria-labelledby="tab-place">
+      <div class="card" id="card"></div>
+      <div class="tools">
+        <button class="btn" id="walk" type="button">WALK HERE</button>
+        <button class="btn" id="home" type="button">BACK TO TOWN</button>
+      </div>
+    </section>
+    <section class="pane" id="pane-list" role="tabpanel" aria-labelledby="tab-list" hidden>
+      <span class="visited" id="visitedCount"></span>
+      <ul class="list" id="list"></ul>
+    </section>
+    <section class="pane" id="pane-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <div class="row"><span class="lbl" id="timeLabel">Time</span><input type="range" id="hour" min="0" max="24" step="0.25" value="9" aria-label="Hour of day"><output id="hourOut">09:00</output><button class="btn" id="autoTime" aria-pressed="true" type="button">AUTO</button></div>
+      <div class="row"><span class="lbl" id="monthLabel">Month</span><input type="range" id="month" min="1" max="12" step="1" value="9" aria-label="Month"><output id="monthOut">Sep</output></div>
+      <div class="toggles">
+        <button class="btn" id="weather" type="button">SKY: AUTO</button>
+        <button class="btn" id="dayBtn" type="button">DAY: SAT</button>
+        <button class="btn" id="labels" aria-pressed="true" type="button">LABELS</button>
+        <button class="btn" id="routes" aria-pressed="true" type="button">TREKS</button>
+        <button class="btn" id="shops" aria-pressed="false" type="button">SHOP NAMES</button>
+        <button class="btn" id="skyToggle" aria-pressed="true" type="button">SKYLINE</button>
+        <button class="btn" id="sound" aria-pressed="false" type="button">SOUND OFF</button>
+        <button class="btn" id="lang" type="button">TIẾNG VIỆT</button>
+      </div>
+    </section>
+    <section class="pane" id="pane-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+      <ul class="legend" id="legend"></ul>
+      <p class="help" id="help"></p>
+      <p class="help" id="credits"></p>
+    </section>
+    <canvas id="mini" width="__W__" height="__H__" aria-label="Overview map. Click to jump there."></canvas>
+  </aside>
+</div>
+
+<script>
+(async function(){
+'use strict';
+/* =====================================================================
+   1. CONFIG AND DATA
+   The frame comes from tools/frame.json: 840 x 472 tiles over lon 103.690-104.005,
+   lat 22.240-22.405, about 38.6 m per tile, drawn as 8 px tiles with a 2 px art grid.
+   All data is one container, gzipped and base64-encoded once: [uint32 length][JSON][binary parts]
+     elev     SRTM via AWS Terrarium z12 at every second tile, 1 m precision, as predictor residuals
+     detail   SRTM z14 at 2x2 samples per tile for the town box: metres = 1100 + v*3.5
+     lc       Sentinel-2 10 m land cover class per tile (Esri / Impact Observatory)
+     JSON     roads, streets, rivers, water, railways, cable car, hotels, waterfalls, viewpoints, peaks,
+              land-cover polygons, buildings and shops (OpenStreetMap)
+   The pipeline that builds this blob is in tools/ next to this file.
+   ===================================================================== */
+const FR=__FRAME__;
+const W=FR.W,H=FR.H,T=8,S=2,MPT=FR.MPT;
+const K=2;     // distances in the code were written for 77 m tiles; K scales them now that tiles are 38.6 m
+const LON0=FR.LON0,LON1=FR.LON1,LAT0=FR.LAT0,LAT1=FR.LAT1;
+const toX=lon=>(lon-LON0)/(LON1-LON0)*W, toY=lat=>(LAT1-lat)/(LAT1-LAT0)*H;
+const DATA_GZ="__DATA_GZ__";
+const loadingEl=document.getElementById('loading');
+/* view settings in the address, e.g. #h=23.5&m=1&d=6&z=8&at=406,199&sel=church
+   (hour, month, weekday 0 Sunday..6 Saturday, zoom, centre tile, place, tab, lang, sky 0-3; worker=0 builds the land on this thread) */
+const HASH={};try{(typeof location!=='undefined'?location.hash:'').replace(/^#/,'').split('&').forEach(kv=>{const p=kv.split('=');if(p[0]&&p[1]!==undefined)HASH[p[0]]=decodeURIComponent(p[1]);});}catch(e){}
+const CLS=['trunk','primary','secondary','tertiary','unclassified','residential','track','path','river','stream'];
+const CH={lat:22.33512,lon:103.84228};
+function km(a,b){const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
+
+/* Landmarks. src: 'osm' = position from OpenStreetMap, 'approx' = hand placed. big: 3-tile shaded sprite. */
+const LM=[
+ {id:'church',en:'Sapa Stone Church',vi:'Nhà thờ Đá Sa Pa',lat:22.33512,lon:103.84228,sp:'church',big:1,major:1,src:'osm',walk:'0',bike:'0',guide:0,
+  f:{en:['Built 1895','1,500 m','Town centre'],vi:['Xây 1895','1.500 m','Trung tâm']},
+  d:{en:'The French-built stone church is the heart of town. The square in front fills on Saturday nights, when Hmong and Dao families come down for the old love market.',vi:'Nhà thờ đá do người Pháp xây là trái tim của thị xã. Tối thứ Bảy, sân nhà thờ đông người Mông, Dao từ bản xuống dự chợ tình.'},
+  t:{en:'Every distance on this map is measured from this square.',vi:'Mọi khoảng cách trên bản đồ đều tính từ sân nhà thờ.'}},
+ {id:'sunplaza',en:'Sun Plaza & Mountain Train',vi:'Sun Plaza & Ga tàu hỏa leo núi',lat:22.33426,lon:103.84037,sp:'sunplaza',big:1,src:'osm',walk:'4 min',bike:'1 min',guide:0,
+  f:{en:['Built 2018','Funicular 2 km','6 min to cable car'],vi:['Xây 2018','Tàu leo núi 2 km','6 phút tới cáp treo']},
+  d:{en:'A building in French railway-station style on the square. The Mường Hoa mountain train leaves from inside and glides 2 km down the valley side to the cable car base.',vi:'Tòa nhà kiểu ga xe lửa Pháp bên quảng trường. Tàu hỏa leo núi Mường Hoa xuất phát từ đây, chạy 2 km xuống ga cáp treo.'},
+  t:{en:'Buy the combined train and cable car ticket here to skip the taxi.',vi:'Mua vé gộp tàu và cáp treo ở đây để khỏi đi taxi.'}},
+ {id:'museum',en:'Sapa Museum',vi:'Bảo tàng Sa Pa',lat:22.33554,lon:103.84010,sp:'museum',src:'osm',walk:'5 min',bike:'1 min',guide:0,
+  f:{en:['Free entry','Hill station history','Ethnic costume'],vi:['Miễn phí','Lịch sử thị xã','Trang phục dân tộc']},
+  d:{en:'A small museum above the square with the story of the French hill station, old photographs and the costumes and tools of the five local peoples.',vi:'Bảo tàng nhỏ phía trên quảng trường kể chuyện thị trấn nghỉ mát thời Pháp, ảnh cũ và trang phục, nông cụ của năm dân tộc địa phương.'},
+  t:{en:'Thirty minutes, and a good first stop when it rains.',vi:'Ba mươi phút, điểm dừng tốt khi trời mưa.'}},
+ {id:'victoria',en:'Victoria Sapa Resort',vi:'Khách sạn Victoria Sa Pa',lat:22.33696,lon:103.84278,sp:'hotel',src:'osm',walk:'5 min',bike:'1 min',guide:0,
+  f:{en:['Opened 1998','Colonial style','Victoria Express'],vi:['Mở 1998','Kiểu thuộc địa','Tàu Victoria Express']},
+  d:{en:'The colonial-style resort on the hill above the lake, famous for its private sleeper carriage attached to the Hanoi night train.',vi:'Khu nghỉ kiểu thuộc địa trên đồi phía trên hồ, nổi tiếng với toa giường nằm riêng móc vào tàu đêm Hà Nội.'},
+  t:{en:'Non-guests can use the heated pool and terrace for a fee.',vi:'Khách ngoài có thể dùng bể bơi nước nóng và sân thượng với một khoản phí.'}},
+ {id:'lake',en:'Sapa Lake',vi:'Hồ Sa Pa',lat:22.33844,lon:103.84735,sp:'isle',src:'osm',walk:'6 min',bike:'2 min',guide:0,
+  f:{en:['Town park','One small island','Evening walks'],vi:['Công viên','Một đảo nhỏ','Dạo tối']},
+  d:{en:'A narrow lake ringed by a promenade, with one small wooded island near its eastern end. Cafés on the slope above look across the water to Hàm Rồng.',vi:'Hồ hẹp có đường dạo quanh, với một đảo nhỏ rợp cây gần đầu phía đông. Quán cà phê trên dốc nhìn qua mặt nước sang Hàm Rồng.'},
+  t:{en:'Fog rolls in fast after 4 pm. The lake disappears in minutes.',vi:'Sau 4 giờ chiều sương xuống rất nhanh, hồ biến mất trong vài phút.'}},
+ {id:'hamrong',en:'Ham Rong Mountain',vi:'Núi Hàm Rồng',lat:22.33363,lon:103.84680,sp:'hill',major:1,src:'osm',walk:'1.5 h loop',bike:'-',guide:0,
+  f:{en:['Garden gate 1,600 m','Summit 1,908 m','Orchids, Cloud Yard'],vi:['Cổng vườn 1.600 m','Đỉnh 1.908 m','Vườn lan, Sân Mây']},
+  d:{en:'"Dragon Jaw" rises straight out of town. Stone steps climb through orchid gardens and a rock maze to Cloud Yard; a longer trail continues east to the true summit.',vi:'Núi "hàm rồng" mọc thẳng từ thị xã. Bậc đá lên qua vườn lan và mê cung đá tới Sân Mây; lối mòn dài hơn đi tiếp về phía đông lên đỉnh thật.'},
+  t:{en:'The gate is a 5-minute walk from the church. Cheapest big view in Sapa.',vi:'Cổng cách nhà thờ 5 phút đi bộ. Góc nhìn rẻ nhất Sa Pa.'}},
+ {id:'monastery',en:'Truc Lam Zen Monastery',vi:'Thiền viện Trúc Lâm Đại Giác',lat:22.34074,lon:103.84942,sp:'pagoda',big:1,src:'osm',walk:'15 min',bike:'4 min',guide:0,
+  f:{en:['Zen Buddhist','View over the lake'],vi:['Thiền tông','Nhìn xuống hồ']},
+  d:{en:'A Zen monastery on the slope north of town, with a wide terrace that looks over the lake to Hàm Rồng.',vi:'Thiền viện trên sườn núi phía bắc thị xã, sân rộng nhìn qua hồ sang Hàm Rồng.'},
+  t:{en:'Quiet at dawn, before the town wakes.',vi:'Yên tĩnh lúc bình minh, trước khi thị xã thức dậy.'}},
+ {id:'market',en:'Sapa Market',vi:'Chợ Sa Pa',lat:22.33829,lon:103.85198,sp:'market',src:'osm',walk:'15 min',bike:'4 min',guide:0,
+  f:{en:['Daily, busiest Sun','Brocade, herbs','Thắng cố'],vi:['Hằng ngày, đông CN','Thổ cẩm, thuốc nam','Thắng cố']},
+  d:{en:'The covered market east of the lake: indigo hemp, embroidered Hmong jackets, Red Dao silver and a food court serving thắng cố, cơm lam and táo mèo wine.',vi:'Chợ có mái phía đông hồ: vải lanh nhuộm chàm, áo Mông thêu tay, bạc Dao đỏ và khu ẩm thực với thắng cố, cơm lam, rượu táo mèo.'},
+  t:{en:'Sunday before 9 am is when the villages come to trade.',vi:'Sáng Chủ nhật trước 9h là lúc dân bản xuống chợ.'},
+  eat:{en:'Dishes to try: thắng cố (horse stew), Sa Pa salmon or sturgeon hotpot, roast lợn cắp nách (small free-range pig), smoked buffalo, cơm lam (sticky rice in bamboo), cải mèo greens.',vi:'Món nên thử: thắng cố, lẩu cá hồi hoặc cá tầm Sa Pa, lợn cắp nách quay, thịt trâu gác bếp, cơm lam, rau cải mèo.'}},
+ {id:'nightmarket',en:'Night Market',vi:'Chợ đêm Sa Pa',lat:22.3393,lon:103.8500,sp:'stalls',src:'osm',walk:'15 min',bike:'4 min',guide:0,
+  f:{en:['Every evening','Grilled skewers','Love market Sat'],vi:['Mỗi tối','Đồ nướng','Chợ tình thứ Bảy']},
+  d:{en:'Food stalls and brocade along the street by the market every evening: grilled pork skewers, bamboo rice, eggs and táo mèo wine.',vi:'Hàng ăn và thổ cẩm dọc phố cạnh chợ mỗi tối: thịt nướng xiên, cơm lam, trứng nướng và rượu táo mèo.'},
+  t:{en:'Come after dark when the lamps are on; it is busiest on Saturday.',vi:'Đến sau khi trời tối, đèn đã bật; đông nhất tối thứ Bảy.'},
+  eat:{en:'Dishes to try: grilled pork and vegetable skewers, grilled eggs, roast sweet potato and chestnuts, cơm lam, a cup of táo mèo (wild apple) wine.',vi:'Món nên thử: thịt và rau nướng xiên, trứng nướng, khoai và hạt dẻ nướng, cơm lam, một chén rượu táo mèo.'}},
+ {id:'bus',en:'Sapa Bus Station',vi:'Bến xe Sa Pa',lat:22.3400,lon:103.8530,sp:'bus',src:'approx',walk:'17 min',bike:'5 min',guide:0,
+  f:{en:['Hanoi 5-6 h','Lào Cai 1 h'],vi:['Hà Nội 5-6 h','Lào Cai 1 h']},
+  d:{en:'Sleeper buses from Hanoi and shuttles from Lào Cai railway station arrive here, beside the market.',vi:'Xe giường nằm từ Hà Nội và xe trung chuyển từ ga Lào Cai về đây, cạnh chợ.'},
+  t:{en:'Book the return seat a day early on holiday weekends.',vi:'Cuối tuần lễ nên đặt vé về trước một ngày.'}},
+ {id:'cable',en:'Fansipan Cable Car Base',vi:'Ga cáp treo Mường Hoa',lat:22.3366,lon:103.8250,sp:'station',big:1,major:1,src:'osm',walk:'35 min',bike:'8 min',guide:0,
+  f:{en:['6,293 m long','1,410 m rise','~15 min ride'],vi:['Dài 6.293 m','Chênh cao 1.410 m','~15 phút']},
+  d:{en:'The Sun World base station west of town, reached by the mountain train. The three-rope cable car holds world records for length and height gain.',vi:'Ga xuất phát Sun World phía tây thị xã, tới bằng tàu leo núi. Cáp treo ba dây giữ kỷ lục thế giới về chiều dài và độ chênh cao.'},
+  t:{en:'Take the first car at 7:30 am. Clouds usually close the summit by noon.',vi:'Đi chuyến đầu 7h30. Mây thường phủ đỉnh trước trưa.'}},
+ {id:'doquyen',en:'Do Quyen Top Station',vi:'Ga Đỗ Quyên',lat:22.30527,lon:103.77531,sp:'station',big:1,src:'osm',walk:'-',bike:'-',guide:0,
+  f:{en:['3,056 m','Pagodas','Giant Buddha'],vi:['3.056 m','Chùa','Đại tượng Phật']},
+  d:{en:'Where the cable car arrives. A chain of pagodas, a bronze Buddha and the small Trúc Mây funicular lead the last 90 metres up to the summit.',vi:'Nơi cáp treo tới. Quần thể chùa, tượng Phật đồng và tàu kéo Trúc Mây đưa lên 90 m cuối tới đỉnh.'},
+  t:{en:'Six hundred steps if you skip the funicular. Go slow, the air is thin.',vi:'Sáu trăm bậc nếu không đi tàu kéo. Đi chậm, không khí loãng.'}},
+ {id:'fansipan',en:'Fansipan Summit',vi:'Đỉnh Fansipan',lat:22.30308,lon:103.77544,sp:'peak',big:1,major:1,src:'osm',walk:'2 days trek',bike:'-',guide:2,
+  f:{en:['3,147 m','Roof of Indochina','Hoàng Liên Sơn'],vi:['3.147 m','Nóc nhà Đông Dương','Hoàng Liên Sơn']},
+  d:{en:'The highest peak in Vietnam, Laos and Cambodia, at the tail of the Himalayas. Trekkers climb two days from Trạm Tôn through bamboo and rhododendron forest.',vi:'Đỉnh cao nhất Việt Nam, Lào và Campuchia, cuối dãy Himalaya. Người leo núi mất hai ngày từ Trạm Tôn qua rừng trúc và đỗ quyên.'},
+  t:{en:'It is 10 °C colder than town. Bring a jacket even in June.',vi:'Lạnh hơn thị xã 10 °C. Mang áo khoác kể cả tháng 6.'}},
+ {id:'tramton',en:'Tram Ton Trailhead',vi:'Trạm Tôn',lat:22.35507,lon:103.76072,sp:'gate',src:'osm',walk:'4 h',bike:'30 min',guide:0,
+  f:{en:['1,930 m','Park ranger gate','Fansipan trail'],vi:['1.930 m','Trạm kiểm lâm','Đường leo Fansipan']},
+  d:{en:'The Hoàng Liên National Park gate where the classic Fansipan trek starts: camp at 2,200 m the first night, summit the next morning.',vi:'Cổng Vườn quốc gia Hoàng Liên, nơi bắt đầu đường leo Fansipan kinh điển: ngủ lán 2.200 m, sáng hôm sau lên đỉnh.'},
+  t:{en:'Permits and a licensed guide are required. Porters carry 15 kg each.',vi:'Cần giấy phép và hướng dẫn viên có thẻ. Porter vác 15 kg mỗi người.'}},
+ {id:'pass',en:'O Quy Ho Pass · Heaven’s Gate',vi:'Đèo Ô Quy Hồ · Cổng Trời',lat:22.35297,lon:103.76481,sp:'pass',major:1,src:'osm',walk:'4 h',bike:'30 min',guide:0,
+  f:{en:['2,000 m','~50 km long','Four great passes'],vi:['2.000 m','Dài ~50 km','Tứ đại đỉnh đèo']},
+  d:{en:'One of the four great passes of the northwest, climbing over the Hoàng Liên Sơn into Lai Châu. The Heaven’s Gate viewpoint at the top sometimes sees snow.',vi:'Một trong tứ đại đỉnh đèo Tây Bắc, vượt Hoàng Liên Sơn sang Lai Châu. Điểm ngắm Cổng Trời trên đỉnh đôi khi có tuyết.'},
+  t:{en:'Ride it, do not bus it. Fog can cut visibility to ten metres.',vi:'Đi xe máy, đừng đi xe khách. Sương có thể chỉ còn thấy mười mét.'}},
+ {id:'silver',en:'Silver Waterfall',vi:'Thác Bạc',lat:22.36324,lon:103.77683,sp:'falls',major:1,src:'osm',walk:'3.5 h',bike:'25 min',guide:0,
+  f:{en:['200 m fall','1,750 m','Pass road'],vi:['Cao 200 m','1.750 m','Đường đèo']},
+  d:{en:'A 200-metre white ribbon down the mountainside beside the pass road, loudest after summer rain.',vi:'Dải nước trắng 200 m đổ xuống sườn núi cạnh đường đèo, ầm nhất sau mưa hè.'},
+  t:{en:'Combine with Love Waterfall and the pass in one motorbike morning.',vi:'Gộp với Thác Tình Yêu và đèo trong một buổi sáng xe máy.'}},
+ {id:'love',en:'Love Waterfall',vi:'Thác Tình Yêu',lat:22.34734,lon:103.77243,sp:'falls',src:'osm',walk:'4 h',bike:'32 min',guide:0,
+  f:{en:['100 m fall','Golden Stream','National park'],vi:['Cao 100 m','Suối Vàng','Vườn quốc gia']},
+  d:{en:'A 30-minute walk up the Golden Stream through Hoàng Liên National Park, south of the pass road.',vi:'Đi bộ 30 phút ngược Suối Vàng trong Vườn quốc gia Hoàng Liên, phía nam đường đèo.'},
+  t:{en:'Rhododendrons flower along the path in March and April.',vi:'Đỗ quyên nở dọc đường vào tháng 3, tháng 4.'}},
+ {id:'catcat',en:'Cat Cat Village',vi:'Bản Cát Cát',lat:22.32853,lon:103.83468,sp:'house',major:1,src:'osm',walk:'30 min',bike:'6 min',guide:0,
+  f:{en:['Black Hmong','1,270 m','1920s hydro station'],vi:['Mông đen','1.270 m','Thủy điện Pháp 1920']},
+  d:{en:'The closest village to town, down a steep lane of hemp looms and indigo vats. A waterfall turns an old French hydro station at the bottom.',vi:'Bản gần thị xã nhất, xuống con dốc đầy khung dệt lanh và chum chàm. Dưới cùng là thác nước và trạm thủy điện Pháp cũ.'},
+  t:{en:'Walk down, take a xe ôm back up. The climb home is brutal.',vi:'Đi bộ xuống, bắt xe ôm lên. Leo về rất mệt.'}},
+ {id:'sinchai',en:'Sin Chai',vi:'Sín Chải',lat:22.3440,lon:103.8265,sp:'house',src:'approx',walk:'50 min',bike:'10 min',guide:0,
+  f:{en:['Black Hmong','Quiet','Cardamom'],vi:['Mông đen','Yên tĩnh','Thảo quả']},
+  d:{en:'A larger, quieter Hmong village on the slope above Cát Cát, with cardamom fields and few tourists.',vi:'Bản Mông lớn hơn, vắng hơn trên sườn núi phía trên Cát Cát, trồng thảo quả, ít khách.'},
+  t:{en:'Loop Cát Cát and Sín Chải in one morning on foot.',vi:'Đi bộ vòng Cát Cát và Sín Chải trong một buổi sáng.'}},
+ {id:'ylinhho',en:'Y Linh Ho',vi:'Ý Linh Hồ',lat:22.3160,lon:103.8520,sp:'house',src:'approx',walk:'1.2 h',bike:'12 min',guide:0,
+  f:{en:['Black Hmong','Trek stop'],vi:['Mông đen','Điểm dừng trek']},
+  d:{en:'First stop on the valley trek, where the path leaves the road and drops onto the terraces.',vi:'Điểm dừng đầu tiên của tuyến trek thung lũng, nơi lối mòn rời đường lớn và xuống ruộng bậc thang.'},
+  t:{en:'Buy water here. The next shop is Lao Chải.',vi:'Mua nước ở đây. Quán tiếp theo là Lao Chải.'}},
+ {id:'laochai',en:'Lao Chai',vi:'Lao Chải',lat:22.31002,lon:103.87623,sp:'house',major:1,src:'osm',walk:'2 h',bike:'15 min',guide:1,
+  f:{en:['Black Hmong','1,000 m','Terrace views'],vi:['Mông đen','1.000 m','Ngắm ruộng bậc thang']},
+  d:{en:'The first big village on the valley trek. Terraces cascade a thousand steps down to the Mường Hoa river.',vi:'Bản lớn đầu tiên trên tuyến trek. Ruộng bậc thang đổ nghìn bậc xuống suối Mường Hoa.'},
+  t:{en:'Classic half-day: Sapa, Ý Linh Hồ, Lao Chải, Tả Van, lunch by the river.',vi:'Nửa ngày kinh điển: Sa Pa, Ý Linh Hồ, Lao Chải, Tả Van, ăn trưa bên suối.'}},
+ {id:'tavan',en:'Ta Van',vi:'Tả Van',lat:22.30266,lon:103.88858,sp:'house',major:1,src:'osm',walk:'3 h',bike:'25 min',guide:1,
+  f:{en:['Giáy people','990 m','Homestays'],vi:['Người Giáy','990 m','Homestay']},
+  d:{en:'A Giáy village on the valley floor, now the homestay capital. Stilt houses, buffalo in the paddies, rice wine after dinner.',vi:'Bản người Giáy dưới đáy thung lũng, thủ phủ homestay. Nhà sàn, trâu dưới ruộng, rượu gạo sau bữa tối.'},
+  t:{en:'Stay one night. The valley at dawn is the real Sapa.',vi:'Ở lại một đêm. Thung lũng lúc bình minh mới là Sa Pa thật.'}},
+ {id:'rocks',en:'Ancient Rock Field',vi:'Bãi đá cổ Mường Hoa',lat:22.30407,lon:103.89856,sp:'rocks',src:'osm',walk:'3.2 h',bike:'28 min',guide:0,
+  f:{en:['~200 carved stones','National relic','Hầu Thào'],vi:['~200 phiến đá khắc','Di tích quốc gia','Hầu Thào']},
+  d:{en:'Around two hundred sandstone boulders carved with spirals, figures and lines that no one has fully read. Some may be a thousand years old.',vi:'Khoảng hai trăm tảng sa thạch khắc xoắn ốc, hình người và vạch chưa ai đọc hết. Có thể đã nghìn năm tuổi.'},
+  t:{en:'The carved boulder museum by the road explains the best stones.',vi:'Bảo tàng đá khắc bên đường giải thích những phiến đẹp nhất.'}},
+ {id:'giang',en:'Giang Ta Chai',vi:'Giàng Tả Chải',lat:22.2975,lon:103.9050,sp:'dao',src:'approx',walk:'4 h',bike:'35 min',guide:1,
+  f:{en:['Red Dao','Rattan bridge','Waterfall'],vi:['Dao đỏ','Cầu mây','Thác nước']},
+  d:{en:'A Red Dao village across a swaying bridge over the Mường Hoa, with a waterfall through bamboo just above the houses.',vi:'Bản Dao đỏ bên kia cây cầu mây đung đưa qua suối Mường Hoa, thác nước chảy qua rừng tre ngay trên bản.'},
+  t:{en:'Continue downstream to Su Pán for a two-day loop with a river swim.',vi:'Đi tiếp xuôi dòng tới Su Pán cho vòng hai ngày, có tắm suối.'}},
+ {id:'supan',en:'Su Pan & Muong Hoa',vi:'Su Pán & Mường Hoa',lat:22.29366,lon:103.92284,sp:'house',major:1,src:'osm',walk:'5 h',bike:'45 min',guide:1,
+  f:{en:['Tày and Hmong','1,070 m','River swims'],vi:['Tày và Mông','1.070 m','Tắm suối']},
+  d:{en:'Villages at the lower end of the valley where the river slows into swimming holes. Bản Hồ is another 5 km downstream.',vi:'Các bản ở cuối thung lũng, nơi suối chảy chậm thành vũng tắm. Bản Hồ cách thêm 5 km xuôi dòng.'},
+  t:{en:'End of the two-day trek. A car can collect you here.',vi:'Điểm cuối tuyến trek hai ngày. Có thể gọi xe đón ở đây.'}},
+ {id:'banho',en:'Ban Ho',vi:'Bản Hồ',lat:22.26369,lon:103.96805,sp:'house',major:1,src:'osm',walk:'7 h',bike:'1 h',guide:1,
+  f:{en:['Tày people','Warm valley floor','Hot springs'],vi:['Người Tày','Đáy thung lũng ấm','Suối nước nóng']},
+  d:{en:'A Tày village far down the valley, about a thousand metres lower and noticeably warmer than Sapa. Stilt houses line the river, with hot springs and a waterfall nearby.',vi:'Bản người Tày cuối thung lũng, thấp hơn Sa Pa khoảng nghìn mét và ấm rõ rệt. Nhà sàn dọc suối, gần đó có suối nước nóng và thác.'},
+  t:{en:'The far end of the two-day valley trek. Arrange a car back to town.',vi:'Điểm cuối tuyến trek thung lũng hai ngày. Nên đặt xe về thị xã.'}},
+ {id:'trungchai',en:'Trung Chai',vi:'Trung Chải',lat:22.3973182,lon:103.8900507,sp:'house',src:'osm',walk:'3.5 h',bike:'25 min',guide:0,
+  f:{en:['Hmong and Red Dao','Road to Lào Cai','Móng Sến viaduct'],vi:['Mông và Dao đỏ','Đường về Lào Cai','Cầu Móng Sến']},
+  d:{en:'A commune of Hmong and Red Dao hamlets along the main road down to Lào Cai. The Móng Sến viaduct, with some of the tallest piers in Vietnam, crosses the gorge here.',vi:'Xã gồm các thôn người Mông và Dao đỏ dọc quốc lộ xuống Lào Cai. Cầu cạn Móng Sến, một trong những cây cầu có trụ cao nhất Việt Nam, vượt qua hẻm núi ở đây.'},
+  t:{en:'The lay-bys above the gorge give the best view of the bridge.',vi:'Các điểm dừng xe phía trên hẻm núi cho góc nhìn cây cầu đẹp nhất.'}},
+ {id:'thanhbinh',en:'Thanh Binh',vi:'Thanh Bình',lat:22.3028375,lon:103.9849741,sp:'dao',src:'osm',walk:'8 h',bike:'1.2 h',guide:1,
+  f:{en:['Red Dao and Hmong','Off the trek routes','Cardamom forest'],vi:['Dao đỏ và Mông','Ngoài tuyến trek','Rừng thảo quả']},
+  d:{en:'A quiet commune on the ridge east of the lower valley, well away from the trekking routes. Terraces drop from the road toward the Ngòi Bo, as the Mường Hoa river is called downstream.',vi:'Xã yên tĩnh trên sườn núi phía đông cuối thung lũng, xa các tuyến trek. Ruộng bậc thang đổ từ đường xuống Ngòi Bo, tên của suối Mường Hoa ở hạ lưu.'},
+  t:{en:'Come with a local guide; few people here work with tourists.',vi:'Nên đi cùng hướng dẫn viên địa phương; ít người ở đây làm du lịch.'}},
+ {id:'muongbo',en:'Muong Bo',vi:'Mường Bo',lat:22.2556353,lon:103.9891631,sp:'house',src:'osm',walk:'8.5 h',bike:'1.2 h',guide:1,
+  f:{en:['Tày, Dao, Xa Phó','Ngòi Bo river','Warm all year'],vi:['Tày, Dao, Xa Phó','Suối Ngòi Bo','Ấm quanh năm']},
+  d:{en:'A low, warm commune of Tày, Red Dao and Xa Phó villages where the river leaves the map. Stilt houses stand among paddies and palms, almost a thousand metres below Sapa town.',vi:'Xã vùng thấp, ấm áp của người Tày, Dao đỏ và Xa Phó, nơi dòng suối rời bản đồ. Nhà sàn đứng giữa ruộng lúa và hàng cọ, thấp hơn thị xã Sa Pa gần nghìn mét.'},
+  t:{en:'The road down from Bản Hồ follows the river all the way.',vi:'Đường từ Bản Hồ xuống men theo suối suốt quãng.'}},
+ {id:'glass',en:'Rong May Glass Bridge',vi:'Cầu kính Rồng Mây',lat:22.3727007,lon:103.7572886,sp:'glass',src:'osm',walk:'5.5 h',bike:'45 min',guide:0,
+  f:{en:['Glass floor','Glass lift up the cliff','O Quy Hồ pass'],vi:['Sàn kính','Thang máy kính lên vách đá','Đèo Ô Quy Hồ']},
+  d:{en:'A glass-floored platform jutting from the cliff above the pass road, reached by a glass lift about 300 m up the rock face. It stands just across the provincial border in Lai Châu.',vi:'Sàn kính vươn ra khỏi vách núi phía trên đường đèo, lên bằng thang máy lồng kính cao khoảng 300 m theo vách đá. Cầu nằm ngay bên kia ranh giới tỉnh, thuộc Lai Châu.'},
+  t:{en:'Go on a clear morning. In cloud you see only white.',vi:'Nên đi vào buổi sáng trời quang. Gặp mây chỉ thấy một màu trắng.'}},
+ {id:'taphin',en:'Ta Phin',vi:'Tả Phìn',lat:22.39529,lon:103.84303,sp:'dao',major:1,src:'osm',walk:'3 h',bike:'25 min',guide:0,
+  f:{en:['Red Dao','1,280 m','Herbal baths'],vi:['Dao đỏ','1.280 m','Tắm lá thuốc']},
+  d:{en:'Famous for the Red Dao herbal bath: a wooden barrel of near-boiling water steeped with a dozen forest leaves. A roofless 1940s French monastery stands nearby.',vi:'Nổi tiếng với tắm lá thuốc Dao đỏ: thùng gỗ nước nóng ngâm hàng chục loại lá rừng. Gần đó là phế tích tu viện Pháp thập niên 1940.'},
+  t:{en:'Fifteen minutes in the bath is enough.',vi:'Ngâm mười lăm phút là đủ.'}},
+];
+/* a place is 2 tiles wide on the map, the six big ones 3; x,y is its top-left tile */
+LM.forEach(l=>{l.w=l.big?3:2;l.x=Math.round(toX(l.lon)-l.w/2);l.y=Math.round(toY(l.lat)-l.w/2);l.km=km(CH,l);});
+const byId=id=>LM.find(l=>l.id===id);
+const LL=pts=>pts.map(p=>[toX(p[1]),toY(p[0])]);
+
+/* Trek overlays: where `re` matches the name of an OSM path that path is used; the hand line through verified villages otherwise. */
+const TREKS=[
+ {id:'valley',en:'Mường Hoa valley trek',vi:'Trek thung lũng Mường Hoa',col:'#c2412b',lines:[LL([[22.33512,103.84228],[22.3300,103.8470],[22.3230,103.8490],[22.3160,103.8520],[22.3120,103.8620],[22.31002,103.87623],[22.3060,103.8830],[22.30266,103.88858],[22.3000,103.8970],[22.2975,103.9050],[22.2950,103.9150],[22.29366,103.92284],[22.2840,103.9400],[22.2720,103.9560],[22.26369,103.96805]])]},
+ {id:'fansipan',en:'Fansipan trail (Trạm Tôn)',vi:'Đường mòn Trạm Tôn lên Fansipan',col:'#f1c232',re:'tram ton',lines:[LL([[22.35507,103.76072],[22.3420,103.7660],[22.3330,103.7700],[22.3220,103.7720],[22.3120,103.7750],[22.30308,103.77544]])]},
+ {id:'hamrong',en:'Hàm Rồng ridge trail',vi:'Lối mòn núi Hàm Rồng',col:'#5aa0ec',re:'ham rong',lines:[]},
+ {id:'vmm',en:'Vietnam Mountain Marathon course',vi:'Đường chạy VMM',col:'#9a8cff',re:'vmm',lines:[]},
+ {id:'taphin',en:'Tả Phìn loop',vi:'Vòng Tả Phìn',col:'#7ad0a0',lines:[LL([[22.33512,103.84228],[22.3372,103.8433],[22.3392,103.8452],[22.34074,103.84942],[22.3550,103.8520],[22.3680,103.8480],[22.3820,103.8450],[22.39529,103.84303]])]},
+ {id:'catcat',en:'Cát Cát · Sín Chải loop',vi:'Vòng Cát Cát · Sín Chải',col:'#f4f4f0',lines:[LL([[22.33512,103.84228],[22.3320,103.8385],[22.32853,103.83468],[22.3360,103.8300],[22.3440,103.8265],[22.3450,103.8360],[22.33512,103.84228]])]},
+ {id:'summit',en:'Summit steps',vi:'Bậc lên đỉnh',col:'#f1c232',lines:[LL([[22.30527,103.77531],[22.30308,103.77544]])]},
+];
+
+/* =====================================================================
+   2. SHARED HELPERS, DATA UNPACKING AND THE TERRAIN BUILD
+   These three functions are pure: they also run, as source text, inside
+   a background worker. They must not touch anything defined outside
+   themselves, so everything they need comes in through their arguments.
+   ===================================================================== */
+function sharedHelpers(){
+ function hash(x,y){let h=x*374761393+y*668265263;h=(h^(h>>13))*1274126177;return((h^(h>>16))>>>0)%1000/1000;}
+ function segDist(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;let t=l2?((px-ax)*dx+(py-ay)*dy)/l2:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
+ function polyLen(pts){let L=0;for(let i=0;i<pts.length-1;i++)L+=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);return L;}
+ function polyAt(pts,t){let L=polyLen(pts)*t;for(let i=0;i<pts.length-1;i++){const d=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);if(L<=d){const k=d?L/d:0;return[pts[i][0]+(pts[i+1][0]-pts[i][0])*k,pts[i][1]+(pts[i+1][1]-pts[i][1])*k];}L-=d;}return pts[pts.length-1];}
+ /* smooth value noise, so land without data forms coherent patches instead of speckle */
+ const NG=64,ngrid=new Float32Array(NG*NG);{let s=20261111;for(let i=0;i<NG*NG;i++){s=(Math.imul(s,1664525)+1013904223)>>>0;ngrid[i]=s/4294967296;}}
+ function nz(x,y){const xi=Math.floor(x),yi=Math.floor(y),fx=x-xi,fy=y-yi;const g=(a,b)=>ngrid[((a%NG)+NG)%NG+(((b%NG)+NG)%NG)*NG];const sm=t=>t*t*(3-2*t),u=sm(fx),v=sm(fy);return (g(xi,yi)*(1-u)+g(xi+1,yi)*u)*(1-v)+(g(xi,yi+1)*(1-u)+g(xi+1,yi+1)*u)*v;}
+ const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
+ const unpack=w=>{const o=[];for(let i=0;i<w.p.length;i+=2)o.push([w.p[i],w.p[i+1]]);return o;};
+ return{hash,segDist,polyLen,polyAt,nz,norm,unpack};
+}
+/* the data container: base64 -> gunzip -> [uint32 length][JSON][binary parts] */
+async function unpackData(b64){
+ if(typeof DecompressionStream==='undefined')throw new Error('nogzip');
+ const bin=atob(b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+ const buf=new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+ const jl=new DataView(buf.buffer,buf.byteOffset,4).getUint32(0,true),meta=JSON.parse(new TextDecoder().decode(buf.subarray(4,4+jl)));
+ return{meta,part:n=>{const p=meta.parts[n];return buf.subarray(4+jl+p[0],4+jl+p[0]+p[1]);}};
+}
+/* everything expensive about the land: returns typed arrays (one small value per tile, no objects) and a few lists */
+function buildTerrain(U,P,HP){
+ const {hash,segDist,polyLen,polyAt,nz,norm,unpack}=HP;
+ const {W,H,T,S,K,CLS,KINDS}=P,N=W*H,D=U.meta,OSM=D.osm,COVER=D.cover,BUILD=D.buildings,POIS=D.pois;
+ const KI={};KINDS.forEach((k,i)=>{KI[k]=i;});
+ const lm=P.lm,byId=id=>lm.find(l=>l.id===id),centre=l=>[l.x+l.w/2,l.y+l.w/2];
+ /* paint(): fn(x,y,dist) for every tile whose centre lies within w of the polyline */
+ function paint(pts,w,fn){for(let i=0;i<pts.length-1;i++){const [ax,ay]=pts[i],[bx,by]=pts[i+1];const x0=Math.max(0,Math.floor(Math.min(ax,bx)-w-1)),x1=Math.min(W-1,Math.ceil(Math.max(ax,bx)+w+1)),y0=Math.max(0,Math.floor(Math.min(ay,by)-w-1)),y1=Math.min(H-1,Math.ceil(Math.max(ay,by)+w+1));
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const d=segDist(x+.5,y+.5,ax,ay,bx,by);if(d<=w)fn(x,y,d);}}}
+ /* trace(): gap-free, 4-connected walk along a polyline, one call per tile it passes through */
+ function trace(pts,fn){let px=-1,py=-1;for(let i=0;i<pts.length-1;i++){const [ax,ay]=pts[i],[bx,by]=pts[i+1];const n=Math.max(1,Math.ceil(Math.hypot(bx-ax,by-ay)*4));for(let k=0;k<=n;k++){const x=Math.floor(ax+(bx-ax)*k/n),y=Math.floor(ay+(by-ay)*k/n);if(x<0||y<0||x>=W||y>=H){px=-1;continue;}if(x===px&&y===py)continue;if(px>=0&&x!==px&&y!==py)fn(x,py);fn(x,y);px=x;py=y;}}}
+ function inPoly(x,y,pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c;}return c;}
+ function fillPoly(pts,fn){const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);const x0=Math.max(0,Math.floor(Math.min(...xs))),x1=Math.min(W-1,Math.ceil(Math.max(...xs))),y0=Math.max(0,Math.floor(Math.min(...ys))),y1=Math.min(H-1,Math.ceil(Math.max(...ys)));for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(inPoly(x+.5,y+.5,pts))fn(x,y);}
+
+ /* elevation: stored at every `step`-th tile as predictor residuals, 1 m precision; smoothed back up with Catmull-Rom */
+ const ew=D.elev.w,eh=D.elev.h,es=D.elev.step,eb=U.part('elev'),en=ew*eh,lo=new Float32Array(en);
+ for(let y=0;y<eh;y++)for(let x=0;x<ew;x++){const i=y*ew+x;let r=eb[i]|(eb[en+i]<<8);if(r>32767)r-=65536;lo[i]=r+(x?lo[i-1]:0)+(y?lo[i-ew]:0)-((x&&y)?lo[i-ew-1]:0);}
+ const elev=new Float32Array(N);
+ if(es===1)elev.set(lo);
+ else{const L=(x,y)=>lo[Math.min(eh-1,Math.max(0,y))*ew+Math.min(ew-1,Math.max(0,x))];
+  const cr=(a,b,c,d,t)=>0.5*(2*b+(c-a)*t+(2*a-5*b+4*c-d)*t*t+(3*b-a-3*c+d)*t*t*t);
+  for(let y=0;y<H;y++){const fy=(y+.5)/es-.5,y0=Math.floor(fy),ty=fy-y0;for(let x=0;x<W;x++){const fx=(x+.5)/es-.5,x0=Math.floor(fx),tx=fx-x0;
+   elev[y*W+x]=cr(cr(L(x0-1,y0-1),L(x0,y0-1),L(x0+1,y0-1),L(x0+2,y0-1),tx),cr(L(x0-1,y0),L(x0,y0),L(x0+1,y0),L(x0+2,y0),tx),cr(L(x0-1,y0+1),L(x0,y0+1),L(x0+1,y0+1),L(x0+2,y0+1),tx),cr(L(x0-1,y0+2),L(x0,y0+2),L(x0+1,y0+2),L(x0+2,y0+2),tx),ty);}}}
+ const DB=P.detail,DBS=DB.size,DF=DB.factor,DN=DBS*DF,dbytes=U.part('detail'),detail=new Float32Array(DN*DN);for(let i=0;i<DN*DN;i++)detail[i]=1100+dbytes[i]*3.5;
+ /* Sentinel-2 land cover per tile: 0 none 1 water 2 trees 3 flooded 4 crops 5 built 6 bare 7 snow 8 cloud 9 rangeland */
+ const lcGrid=U.part('lc');
+ const eAt=(x,y)=>elev[Math.min(H-1,Math.max(0,y))*W+Math.min(W-1,Math.max(0,x))];
+ const dAt=(i,j)=>detail[Math.min(DN-1,Math.max(0,j))*DN+Math.min(DN-1,Math.max(0,i))];
+ /* hillshade: light from the north-west; positive = lit */
+ const shade=new Float32Array(N);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const gx=(eAt(x+1,y)-eAt(x-1,y))/2,gy=(eAt(x,y+1)-eAt(x,y-1))/2;shade[y*W+x]=Math.max(-1,Math.min(1,(gx+gy)/(55/K)));}
+ const dshade=new Float32Array(DN*DN);for(let j=0;j<DN;j++)for(let i=0;i<DN;i++){const gx=(dAt(i+1,j)-dAt(i-1,j))/2,gy=(dAt(i,j+1)-dAt(i,j-1))/2;dshade[j*DN+i]=Math.max(-1,Math.min(1,(gx+gy)/14));}
+ const colMax=new Float32Array(W);for(let x=0;x<W;x++){let m=0;for(let y=0;y<H;y++)m=Math.max(m,elev[y*W+x]);colMax[x]=m;}
+
+ const kind=new Uint8Array(N),flags=new Uint8Array(N),snow=new Uint8Array(N),quad=new Uint16Array(N);
+ const dRiver=new Float32Array(N).fill(99),dStreet=new Float32Array(N).fill(99),trailF=new Uint8Array(N),cover=new Uint8Array(N),bCount=new Uint8Array(N),bKind=new Uint8Array(N),bNear=new Uint8Array(N);
+ const COVER_ID={farm:1,orchard:2,forest:3,scrub:4,grass:5,res:6,wet:7,rock:8,water:9,park:10};
+ const TOWN_R=21*K,churchX=P.church.x,churchY=P.church.y,townDist=(x,y)=>Math.hypot(x+.5-churchX,y+.5-churchY),inTownT=(x,y)=>townDist(x,y)<TOWN_R+6*K;
+ /* thin lines on the art grid, one bit per subpixel and 16 per tile: stMask = roads and streets, railMask = railways */
+ const stMask=new Uint16Array(N),railMask=new Uint16Array(N),mainF=new Uint8Array(N);
+ function subTrace(mask,pts,brush,townOnly){for(let i=0;i<pts.length-1;i++){const [ax,ay]=pts[i],[bx,by]=pts[i+1];const n=Math.max(1,Math.ceil(Math.hypot(bx-ax,by-ay)*16));for(let k=0;k<=n;k++){const gx=Math.floor((ax+(bx-ax)*k/n)*4),gy=Math.floor((ay+(by-ay)*k/n)*4);for(let dy=0;dy<brush;dy++)for(let dx=0;dx<brush;dx++){const sx=gx+dx,sy=gy+dy,x=sx>>2,y=sy>>2;if(x<0||y<0||x>=W||y>=H||(townOnly&&!inTownT(x,y)))continue;mask[y*W+x]|=1<<((sy&3)*4+(sx&3));}}}}
+ /* ---- water, on the art grid: one bit per subpixel, 16 per tile ----
+    Lakes and reservoirs come from their OpenStreetMap outlines, with islands cut out. Rivers are channels that widen
+    downstream: the width at any point follows the length of river above it, tributaries included. */
+ const wMask=new Uint16Array(N),lakeT=new Uint8Array(N),riverT=new Uint8Array(N),rapidT=new Uint8Array(N);
+ const pop16=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;};
+ function fillSub(pts,on){let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of pts){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1]);}
+  x0=Math.max(0,Math.floor(x0*4));x1=Math.min(W*4-1,Math.ceil(x1*4));y0=Math.max(0,Math.floor(y0*4));y1=Math.min(H*4-1,Math.ceil(y1*4));
+  for(let sy=y0;sy<=y1;sy++)for(let sx=x0;sx<=x1;sx++){if(!inPoly((sx+.5)/4,(sy+.5)/4,pts))continue;const i=(sy>>2)*W+(sx>>2),b=1<<((sy&3)*4+(sx&3));if(on)wMask[i]|=b;else wMask[i]&=~b;}}
+ for(const w of (D.water||[]))fillSub(unpack({p:w}),true);
+ for(const w of (D.holes||[]))fillSub(unpack({p:w}),false);
+ /* the shore snaps to the tile where less than a third of it is water */
+ for(let i=0;i<N;i++){if(!wMask[i])continue;if(pop16(wMask[i])<6)wMask[i]=0;else lakeT[i]=1;}
+ {const RV=OSM.rivers.map(w=>{const pts=unpack(w),a=pts[0],b=pts[pts.length-1];
+   /* OSM draws waterways downstream; turn round the few that are not */
+   if(eAt(Math.floor(a[0]),Math.floor(a[1]))<eAt(Math.floor(b[0]),Math.floor(b[1]))-2)pts.reverse();
+   const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+   return{pts,cum,len:cum[cum.length-1],river:CLS[w.c]==='river',to:-1,toS:0,up:-1};});
+  /* where each one ends: on another river, at its nearest point within two and a half tiles */
+  RV.forEach((r,i)=>{const e=r.pts[r.pts.length-1];let bd=2.5;RV.forEach((q,j)=>{if(j===i)return;for(let s=0;s<q.pts.length-1;s++){const a=q.pts[s],b=q.pts[s+1],d=segDist(e[0],e[1],a[0],a[1],b[0],b[1]);if(d<bd){bd=d;r.to=j;const dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy,t=l2?Math.max(0,Math.min(1,((e[0]-a[0])*dx+(e[1]-a[1])*dy)/l2)):0;r.toS=q.cum[s]+t*Math.sqrt(l2);}}});});
+  /* length of river above the end of each one (-2 marks one being worked out, so a loop in the data cannot recurse forever) */
+  const upLen=i=>{const r=RV[i];if(r.up>=0)return r.up;if(r.up===-2)return 0;r.up=-2;let s=r.len;RV.forEach((q,j)=>{if(q.to===i)s+=upLen(j);});r.up=s;return s;};
+  const widthOf=f=>f<50?1:f<160?2:f<420?3:f<900?4:5; /* in art pixels of about 10 m; f is in tiles */
+  /* the bed's own fall, in metres per tile, measured along the channel: rapids are where it is steep */
+  const ptAt=(r,s)=>{s=Math.max(0,Math.min(r.len,s));let k=0;while(k<r.cum.length-2&&r.cum[k+1]<s)k++;const d=r.cum[k+1]-r.cum[k],t=d?(s-r.cum[k])/d:0,a=r.pts[k],b=r.pts[k+1];return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];};
+  const fall=(r,s)=>{const a=ptAt(r,s-1.5),b=ptAt(r,s+1.5);return(eAt(Math.floor(a[0]),Math.floor(a[1]))-eAt(Math.floor(b[0]),Math.floor(b[1])))/3;};
+  RV.forEach((r,i)=>{const trib=[];RV.forEach((q,j)=>{if(q.to===i)trib.push([q.toS,upLen(j)]);});
+   for(let k=0;k<r.pts.length-1;k++){const a=r.pts[k],b=r.pts[k+1],d=r.cum[k+1]-r.cum[k],n=Math.max(1,Math.ceil(d*8));
+    for(let j=0;j<=n;j++){const t=j/n,s=r.cum[k]+d*t;let f=s;for(const tr of trib)if(tr[0]<=s)f+=tr[1];
+     const w=Math.max(r.river?2:1,widthOf(f)),fl=fall(r,s),rapid=w>=2?fl>3:fl>10,gx=Math.floor((a[0]+(b[0]-a[0])*t)*4)-(w>>1),gy=Math.floor((a[1]+(b[1]-a[1])*t)*4)-(w>>1);
+     for(let dy=0;dy<w;dy++)for(let dx=0;dx<w;dx++){const sx=gx+dx,sy=gy+dy,x=sx>>2,y=sy>>2;if(x<0||y<0||x>=W||y>=H)continue;const ii=y*W+x;wMask[ii]|=1<<((sy&3)*4+(sx&3));riverT[ii]=1;if(rapid)rapidT[ii]=1;}}}
+   paint(r.pts,14*K,(x,y,d)=>{const ii=y*W+x;if(d<dRiver[ii])dRiver[ii]=d;});});}
+ const mark=(x,y)=>{trailF[y*W+x]=1;};
+ const ways={main:[],minor:[],town:[]};
+ for(const w of OSM.roads){const c=CLS[w.c],pts=unpack(w);if(c==='path'){paint(pts,0.7,mark);trace(pts,mark);continue;}
+  const big=c==='trunk'||c==='primary'||c==='secondary'||c==='tertiary';(big?ways.main:ways.minor).push(pts);
+  /* every road is a lane on the art grid: main roads two subpixels wide, the rest one, which leaves room for the houses
+     and gardens of a village between them. Tiles on a main road are flagged so the road still shows when zoomed out */
+  if(big){trace(pts,(x,y)=>{mainF[y*W+x]=1;});subTrace(stMask,pts,2,false);}
+  else subTrace(stMask,pts,1,false);
+  if(c!=='track'&&pts.some(p=>townDist(p[0],p[1])<TOWN_R+3*K))paint(pts,2.2*K,(x,y,d)=>{const i=y*W+x;if(d<dStreet[i])dStreet[i]=d;});}
+ for(const w of OSM.streets){const pts=unpack(w);ways.town.push(pts);paint(pts,2.2*K,(x,y,d)=>{const i=y*W+x;if(d<dStreet[i])dStreet[i]=d;});subTrace(stMask,pts,1,true);}
+ for(const w of (OSM.rail||[]))subTrace(railMask,unpack(w),1,false);
+ /* treks: OSM paths where a name matches, the hand-drawn line otherwise */
+ const pathWays=OSM.roads.filter(w=>CLS[w.c]==='path'),trekLines={};
+ for(const t of P.treks){let lines=t.lines||[];if(t.re){const re=new RegExp(t.re),found=pathWays.filter(w=>re.test(norm(w.n))).map(unpack);if(found.length)lines=found;}trekLines[t.id]=lines;for(const ln of lines){paint(ln,0.7,mark);trace(ln,mark);}}
+ /* a street or trail over a river makes the tile a crossing. A lake is crossed only by a real street, and only on a
+    tile that is nearly all water: a street that merely runs along the shore keeps its tile as land */
+ for(let i=0;i<N;i++)if(lakeT[i]&&!riverT[i]&&stMask[i]&&pop16(wMask[i])<12){lakeT[i]=0;wMask[i]=0;}
+ /* the promenade: land within two tiles of a lake in town becomes park */
+ const lakeNear=new Uint8Array(N);for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(!lakeT[y*W+x]||townDist(x,y)>=TOWN_R)continue;for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H)lakeNear[yy*W+xx]=1;}}
+ /* OpenStreetMap land-cover polygons where they exist: general classes first, specific ones override */
+ for(const cls of ['forest','scrub','grass','farm','orchard','rock','wet','res','park','water'])for(const p of COVER){if(p.c!==cls)continue;fillPoly(unpack(p),(x,y)=>{cover[y*W+x]=COVER_ID[cls];});}
+ /* OSM building footprints (centroids): count per tile, dominant kind, and a 'real data nearby' mask */
+ const BK={house:1,big:2,hotel:3,school:2,hospital:2,ind:2,church:1};
+ for(const b of BUILD){const x=Math.floor(b[0]),y=Math.floor(b[1]);if(x<0||y<0||x>=W||y>=H)continue;const i=y*W+x;bCount[i]=Math.min(9,bCount[i]+1);bKind[i]=Math.max(bKind[i],BK[b[2]]||1);const r=3*K;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H)bNear[yy*W+xx]=1;}}
+ const hotelCnt=new Uint8Array(N);for(const p of OSM.hotels){const x=Math.floor(p[0]),y=Math.floor(p[1]);if(x>=0&&y>=0&&x<W&&y<H)hotelCnt[y*W+x]=Math.min(4,hotelCnt[y*W+x]+1);}
+ const pass=byId('pass'),passX=pass.x+pass.w/2,passY=pass.y+pass.w/2;
+ const SQUARE=P.square,villages=lm.filter(l=>l.sp==='house'||l.sp==='dao');
+ /* slope in metres per 77 m, so the thresholds below read the same at any tile size */
+ const slopeAt=(x,y)=>Math.max(Math.abs(eAt(x+K,y)-eAt(x-K,y)),Math.abs(eAt(x,y+K)-eAt(x,y-K)))/2;
+ const mk=byId('market'),bs=byId('bus');
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const i=y*W+x,e=elev[i],v=hash(x,y),sl=slopeAt(x,y),td=townDist(x,y),cx=x+.5,cy=y+.5,cv0=cover[i],lc=lcGrid[i];let k,gen=0;
+  const inSquare=Math.abs(cx-SQUARE.x)<2.6*K&&Math.abs(cy-SQUARE.y)<1.6*K;
+  if(lakeT[i]||riverT[i])k=(stMask[i]||(trailF[i]&&riverT[i]))?'bridge':'water';
+  else if(Math.abs(cx-mk.x-mk.w/2)<2*K&&Math.abs(cy-mk.y-mk.w/2)<1.6*K)k='market';
+  else if(Math.abs(cx-bs.x-bs.w/2)<1.6*K&&Math.abs(cy-bs.y-bs.w/2)<1.6*K)k='busyard';
+  else if(inSquare)k='plaza';
+  else if((bCount[i]||hotelCnt[i])&&td<TOWN_R+8*K)k='town';
+  else if(cv0===10||lakeNear[i])k='park';
+  else if(td<TOWN_R&&!bNear[i]&&dStreet[i]<(td<10*K?2.6*K:1.8*K)&&v<0.97*(1-td/(TOWN_R+10*K))+0.1){k='town';gen=td<8*K?2:1;}
+  else if(td<TOWN_R+8*K&&lc===5&&!bNear[i]&&dStreet[i]<3*K&&v<0.55){k='town';gen=1;}
+  else if(hotelCnt[i]&&e<2400){k='village';gen=1;} /* homestays out in the valley */
+  /* built-up land outside town is a village: houses gather where a smooth noise field is high, the rest is garden */
+  else if(lc===5&&td>=TOWN_R){const c=nz(x/(2.2*K)+7,y/(2.2*K)+3)*0.75+v*0.25;if(sl<50&&c>0.42){k='village';gen=c>0.62?3:c>0.52?2:1;}else k='garden';}
+  else if(villages.some(l=>Math.abs(cx-l.x-l.w/2)<3.5*K&&Math.abs(cy-l.y-l.w/2)<3.5*K)&&v<0.2&&sl<35){k='village';gen=1;}
+  else if(cv0===6&&dStreet[i]<2*K&&v<0.5){k='town';gen=1;}
+  else if(lc===1){k='water';wMask[i]=0xFFFF;}
+  else if(cv0===8||e>2500||(sl>95&&e>2000))k='rock';
+  else if(cv0===3)k='forest';
+  else if(cv0===4)k='scrub';
+  else if(cv0===1)k='terrace';
+  else if(cv0===2)k='orchard';
+  else if(cv0===5||cv0===7||cv0===6)k='grass';
+  else{const n1=nz(x/(7*K),y/(7*K))*0.65+nz(x/(2.5*K),y/(2.5*K))*0.35;
+   /* Sentinel-2 class first; the slope and noise rules only fill tiles it could not classify */
+   if(lc===2)k='forest';
+   else if(lc===4)k=(e<2000&&sl<60)?'terrace':'grass';
+   else if(lc===9)k=(sl>40||n1>0.55)?'scrub':'grass';
+   else if(lc===6)k=(e>2200||sl>70)?'rock':'bare';
+   else if(lc===5)k='garden';
+   else if(lc===3)k='grass';
+   else if(e<1800&&sl<45&&(dRiver[i]<11*K||td<34*K)&&n1<0.7)k='terrace';
+   else if(e>1950||sl>60||n1>0.52)k='forest';
+   else if(sl>40||n1>0.42)k='scrub';
+   else k='grass';}
+  kind[i]=KI[k];
+  /* a town or village tile holds up to four small buildings, one per 2x2-subpixel quadrant that no street crosses.
+     Styles: 1 house, 2 hotel, 3 large, 4 thatch, 5 rust tin, 6 blue tin. Three bits per quadrant. */
+  if(k==='town'||k==='village'){const styles=[];
+   if(k==='town'){for(let n=0;n<hotelCnt[i];n++)styles.push(2);for(let n=0;n<bCount[i];n++)styles.push(n===0&&bKind[i]===2?3:1);for(let n=0;n<gen;n++)styles.push(1);}
+   else for(let n=0;n<Math.max(1,gen);n++)styles.push(4+Math.floor(hash(x*9+n,y*5+2)*3));
+   const order=[0,1,2,3].sort((a,b)=>hash(x*4+a,y*4+7)-hash(x*4+b,y*4+7));let si=0,q=0;for(const qi of order){if(si>=styles.length)break;const qx=(qi&1)*2,qy=(qi>>1)*2;const bits=(1<<(qy*4+qx))|(1<<(qy*4+qx+1))|(1<<((qy+1)*4+qx))|(1<<((qy+1)*4+qx+1));let ov=stMask[i]&bits,nb=0;while(ov){nb+=ov&1;ov>>>=1;}if(nb>1)continue;q|=styles[si++]<<(qi*3);}
+   quad[i]=q;}
+  /* snow, January and February only: 2 the high ridge and the summit, 3 a patchy dusting lower down and around the pass */
+  const n2=nz(x/(4*K)+11,y/(4*K)+23),pd=Math.hypot(cx-passX,cy-passY);snow[i]=e>2800?2:(e>2450&&n2>0.5)?3:(pd<8*K&&e>1930&&n2>0.42)?3:0;
+  /* flags: 1 trail, 2 main road, 4 rapids (a river whose bed falls steeply) */
+  if(trailF[i])flags[i]=1;if(mainF[i])flags[i]|=2;if(rapidT[i])flags[i]|=4;
+ }
+ for(const l of lm)for(let dy=0;dy<l.w;dy++)for(let dx=0;dx<l.w;dx++){const x=l.x+dx,y=l.y+dy;if(x>=0&&y>=0&&x<W&&y<H&&kind[y*W+x]!==KI.water)flags[y*W+x]|=1;}
+ /* lists the renderer walks every frame */
+ const water=[],windows=[],sts=[],lamps=[];
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,k=kind[i],v=hash(x,y);if(k===KI.water||(k===KI.bridge&&wMask[i]))water.push(x,y);if(k===KI.town||k===KI.market||k===KI.village)windows.push(x,y);
+  /* only town streets are lit at night */
+  if(stMask[i]&&k!==KI.water&&inTownT(x,y)){sts.push(x,y);if(v<0.2){const m=stMask[i];let b=0;while(!(m&(1<<b)))b++;lamps.push(x*T+(b&3)*S,y*T+(b>>2)*S);}}
+  else if((k===KI.plaza&&v<0.06)||(k===KI.park&&v<0.08))lamps.push(x*T+T/2,y*T+T/2);}
+ /* named streets for labels: midpoint of each named way in town */
+ const streetLabels=[];{const seen=new Set();for(const w of OSM.streets.concat(OSM.roads)){if(!w.n)continue;const pts=unpack(w),mid=polyAt(pts,0.5);if(townDist(mid[0],mid[1])>TOWN_R+6*K)continue;const key=norm(w.n);if(seen.has(key))continue;seen.add(key);streetLabels.push({n:w.n.replace(/^(Đường|Phố|Ngõ)\s+/i,''),x:mid[0],y:mid[1]});}}
+ /* ride lines from OSM: the Muong Hoa mountain train (Sun Plaza to the cable car base) and the Fansipan cable car */
+ function chain(lines,from){const left=lines.map(l=>l.slice());if(!left.length)return null;const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  let bi=0,bd=1e9,rev=false;left.forEach((l,i)=>{const d0=dist(l[0],from),d1=dist(l[l.length-1],from);if(d0<bd){bd=d0;bi=i;rev=false;}if(d1<bd){bd=d1;bi=i;rev=true;}});
+  let out=left.splice(bi,1)[0];if(rev)out.reverse();
+  for(;;){const tail=out[out.length-1];let ni=-1,nd=3*K,nrev=false;left.forEach((l,i)=>{const d0=dist(l[0],tail),d1=dist(l[l.length-1],tail);if(d0<nd){nd=d0;ni=i;nrev=false;}if(d1<nd){nd=d1;ni=i;nrev=true;}});if(ni<0)break;const nx=left.splice(ni,1)[0];if(nrev)nx.reverse();out=out.concat(nx);}
+  return out;}
+ const sp=byId('sunplaza'),cab=byId('cable'),top=byId('doquyen');
+ const trainLine=chain((OSM.rail||[]).filter(w=>w.k==='funicular'&&/muong hoa/.test(norm(w.n))).map(unpack),centre(sp))||[centre(sp),centre(cab)];
+ const cableLine=(()=>{const c=(OSM.cable||[]).map(unpack)[0],a=centre(cab);if(!c)return[a,centre(top)];const dist=p=>Math.hypot(p[0]-a[0],p[1]-a[1]);return dist(c[0])<dist(c[c.length-1])?c:c.slice().reverse();})();
+ const longest=re=>{let best=null;for(const w of OSM.roads){if(!re.test(norm(w.n)))continue;const p=unpack(w);if(!best||polyLen(p)>polyLen(best))best=p;}return best;};
+ /* waterfalls, viewpoints and peaks: fill in a height from the grid where OSM has none */
+ const feat=(OSM.feat||[]).filter(f=>f.x>=0&&f.y>=0&&f.x<W&&f.y<H).map(f=>({k:f.k,n:f.n||'',ne:f.ne||'',x:f.x,y:f.y,e:f.e||Math.round(elev[Math.floor(f.y)*W+Math.floor(f.x)])}));
+ const u16=a=>Uint16Array.from(a);
+ const out={elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles:u16(water),windowTiles:u16(windows),stTiles:u16(sts),lampPts:u16(lamps),
+  streetLabels,trainLine,cableLine,trekLines,ways,passRoad:longest(/o quy ho|quoc lo 4d/),valleyRoad:longest(/tinh 152|lao chai/),feat,pois:POIS,stays:OSM.stays||[]};
+ out.transfer=[elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
+ return out;
+}
+const {hash,polyLen,polyAt,nz}=sharedHelpers();
+
+/* =====================================================================
+   3. TERRAIN: built in a background worker when the browser allows it,
+   so the page stays responsive while it loads; on this thread otherwise.
+   ===================================================================== */
+const KINDS=['water','bridge','terrace','grass','scrub','orchard','forest','rock','snow','road','track','street','plaza','park','busyard','market','hotel','big','town','hut','bare','village','garden'];
+const KI={};KINDS.forEach((k,i)=>{KI[k]=i;});
+const SPEC={W,H,T,S,K,CLS,KINDS,detail:FR.detail,church:{x:toX(CH.lon),y:toY(CH.lat)},lm:LM.map(l=>({id:l.id,x:l.x,y:l.y,w:l.w,sp:l.sp})),treks:TREKS.map(t=>({id:t.id,lines:t.lines,re:t.re||null})),square:{x:toX(103.84148),y:toY(22.33528)}};
+async function getTerrain(){
+ const here=async()=>buildTerrain(await unpackData(DATA_GZ),SPEC,sharedHelpers());
+ if(HASH.worker==='0'||typeof Worker==='undefined'||typeof Blob==='undefined'||typeof URL==='undefined'||!URL.createObjectURL)return here();
+ try{
+  const src='const sharedHelpers='+sharedHelpers.toString()+';const unpackData='+unpackData.toString()+';const buildTerrain='+buildTerrain.toString()+';onmessage=async e=>{try{const r=buildTerrain(await unpackData(e.data.gz),e.data.spec,sharedHelpers());const t=r.transfer;delete r.transfer;postMessage({ok:true,r},t);}catch(err){postMessage({ok:false,err:String(err&&err.message||err)});}};';
+  const url=URL.createObjectURL(new Blob([src],{type:'text/javascript'})),w=new Worker(url);
+  return await new Promise((res,rej)=>{w.onmessage=e=>{w.terminate();URL.revokeObjectURL(url);if(e.data.ok)res(e.data.r);else rej(new Error(e.data.err));};w.onerror=()=>{w.terminate();rej(new Error('worker'));};w.postMessage({gz:DATA_GZ,spec:SPEC});});
+ }catch(e){if(e.message==='nogzip')throw e;return here();}
+}
+let R;try{R=await getTerrain();}catch(e){loadingEl.textContent=e.message==='nogzip'?'Bản đồ cần trình duyệt từ 2023 trở lên · This map needs a browser from 2023 or later (Chrome 80+, Firefox 113+, Safari 16.4+).':'Không dựng được bản đồ · Could not build the map: '+e.message;return;}
+const {elev,shade,dshade,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles,windowTiles,stTiles,lampPts}=R;
+const POIS=R.pois,STREET_LABELS=R.streetLabels,TRAIN_LINE=R.trainLine,CABLE_LINE=R.cableLine,WAYS=R.ways;
+for(const t of TREKS)t.lines=R.trekLines[t.id]||t.lines;
+const DBX=FR.detail.x,DBY=FR.detail.y,DBS=FR.detail.size,DF=FR.detail.factor,DN=DBS*DF;
+const inDetail=(x,y)=>x>=DBX&&x<DBX+DBS&&y>=DBY&&y<DBY+DBS;
+const eAt=(x,y)=>elev[Math.min(H-1,Math.max(0,y))*W+Math.min(W-1,Math.max(0,x))];
+const slopeAt=(x,y)=>Math.max(Math.abs(eAt(x+K,y)-eAt(x-K,y)),Math.abs(eAt(x,y+K)-eAt(x,y-K)))/2;
+/* height at any point, blended between the four nearest tile centres: the terraces are drawn from this */
+const eSub=(fx,fy)=>{const gx=fx-.5,gy=fy-.5,x0=Math.floor(gx),y0=Math.floor(gy),tx=gx-x0,ty=gy-y0;return(eAt(x0,y0)*(1-tx)+eAt(x0+1,y0)*tx)*(1-ty)+(eAt(x0,y0+1)*(1-tx)+eAt(x0+1,y0+1)*tx)*ty;};
+/* a tile is a view onto the typed arrays: nothing is stored per tile except a few bytes */
+class Tile{constructor(i){this.i=i;}
+ get k(){return KINDS[kind[this.i]];}
+ get e(){return elev[this.i];}
+ get v(){return hash(this.i%W,(this.i/W)|0);}
+ get sl(){return slopeAt(this.i%W,(this.i/W)|0);}
+ get trail(){return (flags[this.i]&1)===1;}
+ get st(){return stMask[this.i]?1:0;}
+ get sn(){return snow[this.i];}
+ get q(){const k=kind[this.i];if(k!==KI.town&&k!==KI.village)return null;const v=quad[this.i];return[v&7,(v>>3)&7,(v>>6)&7,(v>>9)&7];}}
+const OUTSIDE={k:'water',e:0,v:0,sl:0,trail:false,st:0,sn:0,q:null};
+const at=(x,y)=>(x<0||y<0||x>=W||y>=H)?OUTSIDE:new Tile(y*W+x);
+const TOWN_R=21*K,churchX=SPEC.church.x,churchY=SPEC.church.y;const townDist=(x,y)=>Math.hypot(x+.5-churchX,y+.5-churchY);
+const passable=(x,y)=>{if(x<0||y<0||x>=W||y>=H)return false;const i=y*W+x,k=kind[i];return k!==KI.water&&((flags[i]&1)===1||k!==KI.snow);};
+const isPaved=k=>k==='road'||k==='street'||k==='plaza'||k==='busyard'||k==='park'||k==='bridge'||k==='track';
+const pavedT=t=>isPaved(t.k)||t.st===1;
+const isBuilt=k=>k==='town'||k==='village'||k==='market'||k==='hut';
+const poiAt=new Map();for(const p of POIS){const x=Math.floor(p.x),y=Math.floor(p.y);if(x<0||y<0||x>=W||y>=H)continue;const i=y*W+x;if(!poiAt.has(i))poiAt.set(i,[]);poiAt.get(i).push(p);}
+/* the walkable tile closest to the foot of a landmark sprite, preferring pavement */
+function nearTarget(l){let best=null,bd=1e9;for(let dy=-l.w;dy<=l.w*2+2;dy++)for(let dx=-l.w;dx<=l.w*2;dx++){const x=l.x+dx,y=l.y+dy;if(!passable(x,y))continue;const d=Math.hypot(dx-(l.w/2-0.5),dy-(l.w+0.5))+(pavedT(at(x,y))?-0.8:0);if(d<bd){bd=d;best=[x,y];}}return best||[l.x+1,l.y+l.w];}
+/* walking cost of every tile, worked out once so route finding only reads an array */
+const costGrid=new Float32Array(W*H);{const C=new Float32Array(KINDS.length).fill(5);for(const k of ['road','street','plaza','busyard','park','bridge'])C[KI[k]]=1;C[KI.track]=1.2;for(const k of ['town','village','market','hut'])C[KI[k]]=1.6;for(const k of ['grass','terrace','orchard','bare','garden'])C[KI[k]]=2.2;C[KI.scrub]=2.8;C[KI.forest]=3.2;
+ for(let i=0;i<W*H;i++){const k=kind[i],tr=(flags[i]&1)===1;if(k===KI.water||(k===KI.snow&&!tr)){costGrid[i]=1e9;continue;}let c=C[k];if(stMask[i])c=Math.min(c,1);else if(tr)c=Math.min(c,1.4);costGrid[i]=c;}}
+/* waterfalls, viewpoints and peaks that are not already a place with a card */
+const FEAT=R.feat.filter(f=>!LM.some(l=>Math.hypot(f.x-l.x-l.w/2,f.y-l.y-l.w/2)<4*K));
+
+/* =====================================================================
+   4. SPRITES AND TILE ART
+   Everything is drawn on the 2 px art grid, so places, people and
+   animals sit in the landscape at the same scale as the houses.
+   ===================================================================== */
+const PAL={W:'#f4f4f0',R:'#c2412b',B:'#6d4a2a',G:'#8d8d7a',D:'#4a4a42',Y:'#f1c232',K:'#1b1b1b',L:'#5aa0ec',E:'#3b8a3f',O:'#e07b2a',P:'#f0c8a0',S:'#b9dcff',T:'#2e5e32',I:'#2a3f8a',M:'#9a7b5a',N:'#3a2a1a',C:'#c9a227',V:'#4a5566',Q:'#6b6b5b',X:'#dcd6c8'};
+const SPR={
+ church:['.....K......','.....W......','....WWW.....','....WDW.....','....WDW.....','..RRRRRRRR..','.RRRRRRRRRR.','.WWWWWWQQQQ.','.WWDWWWQQQQ.','.WWDWWWQQQQ.','.WWWWWWQQQQ.','.WWDDWWQQQQ.'],
+ station:['KKKKKKKKKKKK','K..R....R..K','K..RRRRRR..K','.....DD.....','.VVVVVVVVVV.','VVVVVVVVVVVV','XXXXXXQQQQQQ','XLLXLLQLLQLL','XLLXLLQLLQLL','XXXXXXQQQQQQ','XXKKXXQQKKQQ','XXKKXXQQKKQQ'],
+ sunplaza:['.....CC.....','....CWWC....','....CWKC....','..CCCCCCCC..','.CCCCCCCCCC.','CCCCCCCCCCCC','XXXXXXQQQQQQ','XKXKXXQKQKQQ','XXXXXXQQQQQQ','XKXKXXQKQKQQ','XXXXXXQQQQQQ','XXXKKXQQKKQQ'],
+ /* the summit: bare rock, the steel pyramid that marks 3,143 m and the flagpole beside it */
+ peak:['.......KRRR.','.......KRYR.','.......KRRR.','.......K....','.......K....','...S...K....','..SSS..K....','.SSXSS.K....','.GGGGGGGGG..','GGDGGGQQGGG.','GGGGDGQQQGGG','DGGGGGQQQQGD'],
+ pagoda:['.....R......','....RRR.....','...RRRRR....','.....CC.....','...RRRRRR...','..RRRRRRRR..','....CCCC....','..RRRRRRRRR.','.RRRRRRRRRRR','...CCCCCCC..','...CCDCCDC..','...CCDCCDC..'],
+ museum:['........','.CCCCCC.','.WWWWWW.','.WDWWDW.','.WWWWWW.','.WDWWDW.','.WWDDWW.','........'],
+ hotel:['.VVVVVV.','.WWWWWW.','.WLWLWL.','.WWWWWW.','.WLWLWL.','.WWWWWW.','.WLWLWL.','.WWDDWW.'],
+ market:['........','RWRWRWRW','RWRWRWRW','B......B','B.YY.O.B','B.YYYO.B','BBBBBBBB','........'],
+ stalls:['Y.Y.Y.Y.','RRRRRRRR','OWOWOWOW','B.B.B.B.','B.B.B.B.','........','........','........'],
+ bus:['........','.KKKKKK.','.KWWWWK.','.KWWWWK.','.KKKKKK.','.RRRRRR.','.RRRRRR.','..K..K..'],
+ isle:['........','..T.....','.TTT.T..','.TTTTTT.','..B.TTT.','.EEEEBE.','LEEEEEEL','.LLLLLL.'],
+ /* on the way up from the top station: bell tower, the bronze Buddha and a pagoda */
+ tower:['..R...','.RRR..','..X...','.RRR..','..X...','.RRR..','..X...','.XDX..'],
+ buddha:['..CC..','.CCCC.','..CC..','.CCCC.','CCCCCC','.CCCC.','GGGGGG','.GGGG.'],
+ temple:['...RR...','..RRRR..','RRRRRRRR','.CXCCXC.','.CXDDXC.','GGGGGGGG'],
+ hill:['...E....','..EEE...','..EEE...','.EEEEE..','.EEGEE..','EEEEEEE.','EGEEEEE.','DDDDDDDD'],
+ house:['........','...TT...','..TTTT..','.TTTTTT.','TTTTTTTT','.BBWWBB.','.BBDDBB.','.BBDDBB.'],
+ dao:['........','...RR...','..RRRR..','.RRRRRR.','RRRRRRRR','.BBWWBB.','.BBDDBB.','.BBDDBB.'],
+ rocks:['........','........','..DD....','.DDDD.DD','.DKDD.DD','DDDDDDDD','........','........'],
+ falls:['GGGLLGGG','GGLLLLGG','GGLWLLGG','GGLLWLGG','GGLWLLGG','GGLLLWGG','GLLWLLLG','SLLLLLLS'],
+ gate:['........','GGGGGGGG','G......G','G......G','G..WW..G','G......G','GG....GG','GG....GG'],
+ pass:['........','..YYYY..','..YKKY..','..YYYY..','...BB...','...BB...','GGGBBGGG','GGGGGGGG'],
+ glass:['........','L......L','LLLLLLLL','SWSWSWSW','LLLLLLLL','.G....G.','.G....G.','GG....GG'],
+};
+function drawSprite(c,name,px,py,z){const s=SPR[name];for(let r=0;r<s.length;r++)for(let col=0;col<s[r].length;col++){const ch=s[r][col];if(ch!=='.'){c.fillStyle=PAL[ch];c.fillRect(px+col*z,py+r*z,z,z);}}}
+/* a place is drawn at one art pixel per sprite pixel: 16 px for most, 24 px for the six big ones */
+function drawLandmark(c,l){drawSprite(c,l.sp,l.x*T,l.y*T,S);}
+/* people, animals and vehicles: a handful of art pixels each. x,y is where their feet touch the ground. */
+function drawPerson(c,x,y,body,head,step){c.fillStyle=head;c.fillRect(x-1,y-6,2,2);c.fillStyle=body;c.fillRect(x-1,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(step?x-1:x,y-2,1,2);c.fillRect(step?x:x-1,y-2,1,1);}
+function drawChild(c,x,y,body){c.fillStyle='#f0c8a0';c.fillRect(x-1,y-4,2,2);c.fillStyle=body;c.fillRect(x-1,y-2,2,2);}
+function drawBuffalo(c,x,y,flip){c.fillStyle='#3a2a1a';c.fillRect(x-3,y-4,6,3);c.fillRect(flip?x-5:x+3,y-5,2,3);c.fillStyle='#1b1b1b';c.fillRect(x-3,y-1,1,1);c.fillRect(x+2,y-1,1,1);}
+function drawMoto(c,x,y){c.fillStyle='#1b1b1b';c.fillRect(x-2,y-2,4,2);c.fillStyle='#c2412b';c.fillRect(x-1,y-4,2,2);c.fillStyle='#f0c8a0';c.fillRect(x-1,y-5,2,1);}
+function drawTrain(c,x,y){c.fillStyle='#c2412b';c.fillRect(x-6,y-5,12,4);c.fillStyle='#f4f4f0';c.fillRect(x-4,y-4,2,2);c.fillRect(x-1,y-4,2,2);c.fillRect(x+2,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(x-5,y-1,2,1);c.fillRect(x+3,y-1,2,1);}
+function drawGondola(c,x,y){c.fillStyle='#1b1b1b';c.fillRect(x,y,1,2);c.fillStyle='#c2412b';c.fillRect(x-1,y+2,3,3);c.fillStyle='#f4f4f0';c.fillRect(x,y+3,1,1);}
+function drawStall(c,x,y,i){c.fillStyle=i%2?'#e07b2a':'#c2412b';c.fillRect(x-3,y-5,6,2);c.fillStyle='#f4f4f0';c.fillRect(x-2,y-5,1,2);c.fillRect(x+1,y-5,1,2);c.fillStyle='#6d4a2a';c.fillRect(x-3,y-3,1,3);c.fillRect(x+2,y-3,1,3);c.fillStyle='#f1c232';c.fillRect(x-1,y-2,2,1);}
+
+const MONTH_FIELD={1:['#a88a5a','#8a6d40','#bfa070'],2:['#a88a5a','#8a6d40','#bfa070'],3:['#b09660','#8f7345','#c8ab78'],4:['#9fa060','#7f7f45','#b8b878'],5:['#7f9fb0','#5f8090','#9fbfcf'],6:['#8fd060','#5f9a3a','#b0e080'],7:['#7cb342','#558b2f','#9ccc65'],8:['#6faa3a','#4d8028','#8fc050'],9:['#d9b23a','#a7832a','#e9cd6a'],10:['#c9a65a','#9a7a38','#e0c070'],11:['#a88a5a','#8a6d40','#bfa070'],12:['#a08258','#7f6240','#b89a6a']};
+const POI_COL={cafe:'#8a5a2b',food:'#c2412b',bar:'#7a3fa0',pharmacy:'#2e7d32',hospital:'#e04040',atm:'#2a6fd6',fuel:'#e07b2a',school:'#f1c232',police:'#2a3f8a',post:'#f1c232',shop:'#2a9d8f'};
+let month=9;
+const winterSnow=()=>month===1||month===2;
+const snowAt=t=>t.sn===1||(winterSnow()&&t.sn>1);
+const dry=()=>month>=11||month<=3;
+const blossom=()=>month===2; // peach and plum blossom around Tết
+/* in the dry months the valley is a patchwork: stubble, winter vegetables and fallow earth */
+const WINTER_GREEN=['#7d9a4a','#5f7a36','#93ad5c'],FALLOW=['#8f7450','#6f5838','#a58a62'];
+function fieldPal(x,y){const C=MONTH_FIELD[month];if(!dry())return C;const w=nz(x/(3.3*K)+40,y/(3.3*K)+90);return w<0.34?WINTER_GREEN:w>0.72?FALLOW:C;}
+const ROOFS={1:['#b5452f','#7a5230','#5c6b7a','#3f7a6a'],4:['#4a3524','#5a4028','#3f2f20'],5:['#8a4a32','#9a5a3a','#7a4030'],6:['#5c6b7a','#6a7888','#50606e']};
+const TSTEP=10; // metres between terrace levels
+const pop16=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;};
+/* the land beside a water tile, for the art pixels its water does not cover; null on an island */
+function bankCol(x,y){for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]){const k=at(x+dx,y+dy).k;if(k==='water'||k==='bridge')continue;return k==='town'||k==='market'||k==='busyard'||k==='plaza'?'#b8a98a':k==='village'?(dry()?'#8fa558':'#7fb84e'):k==='park'?'#7cb342':flatColor(x+dx,y+dy);}return null;}
+function drawTile(oc,x,y,t){
+ const px=x*T,py=y*T,v=t.v,C=fieldPal(x,y),i=y*W+x;
+ const sub=(c,r,col)=>{oc.fillStyle=col;oc.fillRect(px+c*S,py+r*S,S,S);};
+ const fill=col=>{oc.fillStyle=col;oc.fillRect(px,py,T,T);};
+ let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';
+ const grassCol=dry()?'#9aa65a':'#8bc34a',gardenCol=dry()?'#8fa558':'#7fb84e';
+ switch(k){
+  /* water is drawn from its mask: the bank shows in the art pixels the water does not cover, so a stream is a thin
+     line, a river grows wider downstream and a lake keeps its real outline and its island */
+  case 'water':case 'bridge':{const m=wMask[i]||0xFFFF,wet=b=>(m&(1<<b))!==0;
+    if(m===0xFFFF)fill('#3a7bd5');
+    else{const bank=bankCol(x,y);fill(bank||'#7cb342');
+     if(!bank)for(let b=0;b<16;b++)if(!wet(b)&&hash(x*4+(b&3),y*4+(b>>2))<0.45)sub(b&3,b>>2,blossom()?'#f2a0b8':'#2e5e32'); /* an island: trees */
+     for(let b=0;b<16;b++)if(wet(b))sub(b&3,b>>2,'#3a7bd5');}
+    /* a darker line under the northern shore of wide water */
+    if(pop16(m)>=8){const up=y>0?wMask[i-W]:0;for(let b=0;b<16;b++)if(wet(b)&&!(b>=4?wet(b-4):(up&(1<<(12+b)))))sub(b&3,b>>2,'#2f66b8');}
+    /* rapids: white water where a river runs down steep ground */
+    if(flags[i]&4)for(let b=0;b<16;b++)if(wet(b)&&hash(x*4+(b&3)+7,y*4+(b>>2)+3)<0.22)sub(b&3,b>>2,'#dcecff');
+    if(k==='bridge'){const sm=stMask[i];
+     if(sm){const town=townDist(x,y)<TOWN_R+6*K;for(let b=0;b<16;b++)if(sm&(1<<b))sub(b&3,b>>2,wet(b)?'#8a6238':town?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2');}
+     else{/* a footbridge on a trail: planks across the channel */
+      let rows=0,cols=0;for(let q=0;q<4;q++){if(m&(0xF<<(q*4)))rows++;if(m&(0x1111<<q))cols++;}
+      for(let q=0;q<4;q++){const b=rows>=cols?q*4+1:4+q;if(wet(b))sub(b&3,b>>2,'#8a6238');}}}
+    break;}
+  /* terraces follow the real contours: every art pixel takes the level of the ground under it, treads alternate
+     between two tones, and a pixel with lower ground beside it is drawn as the wall of the step */
+  case 'terrace':{const L=new Int16Array(36);for(let r=-1;r<=4;r++)for(let c=-1;c<=4;c++)L[(r+1)*6+c+1]=Math.floor(eSub(x+(c+.5)/4,y+(r+.5)/4)/TSTEP);
+    for(let r=0;r<4;r++)for(let c=0;c<4;c++){const j=(r+1)*6+c+1,l=L[j];sub(c,r,(L[j+6]<l||L[j+1]<l||L[j-6]<l||L[j-1]<l)?C[1]:(l&1)?C[0]:C[2]);}
+    if(month===5&&v>0.5)sub(Math.floor(v*4),Math.floor(v*9)%4,'#d8ecf5');else if(month===10&&v>0.82)sub(Math.floor(v*4),Math.floor(v*9)%4,'#f1e2a0');else if(v>0.8)sub(Math.floor(v*4),Math.floor(v*9)%4,C[1]);break;}
+  case 'grass':fill(grassCol);if(v<0.4)sub(Math.floor(v*10)%4,Math.floor(v*23)%4,'#689f38');if(v>0.85)sub(Math.floor(v*13)%4,Math.floor(v*31)%4,month===3||month===4?'#e86a8f':'#f0c04c');break;
+  case 'scrub':fill(dry()?'#8e9a52':'#7aa844');sub(Math.floor(v*4),Math.floor(v*9)%4,'#4e7a2e');sub((Math.floor(v*4)+2)%4,(Math.floor(v*9)+2)%4,'#4e7a2e');break;
+  case 'orchard':fill(grassCol);{const c0=Math.floor(v*2),r0=Math.floor(v*7)%2,tree=blossom()?'#f2a0b8':month>=3&&month<=4?'#e8a0c0':'#3b8a3f';sub(c0,r0,tree);sub(c0+2,r0+2,blossom()?'#f8e0e8':'#3b8a3f');}break;
+  case 'forest':{const dark=t.e>2000;fill(dark?'#1f5e2a':'#2e7d32');if(hash(x*7+3,y*5+11)>0.42)break; /* a tree on under half the tiles keeps the forest calm */const cx=Math.floor(v*3),cy=Math.floor(v*7)%2,lt=dark?'#2e7d32':'#43a047';sub(cx,cy,lt);sub(cx+1,cy,lt);sub(cx,cy+1,lt);sub(cx+1,cy+1,lt);sub(cx,cy+2,'#5d4037');if(dark&&(month===3||month===4)&&v>0.8)sub(cx+1,cy+1,'#e86a8f');break;}
+  case 'rock':fill('#8d8d7a');sub(Math.floor(v*4),Math.floor(v*9)%4,'#6b6b5b');if(v>0.5)sub(Math.floor(v*7)%4,Math.floor(v*3)%4,'#a3a390');if(t.e>2850&&v>0.55&&v<0.8)sub(Math.floor(v*11)%4,Math.floor(v*5)%4,'#6f8f4a'); /* dwarf bamboo near the summit */break;
+  case 'snow':fill('#e8eef5');sub(Math.floor(v*4),Math.floor(v*9)%4,'#c5d1e0');if(t.k==='forest')sub(Math.floor(v*3)+1,2,'#2e5e32');break;
+  case 'bare':fill('#c2ad84');sub(Math.floor(v*4),Math.floor(v*9)%4,'#a8936a');if(v>0.6)sub(Math.floor(v*7)%4,Math.floor(v*3)%4,'#d4c29c');break;
+  /* garden: vegetable rows and a fruit tree, pink with blossom in February */
+  case 'garden':{fill(gardenCol);const r0=Math.floor(v*4);for(let c=0;c<4;c+=2)sub(c,r0,dry()?'#7a8f4a':'#5f9a3a');if(v>0.45){const tx=Math.floor(v*11)%4,ty=(r0+2)%4;sub(tx,ty,blossom()?(v>0.7?'#f2a0b8':'#f8e0e8'):'#3b8a3f');}if(v<0.18)sub(Math.floor(v*20)%4,(r0+1)%4,'#b59a72');break;}
+  case 'road':fill('#e3d8bd');if(v<0.5)sub(Math.floor(v*8)%4,Math.floor(v*5)%4,'#c8bb9c');break;
+  case 'track':fill('#b8a070');sub(1,Math.floor(v*4),'#9a8458');sub(3,Math.floor(v*7)%4,'#9a8458');break;
+  case 'plaza':fill('#ddd0b0');if((x+y)%2)sub(0,0,'#cdbf9f');else sub(2,2,'#cdbf9f');if(v<0.1){sub(1,1,blossom()?'#f2a0b8':'#3b8a3f');sub(2,1,blossom()?'#f8e0e8':'#3b8a3f');sub(1,2,'#5d4037');}break;
+  case 'park':fill('#7cb342');sub(Math.floor(v*4),Math.floor(v*9)%4,blossom()&&v>0.4?'#f2a0b8':'#3b8a3f');if(v>0.6){sub(Math.floor(v*13)%4,Math.floor(v*7)%4,v>0.8?'#f1c232':'#e07b2a');}break;
+  case 'busyard':fill('#55555c');if(v<0.3){sub(0,1,'#c2412b');sub(1,1,'#c2412b');sub(2,1,'#c2412b');sub(0,2,'#f4f4f0');sub(1,2,'#f4f4f0');sub(2,2,'#f4f4f0');}else if((x+y)%2)sub(1,2,'#f4f4f0');break;
+  case 'market':fill('#b8a98a');for(let c=0;c<4;c++){sub(c,0,c%2?'#e07b2a':'#f4f4f0');sub(c,1,c%2?'#e07b2a':'#f4f4f0');}sub(0,3,'#6d4a2a');sub(3,3,'#6d4a2a');sub(1,2,v<0.5?'#f1c232':'#c2412b');break;
+  /* town and village: small buildings in the quadrants no street crosses; villages sit in gardens with an earth doorstep */
+  case 'town':case 'village':{const vil=k==='village';fill(vil?gardenCol:'#b8a98a');if(!vil&&v<0.5)sub(Math.floor(v*8)%4,Math.floor(v*5)%4,'#a8997a');const q=t.q||[0,0,0,0];
+    for(let qi=0;qi<4;qi++){const st=q[qi],qx=(qi&1)*2,qy=(qi>>1)*2;
+     if(!st){const free=!(stMask[i]&(1<<(qy*4+qx))),h=hash(x*5+qi,y*3+1);if(free&&h<(vil?0.55:0.35))sub(qx,qy,blossom()&&h<0.2?'#f2a0b8':vil&&h>0.35?(dry()?'#7a8f4a':'#5f9a3a'):'#6fa04a');continue;}
+     const hv=hash(x*3+qi,y*7+qi),set=ROOFS[st]||null,roof=st===2?'#4a5566':st===3?'#7d7d85':set[Math.floor(hv*set.length)];
+     sub(qx,qy,roof);sub(qx+1,qy,roof);
+     if(st>=4){sub(qx,qy+1,'#8a6238');sub(qx+1,qy+1,hv<0.5?'#b59a72':'#4a4a42');}
+     else{sub(qx,qy+1,st===2?'#dcd6c8':st===3?'#c9c4b6':'#e8dcc0');sub(qx+1,qy+1,st===2?'#5aa0ec':'#4a4a42');}}break;}
+  case 'hut':{fill(grassCol);const roof=v<0.5?'#3a2a1a':'#5a3a22';sub(1,0,roof);sub(2,0,roof);for(let c=0;c<4;c++)sub(c,1,roof);sub(0,2,'#8a6238');sub(1,2,'#e8dcc0');sub(2,2,'#4a4a42');sub(3,2,'#8a6238');break;}
+ }
+ const ps=poiAt.get(i);if(ps&&k==='town'&&t.q){const qi=t.q.findIndex(st=>st);if(qi>=0)sub((qi&1)*2,(qi>>1)*2+1,POI_COL[ps[0].k]||'#2a9d8f');}
+ /* thin lanes, drawn over whatever the tile is: asphalt in town, pale concrete and earth in the countryside */
+ if(t.st&&k!=='water'&&k!=='bridge'){const m=stMask[i];oc.fillStyle=townDist(x,y)<TOWN_R+6*K?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2';for(let b=0;b<16;b++)if(m&(1<<b))oc.fillRect(px+(b&3)*S,py+(b>>2)*S,S,S);}
+ /* railway: dark rail with pale sleepers, on the same art grid */
+ const rm=railMask[i];if(rm&&k!=='water'){for(let b=0;b<16;b++)if(rm&(1<<b)){oc.fillStyle=((x*4+(b&3)+y*4+(b>>2))%2)?'#3a2a1a':'#9a9a8c';oc.fillRect(px+(b&3)*S,py+(b>>2)*S,S,S);}}
+ if(t.trail&&(k==='rock'||k==='snow'||k==='forest'||k==='grass'||k==='terrace'||k==='scrub'||k==='bare'||k==='garden')){oc.fillStyle='#b59a72';oc.fillRect(px+S,py+S,S*2,S*2);}
+ /* hillshade overlay: per subpixel inside the detail box, per tile elsewhere */
+ const str=(k==='water'||k==='plaza'||k==='busyard')?0.35:1;
+ if(inDetail(x,y)){const bi=(x-DBX)*DF,bj=(y-DBY)*DF;for(let r=0;r<4;r++)for(let c=0;c<4;c++){const sh=dshade[(bj+(r*DF>>2))*DN+bi+(c*DF>>2)];if(sh>0.02)sub(c,r,'rgba(255,255,255,'+(0.2*sh*str).toFixed(3)+')');else if(sh<-0.02)sub(c,r,'rgba(0,0,0,'+(0.28*-sh*str).toFixed(3)+')');}}
+ else{const sh=shade[i];if(sh>0.02)fill('rgba(255,255,255,'+(0.2*sh*str).toFixed(3)+')');else if(sh<-0.02)fill('rgba(0,0,0,'+(0.28*-sh*str).toFixed(3)+')');}
+}
+
+/* =====================================================================
+   5. TERRAIN CACHE: 64x64-tile chunks drawn a few per frame and kept in
+   a small cache (every canvas stays small enough for Safari). The cache
+   is dropped when the month changes.
+   ===================================================================== */
+const MAXC=48; // chunks kept; the least recently drawn is dropped beyond this
+const CH_T=64,CHW=Math.ceil(W/CH_T),CHH=Math.ceil(H/CH_T);const chunks=new Map();
+/* drawTile draws at gx*T, so the chunk context is translated to make that land at the local tile */
+function buildChunk(cx,cy){const c=document.createElement('canvas');c.width=CH_T*T;c.height=CH_T*T;const oc=c.getContext('2d');oc.translate(-cx*CH_T*T,-cy*CH_T*T);for(let y=0;y<CH_T;y++)for(let x=0;x<CH_T;x++){const gx=cx*CH_T+x,gy=cy*CH_T+y;if(gx>=W||gy>=H)continue;drawTile(oc,gx,gy,at(gx,gy));}return c;}
+function invalidateTerrain(){chunks.clear();miniDirty=true;}
+let miniDirty=true;const miniCache=document.createElement('canvas');miniCache.width=W;miniCache.height=H;
+/* one flat colour per tile: used for the overview map, the zoomed-out view and the section strip */
+const FLAT={bare:'#c2ad84',water:'#3a7bd5',bridge:'#8a6238',grass:'#8bc34a',scrub:'#7aa844',orchard:'#7cb342',forest:'#2e7d32',rock:'#8d8d7a',snow:'#e8eef5',road:'#e3d8bd',track:'#b8a070',street:'#6f6f78',plaza:'#ddd0b0',park:'#7cb342',busyard:'#55555c',market:'#e07b2a',hotel:'#4a5566',big:'#7d7d85',town:'#b9806a',hut:'#5a3a22',village:'#9a7a58',garden:'#7fb84e'};
+function flatColor(x,y){const t=at(x,y);let k=t.k;if((flags[y*W+x]&2)&&k!=='water'&&k!=='bridge'&&k!=='plaza')return FLAT.road;if(k==='town'){const q=quad[y*W+x],n=(q&7?1:0)+(q&56?1:0)+(q&448?1:0)+(q&3584?1:0);return n>=3?'#a8644e':n===2?'#b9806a':'#c4b08e';}if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';if(k==='terrace'){const F=fieldPal(x,y);return Math.floor(t.e/25)%2?F[0]:F[2];}if(k==='forest'&&t.e>2000)return '#1f5e2a';if(dry()){if(k==='grass')return '#9aa65a';if(k==='garden')return '#8fa558';}return FLAT[k]||'#000';}
+const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];rgbCache.set(c,v);}return v;};
+/* written straight into pixel data: one pass over the grid, with the hillshade blended in */
+function miniImage(){if(miniDirty){const mcx=miniCache.getContext('2d'),img=mcx.createImageData(W,H),d=img.data;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y)),sh=shade[i];let r=c[0],g=c[1],b=c[2];if(sh>0.05){const a=0.22*sh;r+=(255-r)*a;g+=(255-g)*a;b+=(255-b)*a;}else if(sh<-0.05){const a=1-0.3*-sh;r*=a;g*=a;b*=a;}d[i*4]=r;d[i*4+1]=g;d[i*4+2]=b;d[i*4+3]=255;}
+ mcx.putImageData(img,0,0);miniDirty=false;}return miniCache;}
+/* valley fog masks: one pixel per tile, alpha from how far below the fog level the ground is */
+const fogMasks=new Map();
+function fogMask(level){const key=Math.round(level/40);let c=fogMasks.get(key);if(c)return c;c=document.createElement('canvas');c.width=W;c.height=H;const fc=c.getContext('2d');const img=fc.createImageData(W,H);for(let i=0;i<W*H;i++){const a=Math.round(Math.max(0,Math.min(1,(key*40-elev[i])/220))*4)/4*0.45;img.data[i*4]=235;img.data[i*4+1]=240;img.data[i*4+2]=245;img.data[i*4+3]=Math.round(a*255);}fc.putImageData(img,0,0);fogMasks.set(key,c);return c;}
+/* settlement lights for the zoomed-out night view: a lit pixel on most built tiles, and a soft blocky glow from a quarter-size density map */
+let lightsCache=null;
+function lightsImages(){if(lightsCache)return lightsCache;const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
+ const dots=mk(W,H),dc=dots.getContext('2d'),di=dc.createImageData(W,H),gw=Math.ceil(W/4),gh=Math.ceil(H/4),glow=mk(gw,gh),gc=glow.getContext('2d'),gi=gc.createImageData(gw,gh),cnt=new Uint8Array(gw*gh);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,k=kind[i],h=hash(x+3,y+9),lit=(k===KI.town||k===KI.market)?h<0.75:k===KI.village?h<0.5:false;if(!lit)continue;di.data[i*4]=255;di.data[i*4+1]=214;di.data[i*4+2]=120;di.data[i*4+3]=k===KI.village?190:240;cnt[(y>>2)*gw+(x>>2)]++;}
+ for(let j=0;j<gw*gh;j++){if(!cnt[j])continue;gi.data[j*4]=255;gi.data[j*4+1]=180;gi.data[j*4+2]=80;gi.data[j*4+3]=Math.min(150,cnt[j]*16);}
+ dc.putImageData(di,0,0);gc.putImageData(gi,0,0);lightsCache={dots,glow};return lightsCache;}
+
+/* =====================================================================
+   6. I18N
+   ===================================================================== */
+let lang='vi'; // Vietnamese first; the choice is remembered
+const UI={
+ en:{subtitle:'A pixel map of Sa Pa and the Mường Hoa valley built from real elevation data and OpenStreetMap. Walk, trek, ride the cable car.',labels:'LABELS',treks:'TREKS',sky:['SKY: AUTO','SKY: CLEAR','SKY: FOG','SKY: RAIN'],sound:['SOUND OFF','SOUND ON'],lang:'TIẾNG VIỆT',walk:'WALK HERE',me:'◎ ME',tabs:['PLACE','PLACES','SETTINGS','LEGEND'],skyline:'SECTION',shops:'SHOP NAMES',shopsHint:'Zoom in fully to see shop names.',section:'WEST-EAST SECTION WHERE YOU STAND',skyNames:['','CLEAR','FOG','RAIN','SNOW'],days:['SUN','MON','TUE','WED','THU','FRI','SAT'],legs:{walk:'walk',trainDown:'mountain train',trainUp:'mountain train',cableUp:'cable car',cableDown:'cable car'},total:'total',feat:{waterfall:'Waterfall',viewpoint:'Viewpoint',peak:'Peak'},ridge:'HOÀNG LIÊN SƠN RANGE',valleyName:'MƯỜNG HOA VALLEY',festival:'GẦU TÀO FESTIVAL',dayBtn:'DAY: ',busy:{market:'Market day: the villages are in town.',nightmarket:'Saturday night: the love market is on.'},busyWhen:{market:'Busiest on Sunday from 6 to 11 am.',nightmarket:'Busiest on Saturday from 6 to 11 pm.'},home:'BACK TO TOWN',time:'Time',monthL:'Month',auto:'AUTO',visited:'Visited',
+  months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+  seasons:{1:'January: dry, cold, snow on the pass some years.',2:'February: peach and plum blossom for Tết, and the Hmong Gầu Tào festival.',3:'March: rhododendrons on Fansipan.',4:'April: fields ploughed, buffalo at work.',5:'May: terraces flooded like mirrors, planting begins.',6:'June: young rice, heavy rain.',7:'July: green terraces, wettest month.',8:'August: rice heads form, thunderstorms.',9:'September: harvest gold, crews cutting rice on the terraces.',10:'October: stubble and clear skies.',11:'November: dry and cool, best trekking.',12:'December: frost in the valley, fog in town.'},
+  legend:[['#7cb342','Rice terraces (colour follows the month)'],['#2e7d32','Forest'],['#7aa844','Scrub'],['#8d8d7a','Rock, above 2,500 m'],['#e8eef5','Snow, January and February'],['#c2ad84','Bare ground'],['#3a7bd5','Rivers, lake'],['#3a2a1a','Mountain railway'],['#e3d8bd','Paved roads'],['#b8a070','Tracks'],['#8a6238','Bridges'],['#6f6f78','Town streets (OSM)'],['#b5452f','Houses (OSM footprints)'],['#4a5566','Hotels (OSM)'],['#8a4a32','Village houses'],['#7fb84e','Gardens'],['#2a9d8f','Shop or café sign'],['#f1c232','Homestay (OSM)'],['dash','Trek routes']],
+  help:'Click or tap the map to walk to that spot, or a place to walk there along the roads; a flag marks where you are going and dots show the way. A click on water or a cliff goes to the nearest spot you can reach. Drag to pan, scroll, pinch or <kbd>+</kbd><kbd>-</kbd> to zoom, and double-tap to zoom in on a phone. On a keyboard the arrow keys move the view and <kbd>Enter</kbd> walks to the cross in the middle. Trips between town and the cable car take the mountain train from Sun Plaza. One tile is about 39 m; the scale bar shows 1 km. Only the main places are labelled at first; zoom in for the rest, then street names. Shop names show on hover, or all at once with the Shop names switch in Settings. Month, sky, sound and language are in the Settings tab. Morning fog pools in the valleys and lifts by mid-morning.',
+  credits:'Elevation: SRTM via AWS Terrain Tiles. Land cover: Sentinel-2 10 m, Esri and Impact Observatory. Roads, rivers, land cover, buildings, shops, hotels and most places: © OpenStreetMap contributors. Bus station, Sín Chải, Ý Linh Hồ and Giàng Tả Chải are hand placed. Homestay names are as mapped in OpenStreetMap. Monthly temperature and rain: Sa Pa averages from climatestotravel.com. Build pipeline in the tools folder.',
+  welcome:'WELCOME TO SA PA',intro:'You start at the stone church. Click or tap anywhere on the map to walk there, pick a place to go straight to it, and ride the cable car from the Mường Hoa base station to Fansipan. Visit all {n} places to fill the journal. Your position and journal are remembered on this device.',go:"LET'S GO",
+  homeCard:['Welcome to Sa Pa','Walk the valley','Thị xã Sa Pa, tỉnh Lào Cai','A hill station at 1,500 m, founded by the French in 1903 and home to Hmong, Dao, Giáy, Tày and Xa Phó communities. Rice is planted in May and June and turns gold in September.','Pick a place from the list or click it on the map.'],
+  fromChurch:'from the church',walkT:'On foot',bikeT:'Motorbike',guideT:'Guide',guide:['Not needed','Recommended','Required'],stamp:'VISITED',src:{osm:'Position from OpenStreetMap',approx:'Position approximate'},
+  etaWalk:'walk',here:'YOU',stay:'Homestay',stayLine:'Homestays here (OpenStreetMap): ',climTip:'Typical for this month at the height where you stand: mean temperature, and rain for the whole month in Sa Pa.',
+  poi:{cafe:'Café',food:'Restaurant',bar:'Bar',pharmacy:'Pharmacy',hospital:'Hospital',atm:'ATM / bank',fuel:'Fuel',school:'School',police:'Police',post:'Post office',shop:'Shop'},
+  toast:{deep:'Too deep to wade.',cloud:'Above the snow line. Take the cable car or the trail.',walking:'Walking to ',arrived:'Arrived: ',cable:'Riding the cable car...',train:'Riding the mountain train...',noPath:'No path there.',near:'Walking to the nearest spot you can reach.',pick:'Pick a place first.',home:'Back at the church square.',visited:'New place in the journal: '},
+  scale:'1 KM',hourFmt:h=>String(Math.floor(h)).padStart(2,'0')+':'+(h%1?'30':'00')},
+ vi:{subtitle:'Bản đồ pixel Sa Pa và thung lũng Mường Hoa dựng từ dữ liệu độ cao thật và OpenStreetMap. Đi bộ, trek, đi cáp treo.',labels:'NHÃN',treks:'TREK',sky:['TRỜI: TỰ ĐỘNG','TRỜI: QUANG','TRỜI: SƯƠNG','TRỜI: MƯA'],sound:['TẮT TIẾNG','BẬT TIẾNG'],lang:'ENGLISH',walk:'ĐI TỚI ĐÂY',me:'◎ TÔI',tabs:['ĐỊA ĐIỂM','DANH SÁCH','CÀI ĐẶT','CHÚ GIẢI'],skyline:'LÁT CẮT',shops:'TÊN QUÁN',shopsHint:'Phóng to hết cỡ để thấy tên quán.',section:'LÁT CẮT TÂY-ĐÔNG TẠI CHỖ BẠN ĐỨNG',skyNames:['','QUANG','SƯƠNG','MƯA','TUYẾT'],days:['CN','T2','T3','T4','T5','T6','T7'],legs:{walk:'đi bộ',trainDown:'tàu leo núi',trainUp:'tàu leo núi',cableUp:'cáp treo',cableDown:'cáp treo'},total:'tổng',feat:{waterfall:'Thác nước',viewpoint:'Điểm ngắm cảnh',peak:'Đỉnh núi'},ridge:'DÃY HOÀNG LIÊN SƠN',valleyName:'THUNG LŨNG MƯỜNG HOA',festival:'LỄ HỘI GẦU TÀO',dayBtn:'THỨ: ',busy:{market:'Phiên chợ: dân bản xuống chợ.',nightmarket:'Tối thứ Bảy: chợ tình đang họp.'},busyWhen:{market:'Đông nhất Chủ nhật từ 6 đến 11 giờ sáng.',nightmarket:'Đông nhất tối thứ Bảy từ 18 đến 23 giờ.'},home:'VỀ THỊ XÃ',time:'Giờ',monthL:'Tháng',auto:'TỰ ĐỘNG',visited:'Đã ghé',
+  months:['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'],
+  seasons:{1:'Tháng 1: khô, rét, có năm tuyết trên đèo.',2:'Tháng 2: hoa đào, hoa mận đón Tết và lễ hội Gầu Tào của người Mông.',3:'Tháng 3: đỗ quyên nở trên Fansipan.',4:'Tháng 4: cày ải, trâu ra đồng.',5:'Tháng 5: ruộng đổ nước như gương, bắt đầu cấy.',6:'Tháng 6: lúa non, mưa lớn.',7:'Tháng 7: ruộng xanh, tháng mưa nhiều nhất.',8:'Tháng 8: lúa trổ bông, giông chiều.',9:'Tháng 9: mùa vàng, người gặt lúa trên ruộng bậc thang.',10:'Tháng 10: gốc rạ, trời trong.',11:'Tháng 11: khô mát, trek đẹp nhất.',12:'Tháng 12: băng giá dưới thung lũng, sương trong thị xã.'},
+  legend:[['#7cb342','Ruộng bậc thang (màu theo tháng)'],['#2e7d32','Rừng'],['#7aa844','Cây bụi'],['#8d8d7a','Đá, trên 2.500 m'],['#e8eef5','Tuyết, tháng 1 và tháng 2'],['#c2ad84','Đất trống'],['#3a7bd5','Suối, hồ'],['#3a2a1a','Đường tàu leo núi'],['#e3d8bd','Đường nhựa'],['#b8a070','Đường đất'],['#8a6238','Cầu'],['#6f6f78','Phố thị xã (OSM)'],['#b5452f','Nhà (theo OSM)'],['#4a5566','Khách sạn (OSM)'],['#8a4a32','Nhà trong bản'],['#7fb84e','Vườn'],['#2a9d8f','Biển hiệu quán, cửa hàng'],['#f1c232','Homestay (theo OSM)'],['dash','Tuyến trek']],
+  help:'Bấm hoặc chạm vào bản đồ để đi tới điểm đó, hoặc vào một địa điểm để đi tới theo đường; lá cờ đánh dấu nơi bạn đang tới và các chấm chỉ đường đi. Bấm vào mặt nước hay vách đá thì đi tới điểm gần nhất có thể tới. Kéo để dời, lăn chuột, chụm ngón tay hoặc <kbd>+</kbd><kbd>-</kbd> để phóng, chạm hai lần để phóng to trên điện thoại. Trên bàn phím, phím mũi tên dời bản đồ và <kbd>Enter</kbd> đi tới dấu chữ thập ở giữa. Đi giữa thị xã và ga cáp treo sẽ lên tàu hỏa leo núi ở Sun Plaza. Một ô khoảng 39 m; thước tỷ lệ là 1 km. Ban đầu chỉ hiện các địa điểm chính; phóng to để thấy phần còn lại, rồi tên phố. Tên quán hiện khi rê chuột, hoặc bật Tên quán trong Cài đặt. Tháng, thời tiết, âm thanh và ngôn ngữ nằm ở thẻ Cài đặt. Sương sớm đọng dưới thung lũng và tan giữa buổi sáng.',
+  credits:'Độ cao: SRTM qua AWS Terrain Tiles. Lớp phủ: Sentinel-2 10 m, Esri và Impact Observatory. Đường, suối, lớp phủ, nhà, quán, khách sạn và hầu hết địa điểm: © OpenStreetMap contributors. Bến xe, Sín Chải, Ý Linh Hồ và Giàng Tả Chải đặt tay. Tên homestay theo OpenStreetMap. Nhiệt độ và lượng mưa theo tháng: trung bình của Sa Pa từ climatestotravel.com. Quy trình dựng dữ liệu ở thư mục tools.',
+  welcome:'CHÀO MỪNG ĐẾN SA PA',intro:'Bạn bắt đầu ở nhà thờ đá. Bấm hoặc chạm vào bất kỳ đâu trên bản đồ để đi tới đó, chọn một địa điểm để đi thẳng tới, và đi cáp treo từ ga Mường Hoa lên Fansipan. Ghé đủ {n} nơi để điền kín nhật ký. Vị trí và nhật ký được lưu trên thiết bị này.',go:'ĐI THÔI',
+  homeCard:['Chào mừng đến Sa Pa','Dạo thung lũng','Thị xã Sa Pa, tỉnh Lào Cai','Thị xã nghỉ mát ở độ cao 1.500 m, người Pháp lập năm 1903, quê hương của người Mông, Dao, Giáy, Tày và Xa Phó. Lúa cấy tháng 5-6 và chín vàng tháng 9.','Chọn địa điểm trong danh sách hoặc bấm trên bản đồ.'],
+  fromChurch:'từ nhà thờ',walkT:'Đi bộ',bikeT:'Xe máy',guideT:'Hướng dẫn',guide:['Không cần','Nên có','Bắt buộc'],stamp:'ĐÃ GHÉ',src:{osm:'Vị trí theo OpenStreetMap',approx:'Vị trí ước lượng'},
+  etaWalk:'đi bộ',here:'BẠN',stay:'Homestay',stayLine:'Homestay ở đây (theo OpenStreetMap): ',climTip:'Điển hình của tháng này ở độ cao bạn đang đứng: nhiệt độ trung bình, và lượng mưa cả tháng tại Sa Pa.',
+  poi:{cafe:'Cà phê',food:'Quán ăn',bar:'Quán bar',pharmacy:'Nhà thuốc',hospital:'Bệnh viện',atm:'ATM / ngân hàng',fuel:'Cây xăng',school:'Trường học',police:'Công an',post:'Bưu điện',shop:'Cửa hàng'},
+  toast:{deep:'Suối sâu quá, không lội được.',cloud:'Trên đường tuyết. Đi cáp treo hoặc theo lối mòn.',walking:'Đang đi tới ',arrived:'Đã đến: ',cable:'Đang đi cáp treo...',train:'Đang đi tàu hỏa leo núi...',noPath:'Không có đường tới đó.',near:'Đi tới điểm gần nhất có thể tới.',pick:'Chọn địa điểm trước.',home:'Đã về sân nhà thờ.',visited:'Nơi mới trong nhật ký: '},
+  scale:'1 KM',hourFmt:h=>String(Math.floor(h)).padStart(2,'0')+':'+(h%1?'30':'00')}
+};
+const U=()=>UI[lang];
+const nameOf=l=>lang==='vi'?l.vi:l.en, altOf=l=>lang==='vi'?l.en:l.vi;
+const fmtMin=m=>{m=Math.round(m);if(m<60)return m+' min';const h=Math.floor(m/60),r=m%60;return h+' h'+(r?' '+String(r).padStart(2,'0'):'');};
+
+/* =====================================================================
+   7. STATE AND CAMERA
+   ===================================================================== */
+const cv=document.getElementById('map'),ctx=cv.getContext('2d'),mini=document.getElementById('mini'),mc=mini.getContext('2d'),sky=document.getElementById('sky'),sc=sky.getContext('2d'),tipEl=document.getElementById('tip'),panelEl=document.getElementById('panel');
+mini.width=W;mini.height=H;
+const PHONE=()=>typeof matchMedia==='function'&&matchMedia('(max-width:900px)').matches;
+let showLabels=true,showRoutes=true,skyMode=0,hour=9,autoTime=true,soundOn=false,skyDirty=true,lastSkyCol=-1,showSky=true,statusAcc=1e9,showShops=false,lastInput=0,kbAim=false;
+let day=new Date().getDay(); // 0 Sunday .. 6 Saturday; moves on at midnight on the map clock
+/* saved under its own key because tile coordinates changed with the 39 m grid; the journal carries over */
+let saved={};try{saved=JSON.parse(localStorage.getItem('sapa-state-2')||'null')||{};if(!saved.visited){const old=JSON.parse(localStorage.getItem('sapa-state')||'{}')||{};saved.visited=old.visited;}}catch(e){}
+const START=nearTarget(byId('church'));
+/* everything that can be walked to from the church. A click anywhere else goes to the nearest tile of it. */
+const reach=new Uint8Array(W*H);{const q=[START[1]*W+START[0]];reach[q[0]]=1;for(let h=0;h<q.length;h++){const i=q[h],x=i%W,y=(i/W)|0;if(x>0&&!reach[i-1]&&costGrid[i-1]<1e9){reach[i-1]=1;q.push(i-1);}if(x<W-1&&!reach[i+1]&&costGrid[i+1]<1e9){reach[i+1]=1;q.push(i+1);}if(y>0&&!reach[i-W]&&costGrid[i-W]<1e9){reach[i-W]=1;q.push(i-W);}if(y<H-1&&!reach[i+W]&&costGrid[i+W]<1e9){reach[i+W]=1;q.push(i+W);}}}
+let hero={x:START[0],y:START[1],rx:START[0],ry:START[1],face:1,step:0,moving:false,path:[],stepT:0,riding:null};
+if(saved.hx!==undefined&&passable(saved.hx,saved.hy)&&reach[saved.hy*W+saved.hx]){hero.x=hero.rx=saved.hx;hero.y=hero.ry=saved.hy;}
+/* versions before this one saved English without being asked, so a saved language only counts if it was chosen */
+let langSet=saved.langSet===true;if(langSet&&(saved.lang==='en'||saved.lang==='vi'))lang=saved.lang;if(saved.month>=1&&saved.month<=12)month=saved.month;
+/* on a phone the section strip starts hidden so the map has the whole screen */
+if(saved.sky===false||(saved.sky===undefined&&PHONE()))showSky=false;
+let sel=null,hover=null,hoverFeat=null,frame=0,gond=0,follow=true;
+const visited=new Set((saved.visited||[]).filter(id=>byId(id)));
+let saveT=null;function saveState(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('sapa-state-2',JSON.stringify({hx:hero.x,hy:hero.y,z:cam.z,lang,langSet,month,sky:showSky,visited:[...visited]}));}catch(e){}},300);}
+const cam={x:hero.x*T,y:hero.y*T,z:1};let fitScale=1;const ZMAX=16;
+function viewW(){return cv.width/(fitScale*cam.z);}function viewH(){return cv.height/(fitScale*cam.z);}
+function clampCam(){cam.z=Math.max(1,Math.min(ZMAX,cam.z));const vw=viewW(),vh=viewH();cam.x=Math.max(vw/2,Math.min(W*T-vw/2,cam.x));cam.y=Math.max(vh/2,Math.min(H*T-vh/2,cam.y));if(vw>W*T)cam.x=W*T/2;if(vh>H*T)cam.y=H*T/2;}
+/* zoom 1 always fills the canvas, whatever its shape, so a tall phone screen never shows empty bands */
+function resize(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);cv.width=Math.max(1,Math.round(r.width*dpr));cv.height=Math.max(1,Math.round(r.height*dpr));fitScale=Math.max(cv.width/(W*T),cv.height/(H*T));if(showSky){const sr=sky.getBoundingClientRect();sky.width=Math.max(1,Math.round(sr.width*dpr));sky.height=Math.max(1,Math.round(sr.height*dpr));}clampCam();skyDirty=true;
+ /* setting a canvas size clears it, so repaint at once instead of waiting for the next paced frame */
+ if(booted){render();renderSky();}}
+let booted=false;
+sky.hidden=!showSky;window.addEventListener('resize',resize);resize();cam.z=saved.z||5;clampCam();
+/* view settings from the address (parsed in section 1) */
+if(HASH.h!==undefined){hour=Math.max(0,Math.min(24,parseFloat(HASH.h)||0));autoTime=false;}
+if(HASH.m){const mm=parseInt(HASH.m,10);if(mm>=1&&mm<=12)month=mm;}
+if(HASH.d!==undefined){const dd=parseInt(HASH.d,10);if(dd>=0&&dd<=6)day=dd;}
+if(HASH.lang==='vi'||HASH.lang==='en')lang=HASH.lang;
+if(HASH.sky)skyMode=Math.max(0,Math.min(3,parseInt(HASH.sky,10)||0));
+if(HASH.z)cam.z=parseFloat(HASH.z)||cam.z;
+if(HASH.at){const a=HASH.at.split(',').map(Number);if(isFinite(a[0])&&isFinite(a[1])){cam.x=a[0]*T;cam.y=a[1]*T;follow=false;}}
+clampCam();
+const pxPerTile=()=>fitScale*cam.z*T;
+const toast=document.getElementById('toast');let toastT;
+function say(m){toast.textContent=m;toast.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>toast.classList.remove('show'),2200);}
+function scr(wx,wy){const s=fitScale*cam.z;return[(wx-cam.x)*s+cv.width/2,(wy-cam.y)*s+cv.height/2];}
+function world(sx,sy){const s=fitScale*cam.z;return[(sx-cv.width/2)/s+cam.x,(sy-cv.height/2)/s+cam.y];}
+
+/* =====================================================================
+   8. PATHFINDING (A*, 4-neighbour, cost read from the precomputed grid)
+   ===================================================================== */
+const walkCost=(x,y)=>(x<0||y<0||x>=W||y>=H)?1e9:costGrid[y*W+x];
+function findPath(sx,sy,tx,ty){
+ if(!passable(tx,ty))return null;const N=W*H,g=new Float32Array(N).fill(1e9),from=new Int32Array(N).fill(-1),closed=new Uint8Array(N);
+ const heap=[];const push=(f,i)=>{heap.push([f,i]);let k=heap.length-1;while(k>0){const p=(k-1)>>1;if(heap[p][0]<=heap[k][0])break;[heap[p],heap[k]]=[heap[k],heap[p]];k=p;}};
+ const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let k=0;for(;;){let l=2*k+1,r=l+1,m=k;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===k)break;[heap[m],heap[k]]=[heap[k],heap[m]];k=m;}}return top;};
+ const s=sy*W+sx,t=ty*W+tx;g[s]=0;push(Math.abs(tx-sx)+Math.abs(ty-sy),s);let it=0;
+ while(heap.length&&it++<2500000){const [,i]=pop();if(closed[i])continue;closed[i]=1;if(i===t)break;const x=i%W,y=(i/W)|0;
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const j=ny*W+nx,c=costGrid[j];if(c>=1e9)continue;const ng=g[i]+c;if(ng<g[j]){g[j]=ng;from[j]=i;push(ng+Math.abs(tx-nx)+Math.abs(ty-ny),j);}}}
+ if(from[t]<0&&t!==s)return null;const path=[];let c=t;while(c!==s&&c>=0){path.push([c%W,(c/W)|0]);c=from[c];}return path.reverse();
+}
+/* walking time from the real path: 4.5 km/h on roads, slower by terrain cost and, off-road, by slope */
+function estimate(path){let min=0;for(const [x,y] of path){const i=y*W+x,paved=stMask[i]||isPaved(KINDS[kind[i]]),steep=paved?1:1+slopeAt(x,y)/35;min+=(MPT/1000)/(4.5/(costGrid[i]*steep))*60;}return{min,tiles:path.length};}
+
+/* =====================================================================
+   9. MOVEMENT AND TRAVEL
+   A trip is a list of legs: walk to a place, ride the mountain train,
+   ride the cable car. The same plan drives the walker and the card.
+   ===================================================================== */
+let pending=null,goal=null; // goal: the tile the walker is heading for, marked with a flag
+function arrive(){if(goal&&!hero.path.length&&Math.abs(hero.x-goal[0])+Math.abs(hero.y-goal[1])<=1)goal=null;const l=LM.find(l=>hero.x>=l.x-K*2&&hero.x<=l.x+l.w+K&&hero.y>=l.y-K*2&&hero.y<=l.y+l.w+K*2);if(l){if(l!==sel){sel=l;renderCard();}if(!visited.has(l.id)){visited.add(l.id);say(U().toast.visited+nameOf(l));renderCard();renderList();}}saveState();}
+function goTo(tx,ty,label,then){const p=findPath(hero.x,hero.y,tx,ty);if(!p){say(U().toast.noPath);goal=null;return false;}hero.path=p;pending=then||null;if(label)say(U().toast.walking+label);follow=true;return true;}
+const RIDES={
+ trainDown:{line:()=>TRAIN_LINE,sprite:'train',dur:3800,toast:'train',min:6},
+ trainUp:{line:()=>TRAIN_LINE.slice().reverse(),sprite:'train',dur:3800,toast:'train',min:6},
+ cableUp:{line:()=>CABLE_LINE,sprite:'gondola',dur:5200,toast:'cable',min:15},
+ cableDown:{line:()=>CABLE_LINE.slice().reverse(),sprite:'gondola',dur:5200,toast:'cable',min:15}};
+/* work out the legs from where the walker stands to a place */
+function planLegs(l){const legs=[];let px=hero.x,py=hero.y;const st=byId('cable'),top=byId('doquyen'),sp=byId('sunplaza'),fan=byId('fansipan');
+ const near=(p,r)=>Math.abs(px-p.x-p.w/2)<=r&&Math.abs(py-p.y-p.w/2)<=r;
+ const put=(k,to)=>{const t=nearTarget(to);legs.push({k,to,from:[px,py],target:t});px=t[0];py=t[1];};
+ for(let guard=0;guard<4;guard++){const atTop=near(top,6*K)||near(fan,6*K),atBase=near(st,4*K),inTown=townDist(px,py)<TOWN_R,high=l===top||l===fan;
+  if(high){if(!atTop){if(!atBase){if(inTown){if(!near(sp,4*K))put('walk',sp);put('trainDown',st);}else put('walk',st);}put('cableUp',top);}if(l===fan)put('walk',fan);else if(!near(top,3*K))put('walk',top);break;}
+  if(atTop){if(!near(top,4*K))put('walk',top);put('cableDown',st);if(l===st)break;continue;}
+  if(l===st){if(!atBase){if(inTown){if(!near(sp,4*K))put('walk',sp);put('trainDown',st);}else put('walk',st);}break;}
+  if(atBase&&townDist(l.x+l.w/2,l.y+l.w/2)<TOWN_R){put('trainUp',sp);if(l!==sp)put('walk',l);break;}
+  put('walk',l);break;}
+ if(!legs.length)put('walk',l);
+ return legs;}
+function rideAlong(line,sprite,dur,dest,after,msg){hero.path=[];pending=null;hero.riding={t:0,line,sprite,dur,dest,after};say(msg);follow=true;rideSound(sprite);}
+function runLegs(legs){const g=legs.shift();if(!g)return;const next=()=>runLegs(legs);
+ if(g.k==='walk'){if(!goTo(g.target[0],g.target[1],nameOf(g.to),next))return;if(!hero.path.length){pending=null;next();}}
+ else{const r=RIDES[g.k];rideAlong(r.line(),r.sprite,r.dur,g.to,next,U().toast[r.toast]);}}
+function travel(l){sel=l;showTab('place');renderCard();if(hero.riding)return;hero.path=[];pending=null;const legs=planLegs(l);goal=legs.length?legs[legs.length-1].target:null;runLegs(legs);if(!hero.path.length&&!hero.riding&&!pending)goal=null;}
+/* a click on the map: walk to that tile, or to the nearest one that can be reached when it is water, cliff or cut off */
+function nearestOpen(tx,ty){let best=null,bd=1e9;for(let r=1;r<=24&&r<=bd+1;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(Math.max(Math.abs(dx),Math.abs(dy))!==r)continue;const x=tx+dx,y=ty+dy;if(x<0||y<0||x>=W||y>=H||!reach[y*W+x])continue;const d=Math.hypot(dx,dy);if(d<bd){bd=d;best=[x,y];}}return best;}
+function walkTo(tx,ty){if(tx<0||ty<0||tx>=W||ty>=H||hero.riding)return;let t=[tx,ty];if(!reach[ty*W+tx]){t=nearestOpen(tx,ty);if(!t){say(U().toast.noPath);return;}say(U().toast.near);}
+ if(goTo(t[0],t[1]))goal=t;}
+/* what the card shows: each leg with its time, walking legs measured on the real path */
+function routeInfo(l){const parts=[];let total=0;for(const g of planLegs(l)){let min;if(g.k==='walk'){const p=findPath(g.from[0],g.from[1],g.target[0],g.target[1]);if(!p||p.length<2*K)continue;min=estimate(p).min;}else min=RIDES[g.k].min;parts.push({k:g.k,min});total+=min;}return{parts,total};}
+function tick(dt){
+ if(hero.riding){const r=hero.riding;r.t+=dt/r.dur;const k=Math.min(1,r.t),p=polyAt(r.line,k);hero.face=p[0]<hero.rx?-1:1;hero.rx=p[0];hero.ry=p[1];if(k>=1){const t=nearTarget(r.dest);hero.x=t[0];hero.y=t[1];hero.rx=hero.x;hero.ry=hero.y;hero.riding=null;rideSound(null);arrive();if(r.after)setTimeout(r.after,300);}}
+ else{
+  if(hero.moving){hero.stepT+=dt/(hero.path.length?24:44);if(hero.stepT>=1){hero.moving=false;hero.rx=hero.x;hero.ry=hero.y;arrive();}else{hero.rx+=(hero.x-hero.rx)*Math.min(1,dt/22);hero.ry+=(hero.y-hero.ry)*Math.min(1,dt/22);}}
+  if(!hero.moving&&hero.path.length){const [nx,ny]=hero.path.shift();hero.face=nx-hero.x||hero.face;hero.x=nx;hero.y=ny;hero.moving=true;hero.stepT=0;hero.step^=1;if(!hero.path.length&&pending){const f=pending;pending=null;setTimeout(f,200);}}}
+ if(follow){const [sx,sy]=scr(hero.rx*T,hero.ry*T);const mx=cv.width*0.3,my=cv.height*0.3;let tx=cam.x,ty=cam.y;const s=fitScale*cam.z;
+  if(sx<mx)tx-=(mx-sx)/s;if(sx>cv.width-mx)tx+=(sx-(cv.width-mx))/s;if(sy<my)ty-=(my-sy)/s;if(sy>cv.height-my)ty+=(sy-(cv.height-my))/s;
+  cam.x+=(tx-cam.x)*Math.min(1,dt/120);cam.y+=(ty-cam.y)*Math.min(1,dt/120);clampCam();}
+}
+
+/* =====================================================================
+   10. LIFE ON THE MAP, MARKET DAYS, SEASONAL EVENTS, WEATHER
+   Hundreds of small figures rather than a few big ones. They are placed
+   with a fixed random seed, so the map looks the same on every visit.
+   ===================================================================== */
+const rnd=(()=>{let s=987654321;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};})();
+const pick=a=>a[Math.floor(rnd()*a.length)];
+const CLOTH=['#2a3f8a','#1f2f6a','#3a2a5a','#c2412b','#8a2a3a','#2e5e32','#4a4a42','#b0306a','#2a3f8a','#1f2f6a']; // indigo for Hmong, red for Dao, and everyday colours
+const HEAD=['#1b1b1b','#1b1b1b','#f0c8a0','#c2412b','#e9cd6a','#2a3f8a'];
+const amb=[];
+/* nobody walks on water. dryAt: is this point on land or a crossing? */
+const dryAt=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y);return xi>=0&&yi>=0&&xi<W&&yi<H&&kind[yi*W+xi]!==KI.water;};
+const clearOfWater=(x,y,r)=>{for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const k=kind[yy*W+xx];if(k===KI.water||k===KI.bridge)return false;}return true;};
+/* a line is cut wherever it enters a lake or a stream with no crossing; walkers keep to one of its dry pieces */
+const dryCache=new Map();
+function dryRuns(path){let r=dryCache.get(path);if(r)return r;r=[];let cur=[],last=null;const end=()=>{if(cur.length){if(last&&last!==cur[cur.length-1])cur.push(last);if(cur.length>1)r.push(cur);}cur=[];last=null;};
+ for(let i=0;i<path.length-1;i++){const a=path[i],b=path[i+1],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*4));
+  for(let k=i?1:0;k<=n;k++){const p=k===n?b:k===0?a:[a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n];if(dryAt(p[0],p[1])){if(!cur.length||k===n)cur.push(p);last=p;}else end();}}
+ end();dryCache.set(path,r);return r;}
+const addOnLine=(line,spd,kind,extra)=>{const runs=dryRuns(line).filter(q=>polyLen(q)>=1.5);if(!runs.length)return false;const path=pick(runs),len=polyLen(path);amb.push(Object.assign({kind,path,len,spd,t:rnd(),dir:rnd()<0.5?1:-1,body:pick(CLOTH),head:pick(HEAD)},extra||{}));return true;};
+/* put n things on lines picked at random from a list, skipping lines too short to walk */
+const addMany=(list,n,mk)=>{if(!list.length)return;for(let i=0,tries=0;i<n&&tries<n*8;tries++)if(mk(pick(list)))i++;};
+const builtNear=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y);for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const xx=xi+dx,yy=yi+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const k=kind[yy*W+xx];if(k===KI.village||k===KI.town||k===KI.garden)return true;}return false;};
+/* people on the town streets, on village lanes and roads, motorbikes on the main roads */
+addMany(WAYS.town,90,p=>addOnLine(p,1.0+rnd()*1.4,'person'));
+addMany(WAYS.minor.filter(p=>{const m=p[Math.floor(p.length/2)];return builtNear(m[0],m[1]);}),190,p=>addOnLine(p,0.8+rnd()*1.4,'person'));
+addMany(WAYS.main.filter(p=>polyLen(p)>12*K),30,p=>addOnLine(p,8+rnd()*7,'moto'));
+if(R.passRoad)for(let i=0;i<3;i++)addOnLine(R.passRoad,10+rnd()*5,'moto');
+if(R.valleyRoad)for(let i=0;i<3;i++)addOnLine(R.valleyRoad,9+rnd()*5,'moto');
+/* trekkers and porters on the trek lines */
+for(const id of ['fansipan','valley','taphin','catcat','hamrong'])for(const ln of byTrek(id)){const n=id==='fansipan'?9:id==='valley'?8:4;for(let i=0;i<n;i++)addOnLine(ln,1.1+rnd()*0.7,'person',{body:pick(['#e07b2a','#f1c232','#c2412b','#2a9d8f']),head:pick(['#f1c232','#f4f4f0','#c2412b']),load:rnd()<0.3});}
+function byTrek(id){const t=TREKS.find(t=>t.id===id);if(!t||!t.lines.length)return[];return[t.lines.slice().sort((a,b)=>polyLen(b)-polyLen(a))[0]];}
+amb.push({kind:'train',path:TRAIN_LINE,len:Math.max(1,polyLen(TRAIN_LINE)),spd:9,t:0.5,dir:1,pause:2500});
+/* fields next to village houses: buffalo, the children who mind them, and the harvest crews */
+const villageTiles=[];for(let i=0;i<W*H;i++)if(kind[i]===KI.village)villageTiles.push(i);
+function fieldSpot(){for(let tries=0;tries<60&&villageTiles.length;tries++){const i=pick(villageTiles),x=i%W+Math.round((rnd()*2-1)*7),y=((i/W)|0)+Math.round((rnd()*2-1)*7);if(x<1||y<1||x>=W-1||y>=H-1)continue;const k=kind[y*W+x];if(k===KI.terrace||k===KI.grass||k===KI.garden)return[x,y];}return null;}
+for(let i=0;i<90;i++){const s=fieldSpot();if(!s)break;const b={kind:'buffalo',x:s[0],y:s[1],wait:rnd()*3000,flip:rnd()<0.5};amb.push(b);if(rnd()<0.45)amb.push({kind:'child',follow:b,body:pick(CLOTH)});}
+const crews=[];for(let i=0;i<34;i++){const s=fieldSpot();if(!s||kind[s[1]*W+s[0]]!==KI.terrace)continue;for(let j=0;j<4+Math.floor(rnd()*4);j++){const x=s[0]+(rnd()*2-1)*1.6,y=s[1]+(rnd()*2-1)*1.2;if(kind[Math.floor(y)*W+Math.floor(x)]===KI.terrace)crews.push({x,y,ph:rnd()*6,body:pick(CLOTH)});}}
+const harvesting=()=>month===9||month===10;
+function tickAmb(dt){for(const a of amb){
+ if(a.path){if(a.hold>0)a.hold-=dt;else{a.t+=a.spd*a.dir*dt/1000/a.len;if(a.t>1){a.t=1;a.dir=-1;a.hold=a.pause||0;}if(a.t<0){a.t=0;a.dir=1;a.hold=a.pause||0;}}const p=polyAt(a.path,a.t);a.px=p[0]*T;a.py=p[1]*T;}
+ else if(a.follow){let ox=a.follow.flip?5:-5;if(!dryAt((a.follow.px+ox)/T,(a.follow.py+1)/T))ox=-ox;a.px=a.follow.px+ox;a.py=a.follow.py+1;}
+ else{a.wait-=dt;if(a.wait<=0){a.wait=2000+Math.random()*5000;const dx=Math.round(Math.random()*2-1),dy=Math.round(Math.random()*2-1),nx=a.x+dx,ny=a.y+dy;if(nx>0&&ny>0&&nx<W&&ny<H){const k=kind[ny*W+nx];if(k===KI.terrace||k===KI.grass||k===KI.garden||k===KI.bare){a.x=nx;a.y=ny;if(dx)a.flip=dx<0;}}}a.px=a.x*T+T/2;a.py=a.y*T+T/2;}}}
+/* market days: a crowd and extra stalls at Sapa Market on Sunday morning and at the night market on Saturday night */
+const marketBusy=id=>id==='market'?(day===0&&hour>=6&&hour<11):id==='nightmarket'?(day===6&&hour>=18&&hour<23):false;
+const shoppers=[],stalls=[];for(const id of ['market','nightmarket']){const l=byId(id),cx=l.x+l.w/2,cy=l.y+l.w+1.5;
+ for(let i=0;i<54;i++){let x,y,tries=0;do{x=cx+(rnd()*2-1)*3.2*K;y=cy+(rnd()*2-1)*1.6*K;}while(!dryAt(x,y)&&++tries<20);if(dryAt(x,y))shoppers.push({id,x,y,hx:cx,hy:cy,wait:rnd()*2000,body:pick(CLOTH),head:pick(HEAD),base:i<5});}
+ for(let i=0;i<10;i++){const x=cx+(i%5-2)*1.3*K,y=cy+(i<5?-0.9:0.9)*K;if(dryAt(x,y))stalls.push({id,x,y,base:i<2,i});}}
+function tickShoppers(dt){for(const s of shoppers){s.wait-=dt;if(s.wait>0)continue;s.wait=500+Math.random()*1800;const nx=s.x+(Math.random()*2-1)*1.2,ny=s.y+(Math.random()*2-1)*1.0;if(Math.abs(nx-s.hx)>3.4*K||Math.abs(ny-s.hy)>1.8*K||!dryAt(nx,ny))continue;s.x=nx;s.y=ny;}}
+/* February: the Hmong Gầu Tào festival, a pole with a red banner and a ring of dancers on a field near Lao Chải */
+const FEST=(()=>{const l=byId('laochai');for(let r=3;r<16;r++)for(let a=0;a<12;a++){const x=Math.round(l.x+Math.cos(a*0.52)*r*K),y=Math.round(l.y+Math.sin(a*0.52)*r*K);if(x>4&&y>4&&x<W-4&&y<H-4){const k=kind[y*W+x];if((k===KI.terrace||k===KI.grass)&&clearOfWater(x,y,4))return{x,y};}}return{x:l.x+6,y:l.y+6};})();
+const festival=()=>month===2;
+/* homestays: places to stay that OpenStreetMap names, within about a kilometre of a village on the list, eight a village at most */
+const STAYS=(()=>{const vs=LM.filter(l=>l.sp==='house'||l.sp==='dao'),by=new Map();for(const s of R.stays||[]){if(s.x<1||s.y<1||s.x>=W-1||s.y>=H-1||townDist(s.x,s.y)<TOWN_R+8*K||!dryAt(s.x,s.y))continue;let bv=null,bd=28;for(const v of vs){const d=Math.hypot(s.x-v.x-v.w/2,s.y-v.y-v.w/2);if(d<bd){bd=d;bv=v;}}if(!bv)continue;if(!by.has(bv.id))by.set(bv.id,[]);by.get(bv.id).push({n:s.n,x:s.x,y:s.y,v:bv.id,d:bd});}
+ const out=[];for(const l of by.values()){l.sort((a,b)=>a.d-b.d);out.push(...l.slice(0,8));}return out;})();
+/* the way up from the top station: stone steps past the bell tower, the bronze Buddha and a pagoda, in world pixels */
+const SUMMIT=(()=>{const a=byId('doquyen'),b=byId('fansipan'),ax=(a.x+a.w/2)*T,ay=(a.y+a.w)*T,bx=(b.x+b.w/2)*T,by=b.y*T+16;return{ax,ay,bx,by,decor:[['tower',ax-22,ay+2],['buddha',ax+12,ay+6],['temple',bx-32,by-18]]};})();
+/* typical weather by month in Sa Pa town, at about 1,500 m: mean temperature in °C and rain in mm */
+const CLIM_T=[9.4,10.8,14.4,17.5,19.4,20.2,20.4,20.2,18.8,16.2,13,10.2],CLIM_R=[65,80,105,215,345,410,465,450,315,215,110,65];
+/* clouds are blocky: each is a small bitmap of cells stored as row runs, so shadows and haze stay on the pixel grid */
+function cloudShape(seed,cw,chh){const runs=[];for(let j=0;j<chh;j++){let start=-1;for(let i=0;i<=cw;i++){const nx=(i+0.5-cw/2)/(cw/2),ny=(j+0.5-chh*0.55)/(chh/2);const on=i<cw&&nx*nx+ny*ny<0.7+0.5*(nz(i/5+seed*3.1,j/5+seed*1.7)-0.5);if(on&&start<0)start=i;if(!on&&start>=0){runs.push([j,start,i-start]);start=-1;}}}return{cw,chh,runs};}
+const CLOUD_CELL=16;
+const clouds=[];for(let i=0;i<18;i++){const r=240+Math.random()*320,cw=Math.round(r*2/CLOUD_CELL);clouds.push({x:Math.random()*W*T,y:Math.random()*H*T,r,cell:CLOUD_CELL,shape:cloudShape(i*17+3,cw,Math.round(cw*0.5)),v:0.5+Math.random()*0.6,p:1.15+Math.random()*0.25});}
+/* stepped disc on the art grid, used for every glow so light stays blocky */
+function pixelDisc(c,cx,cy,r){const x0=Math.round(cx/S)*S,y0=Math.round(cy/S)*S;for(let dy=-r;dy<=r;dy++){const hw=Math.floor(Math.sqrt(r*r-dy*dy)+0.5);c.fillRect(x0-hw*S,y0+dy*S,(2*hw+1)*S,S);}}
+const rain=[];for(let i=0;i<220;i++)rain.push([Math.random(),Math.random()]);
+function darkness(h){if(h>=6.5&&h<=17.5)return 0;if(h>17.5&&h<20)return (h-17.5)/2.5*0.6;if(h>=20||h<5)return 0.6;return 0.6*(1-(h-5)/1.5);}
+/* valley fog: the height below which the air is white; peaks stand clear above it */
+function fogLevel(h){const winter=month===12||month<=2;let L=0;
+ if(h>=4.5&&h<=9.5){const t=h<7?(h-4.5)/2.5:Math.max(0,1-(h-7)/2.5);L=1150+((winter?2050:1900)-1150)*t;}
+ if(winter&&h>=15.5&&h<=20){const t=h<17.5?(h-15.5)/2:Math.max(0,1-(h-17.5)/2.5);L=Math.max(L,1150+(1800-1150)*t);}
+ if(skyNow()===2)L=Math.max(L,2600);return L;}
+let autoSky=1,autoSkyT=0;function pickAutoSky(){const r=Math.random();const rainP=month>=6&&month<=8?0.5:month===5||month===9?0.25:0.08;const fogP=month===12||month<=2?0.35:0.12;autoSky=r<rainP?3:r<rainP+fogP?2:1;}pickAutoSky();
+const skyNow=()=>skyMode===0?autoSky:skyMode;
+
+/* =====================================================================
+   11. RENDER
+   ===================================================================== */
+/* the pixel font has no Vietnamese-only letters, so any label that needs them is set in the body font */
+const BODY_LABEL='600 11px "IBM Plex Sans",system-ui,sans-serif';
+const needsBody=s=>/[ĂăĐđĨĩŨũƠ-ưẠ-ỹ]/.test(s);
+const SEL_COL='#2e7d32',YOU_COL='#f1c232';
+function placeLabel(placed,text,x,y,style,font){if(needsBody(text))font=BODY_LABEL;ctx.font=font;const w=ctx.measureText(text).width+8,h=14;const lx=Math.max(2,Math.min(cv.width-w-2,x-w/2)),ly=Math.max(2,Math.min(cv.height-h-2,y));const rect=[lx,ly,w,h];
+ for(const p of placed)if(!(rect[0]>p[0]+p[2]||rect[0]+rect[2]<p[0]||rect[1]>p[1]+p[3]||rect[1]+rect[3]<p[1]))return false;
+ placed.push(rect);ctx.fillStyle=style==='hi'?SEL_COL:style==='street'?'rgba(60,60,70,.78)':style==='poi'?'rgba(42,157,143,.85)':style==='peak'?'rgba(27,27,27,.55)':'rgba(27,27,27,.82)';ctx.fillRect(lx,ly,w,h);ctx.fillStyle=style==='street'?'#e8e8dc':'#f4f4f0';ctx.fillText(text,lx+4,ly+10);return true;}
+/* the range and the valley get the same boxed label as every other name. A few spots along their line are tried, so
+   the label never covers a place name and stays on screen */
+function areaLabel(placed,text,x0,y0,x1,y1,font){for(const t of [0.5,0.34,0.66,0.2,0.8]){const [sx,sy]=scr((x0+(x1-x0)*t)*T,(y0+(y1-y0)*t)*T);if(sx<60||sx>cv.width-60||sy<8||sy>cv.height-26)continue;if(placeLabel(placed,text,sx,sy,'peak',font))return;}}
+function render(){
+ const s=fitScale*cam.z;ctx.imageSmoothingEnabled=false;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#1d2a1d';ctx.fillRect(0,0,cv.width,cv.height);
+ const setWorld=()=>ctx.setTransform(s,0,0,s,cv.width/2-cam.x*s,cv.height/2-cam.y*s);setWorld();
+ const vx0=cam.x-viewW()/2,vy0=cam.y-viewH()/2,vx1=cam.x+viewW()/2,vy1=cam.y+viewH()/2;
+ const seen=(px,py,m)=>px>vx0-m&&px<vx1+m&&py>vy0-m&&py<vy1+m;
+ const c0x=Math.max(0,Math.floor(vx0/(CH_T*T))),c1x=Math.min(CHW-1,Math.floor(vx1/(CH_T*T))),c0y=Math.max(0,Math.floor(vy0/(CH_T*T))),c1y=Math.min(CHH-1,Math.floor(vy1/(CH_T*T)));
+ /* zoomed out, tile detail is smaller than a screen pixel and turns to noise: draw one flat colour per tile instead */
+ const ppt=pxPerTile(),lowZoom=ppt<6;
+ if(lowZoom)ctx.drawImage(miniImage(),0,0,W*T,H*T);
+ else{/* terrain chunks are drawn a few per frame; until one is ready its area shows the flat overview, and the loop stays awake */
+  const t0=performance.now();let waiting=0;
+  for(let cy=c0y;cy<=c1y;cy++)for(let cx=c0x;cx<=c1x;cx++){const key=cx+','+cy;let c=chunks.get(key);
+   if(c){chunks.delete(key);chunks.set(key,c);}
+   else if(performance.now()-t0<14){c=buildChunk(cx,cy);chunks.set(key,c);if(chunks.size>MAXC)chunks.delete(chunks.keys().next().value);}
+   else{waiting++;ctx.drawImage(miniImage(),cx*CH_T,cy*CH_T,CH_T,CH_T,cx*CH_T*T,cy*CH_T*T,CH_T*T,CH_T*T);continue;}
+   ctx.drawImage(c,cx*CH_T*T,cy*CH_T*T);}
+  if(waiting)lastInput=performance.now();}
+ ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c)))ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}
+  /* rapids flicker white */
+  if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
+ if(showRoutes){ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.lineDashOffset=-frame;for(const r of TREKS){ctx.strokeStyle=r.col;for(const ln of r.lines){ctx.beginPath();ln.forEach((p,i)=>i?ctx.lineTo(p[0]*T,p[1]*T):ctx.moveTo(p[0]*T,p[1]*T));ctx.stroke();}}ctx.setLineDash([]);}
+ /* cable car: the real line from OSM, pylons and two gondolas */
+ const ca=CABLE_LINE[0],cb=CABLE_LINE[CABLE_LINE.length-1],ax=ca[0]*T,ay=ca[1]*T-6,bx=cb[0]*T,by=cb[1]*T-4;
+ ctx.strokeStyle='#1b1b1b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+ if(!lowZoom){for(let i=1;i<12;i++){const tx=ax+(bx-ax)*i/12,ty=ay+(by-ay)*i/12;ctx.fillStyle='#4a4a42';ctx.fillRect(Math.round(tx)-1,Math.round(ty)-1,2,10);}
+  const gt=(gond%600)/600;drawGondola(ctx,Math.round(ax+(bx-ax)*gt),Math.round(ay+(by-ay)*gt));drawGondola(ctx,Math.round(ax+(bx-ax)*(1-gt)),Math.round(ay+(by-ay)*(1-gt)));}
+ /* waterfalls, viewpoints and peaks */
+ if(!lowZoom)for(const f of FEAT){const fx=Math.round(f.x*T),fy=Math.round(f.y*T);if(!seen(fx,fy,20))continue;
+  if(f.k==='waterfall'){ctx.fillStyle='#f4f4f0';ctx.fillRect(fx-1,fy-4,2,6);ctx.fillStyle='#8fc3ff';ctx.fillRect(fx-2,fy+2,4,2);}
+  else if(f.k==='peak'){ctx.fillStyle='#1b1b1b';ctx.fillRect(fx-3,fy+1,6,2);ctx.fillRect(fx-2,fy-1,4,2);ctx.fillRect(fx-1,fy-3,2,2);}
+  else{ctx.fillStyle='#1b1b1b';ctx.fillRect(fx-2,fy-2,4,4);ctx.fillStyle='#f1c232';ctx.fillRect(fx-1,fy-1,2,2);}}
+ /* homestays: a small house with a gold roof */
+ if(!lowZoom)for(const h of STAYS){const hx=Math.round(h.x*T),hy=Math.round(h.y*T);if(!seen(hx,hy,20))continue;ctx.fillStyle='#1b1b1b';ctx.fillRect(hx-3,hy-4,6,7);ctx.fillStyle='#f1c232';ctx.fillRect(hx-2,hy-3,4,2);ctx.fillStyle='#f4f4f0';ctx.fillRect(hx-2,hy-1,4,3);ctx.fillStyle='#1b1b1b';ctx.fillRect(hx,hy,1,2);}
+ /* the summit steps and the buildings beside them */
+ if(!lowZoom&&seen(SUMMIT.ax,SUMMIT.ay,160)){const {ax,ay,bx,by}=SUMMIT,n=Math.round(Math.hypot(bx-ax,by-ay)/S);for(let i=0;i<=n;i++){ctx.fillStyle=i%2?'#d8d2c0':'#9a9486';ctx.fillRect(Math.round((ax+(bx-ax)*i/n)/S)*S-S,Math.round((ay+(by-ay)*i/n)/S)*S,2*S,S);}
+  for(const d of SUMMIT.decor)drawSprite(ctx,d[0],d[1],d[2],S);}
+ /* places: small sprites on the art grid; the selected or hovered one gets a thin frame */
+ for(const l of LMY){if(!seen(l.x*T,l.y*T,60))continue;drawLandmark(ctx,l);const hi=l===sel||l===hover,wp=l.w*T;
+  if(hi){ctx.fillStyle=l===sel?YOU_COL:'#f4f4f0';ctx.fillRect(l.x*T-2,l.y*T-2,wp+4,1);ctx.fillRect(l.x*T-2,l.y*T+wp+1,wp+4,1);ctx.fillRect(l.x*T-2,l.y*T-2,1,wp+4);ctx.fillRect(l.x*T+wp+1,l.y*T-2,1,wp+4);}
+  if(visited.has(l.id)){ctx.fillStyle='#2e7d32';ctx.fillRect(l.x*T+wp-2,l.y*T-2,4,4);ctx.fillStyle='#f4f4f0';ctx.fillRect(l.x*T+wp-1,l.y*T-1,2,2);}}
+ /* the way the walker is about to take, as a dotted line */
+ if(hero.path.length&&!hero.riding){const st=lowZoom?Math.max(2,Math.round(3/s)):1,d=lowZoom?Math.max(2,Math.round(1.6/s)):2;for(const pass of [0,1]){ctx.fillStyle=pass?YOU_COL:'#1b1b1b';const e=pass?0:1;for(let i=(hero.path.length-1)%st;i<hero.path.length;i+=st){const p=hero.path[i];if(seen(p[0]*T,p[1]*T,T))ctx.fillRect(p[0]*T+T/2-d/2-e,p[1]*T+T/2-d/2-e,d+2*e,d+2*e);}}}
+ const dk=darkness(hour),step2=(frame>>2)%2;
+ if(!lowZoom){
+  /* festival pole and dancers, harvest crews, market stalls and crowd */
+  if(festival()&&seen(FEST.x*T,FEST.y*T,80)){const fx=FEST.x*T,fy=FEST.y*T;ctx.fillStyle='#6d4a2a';ctx.fillRect(fx,fy-22,2,24);ctx.fillStyle='#c2412b';ctx.fillRect(fx+2,fy-22,6,8);ctx.fillStyle='#f1c232';ctx.fillRect(fx+2,fy-14,6,2);
+   for(let i=0;i<26;i++){const a=i/26*6.283+frame*0.05,r=(i%2?20:28);drawPerson(ctx,Math.round(fx+Math.cos(a)*r),Math.round(fy+Math.sin(a)*r*0.6)+4,CLOTH[i%CLOTH.length],i%3?'#1b1b1b':'#c2412b',(frame+i)%2);}}
+  if(harvesting())for(const c of crews){const px=Math.round(c.x*T),py=Math.round(c.y*T);if(!seen(px,py,20))continue;drawPerson(ctx,px,py+(((frame>>1)+Math.floor(c.ph))%3?0:1),c.body,'#e9cd6a',0);if(month===10&&(c.ph|0)%2){ctx.fillStyle='#e9cd6a';ctx.fillRect(px+3,py-2,3,2);}}
+  for(const st of stalls){if(!st.base&&!marketBusy(st.id))continue;drawStall(ctx,Math.round(st.x*T),Math.round(st.y*T),st.i);}
+  for(const sh of shoppers){if(!sh.base&&!marketBusy(sh.id))continue;drawPerson(ctx,Math.round(sh.x*T),Math.round(sh.y*T),sh.body,sh.head,step2);}
+  /* everyone and everything that moves */
+  for(const a of amb){const px=Math.round(a.px),py=Math.round(a.py);if(!seen(px,py,20))continue;
+   if(a.kind==='person'){drawPerson(ctx,px,py,a.body,a.head,step2);if(a.load){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}}
+   else if(a.kind==='moto')drawMoto(ctx,px,py);
+   else if(a.kind==='buffalo')drawBuffalo(ctx,px,py,a.flip);
+   else if(a.kind==='child')drawChild(ctx,px,py,a.body);
+   else if(a.kind==='train')drawTrain(ctx,px,py);}}
+ /* you: the same size as everyone else, in gold, under a small bobbing marker so you can find yourself */
+ {const hx=Math.round(hero.rx*T+T/2),hy=Math.round(hero.ry*T+T);
+  if(hero.riding){if(hero.riding.sprite==='train')drawTrain(ctx,hx,hy-2);else drawGondola(ctx,hx,hy-10);}
+  else if(!lowZoom)drawPerson(ctx,hx,hy,YOU_COL,'#f4f4f0',hero.moving&&hero.step);
+  const bob=(frame>>2)%2,my=hy-(lowZoom?6:12)-bob;ctx.fillStyle='#1b1b1b';ctx.fillRect(hx-3,my-1,6,3);ctx.fillRect(hx-2,my+2,4,2);ctx.fillStyle=YOU_COL;ctx.fillRect(hx-2,my,4,2);ctx.fillRect(hx-1,my+2,2,1);}
+ /* where you are going: a small flag on the tile you clicked */
+ if(goal){const m=lowZoom?Math.max(1,Math.round(1.6/s)):1,gx=Math.round(goal[0]*T+T/2),gy=Math.round(goal[1]*T+T),bob=(frame>>2)%2;
+  ctx.fillStyle='#1b1b1b';ctx.fillRect(gx-m,gy-11*m,3*m,12*m);ctx.fillRect(gx+m,gy-12*m-bob*m,6*m,6*m);
+  ctx.fillStyle='#f4f4f0';ctx.fillRect(gx,gy-10*m,m,10*m);ctx.fillStyle='#c2412b';ctx.fillRect(gx+m,gy-11*m-bob*m,4*m,4*m);ctx.fillStyle=YOU_COL;ctx.fillRect(gx+2*m,gy-10*m-bob*m,2*m,2*m);}
+ /* cloud shadows: blocky, snapped to the cloud cell */
+ ctx.fillStyle='rgba(10,20,10,.13)';for(const c of clouds){const cell=c.cell,ox=Math.round((c.x-c.shape.cw*cell/2)/cell)*cell,oy=Math.round((c.y-c.shape.chh*cell/2)/cell)*cell;if(ox>vx1||ox+c.shape.cw*cell<vx0||oy>vy1||oy+c.shape.chh*cell<vy0)continue;for(const [j,i0,n] of c.shape.runs)ctx.fillRect(ox+i0*cell,oy+j*cell,n*cell,cell);}
+ /* valley fog: one flat block per tile, in four density steps */
+ const fl=fogLevel(hour);if(fl>1150)ctx.drawImage(fogMask(fl),0,0,W*T,H*T);
+ ctx.setTransform(1,0,0,1,0,0);
+ const h=hour,sk=skyNow();if(h>16.5&&h<19.5){ctx.fillStyle='rgba(230,120,50,'+(0.18*(1-Math.abs(h-18)/1.5))+')';ctx.fillRect(0,0,cv.width,cv.height);}
+ if(dk>0){ctx.fillStyle='rgba(12,18,52,'+dk+')';ctx.fillRect(0,0,cv.width,cv.height);}
+ const centerE=eAt(Math.floor(cam.x/T),Math.floor(cam.y/T));const snowing=sk===3&&winterSnow()&&centerE>1800;
+ if(sk===3&&!snowing){ctx.fillStyle='rgba(40,60,90,.18)';ctx.fillRect(0,0,cv.width,cv.height);ctx.strokeStyle='rgba(200,225,255,.6)';ctx.lineWidth=1;ctx.beginPath();for(const r of rain){const x=((r[0]+frame*0.004)%1)*cv.width,y=((r[1]+frame*0.03)%1)*cv.height;ctx.moveTo(x,y);ctx.lineTo(x-3,y+12);}ctx.stroke();}
+ if(snowing){ctx.fillStyle='rgba(200,210,230,.15)';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='rgba(255,255,255,.9)';for(const r of rain){const x=((r[0]+frame*0.0015+Math.sin(frame*0.2+r[1]*20)*0.004)%1)*cv.width,y=((r[1]+frame*0.008)%1)*cv.height;ctx.fillRect(x,y,3,3);}}
+ if(dk>0.12){const al=Math.min(1,(dk-0.1)/0.45);setWorld();ctx.globalCompositeOperation='lighter';
+  if(lowZoom){/* zoomed out: every settlement shows as a cluster of lights with a soft blocky glow */
+   const L=lightsImages();ctx.globalAlpha=al;ctx.drawImage(L.glow,0,0,W*T,H*T);ctx.drawImage(L.dots,0,0,W*T,H*T);ctx.globalAlpha=1;}
+  else{
+   const inView=(x,y)=>!(x*T<vx0-80||x*T>vx1+80||y*T<vy0-80||y*T>vy1+80);
+   /* streets pick up a little light so the town keeps its shape after dark */
+   ctx.fillStyle='rgba(150,160,195,'+(0.14*al)+')';for(let i=0;i<stTiles.length;i+=2){const x=stTiles[i],y=stTiles[i+1];if(!inView(x,y))continue;const m=stMask[y*W+x];for(let b=0;b<16;b++)if(m&(1<<b))ctx.fillRect(x*T+(b&3)*S,y*T+(b>>2)*S,S,S);}
+   /* lamps: a small two-step glow and one bright pixel */
+   for(let i=0;i<lampPts.length;i+=2){const lx=lampPts[i],ly=lampPts[i+1];if(lx<vx0-40||lx>vx1+40||ly<vy0-40||ly>vy1+40)continue;const flk=((frame+lx+ly*3)%11===0)?0.6:1;ctx.fillStyle='rgba(255,190,80,'+(0.06*al*flk)+')';pixelDisc(ctx,lx,ly,4);ctx.fillStyle='rgba(255,205,110,'+(0.1*al*flk)+')';pixelDisc(ctx,lx,ly,2);ctx.fillStyle='rgba(255,235,170,'+(al*flk)+')';ctx.fillRect(lx,ly,S,S);}
+   /* windows: one lit pixel per building, two for hotels; village houses light up a little less often */
+   ctx.fillStyle='rgba(255,216,102,'+(0.95*al)+')';
+   for(let i=0;i<windowTiles.length;i+=2){const x=windowTiles[i],y=windowTiles[i+1];if(!inView(x,y))continue;const j=y*W+x,k=kind[j];
+    if(k===KI.market){if(((x*7+y*13+Math.floor(hour))%5)!==0)ctx.fillRect(x*T+3*S,y*T+2*S,S,S);continue;}
+    const v=quad[j],skip=k===KI.village?3:5;for(let qi=0;qi<4;qi++){const st=(v>>(qi*3))&7;if(!st||((x*7+y*13+qi*5+Math.floor(hour))%skip)===0)continue;const qx=(qi&1)*2,qy=(qi>>1)*2;ctx.fillRect(x*T+(qx+1)*S,y*T+(qy+1)*S,S,S);if(st===2)ctx.fillRect(x*T+qx*S,y*T+(qy+1)*S,S,S);}}
+   for(const l of LM){if(!inView(l.x,l.y))continue;if(/house|dao|station|market|stalls|bus|church|sunplaza|hotel|museum|pagoda|glass/.test(l.sp)){const wp=l.w*T;ctx.fillStyle='rgba(255,216,102,'+al+')';ctx.fillRect(l.x*T+wp/2-2,l.y*T+wp*0.62,4,4);if(l.sp==='church')ctx.fillRect(l.x*T+wp/2-2,l.y*T+2,4,6);
+    ctx.fillStyle='rgba(255,190,80,'+(0.05*al)+')';pixelDisc(ctx,l.x*T+wp/2,l.y*T+wp*0.62,7);ctx.fillStyle='rgba(255,200,100,'+(0.07*al)+')';pixelDisc(ctx,l.x*T+wp/2,l.y*T+wp*0.62,3);}}
+   /* the busy market glows a little warmer */
+   for(const id of ['market','nightmarket'])if(marketBusy(id)){const l=byId(id);ctx.fillStyle='rgba(255,170,70,'+(0.07*al)+')';pixelDisc(ctx,(l.x+l.w/2)*T,(l.y+l.w+1.5)*T,24);}
+   ctx.fillStyle='rgba(255,220,120,'+(0.08*al)+')';for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(townDist(x,y)<TOWN_R&&((x+y+frame)%3===0)&&(wMask[y*W+x]&0x60)===0x60)ctx.fillRect(x*T+S,y*T+S,2*S,S);}}
+  ctx.globalCompositeOperation='source-over';ctx.setTransform(1,0,0,1,0,0);}
+ /* cloud haze above the land: only when zoomed out, fading away as you zoom into town */
+ {const hz=Math.max(0,Math.min(1,(4-cam.z)/2));if(hz>0){ctx.fillStyle=sk===2?'rgba(255,255,255,'+(0.2*hz)+')':'rgba(255,255,255,'+((0.09-dk*0.08)*hz)+')';for(const c of clouds){const [sx,sy]=scr(c.x,c.y);const px=cv.width/2+(sx-cv.width/2)*c.p,py=cv.height/2+(sy-cv.height/2)*c.p;const cell=Math.max(1,Math.round(c.cell*s*c.p));const cwp=c.shape.cw*cell,chp=c.shape.chh*cell;const ox=Math.round(px-cwp/2),oy=Math.round(py-chp/2);if(ox>cv.width||ox+cwp<0||oy>cv.height||oy+chp<0)continue;for(const [j,i0,n] of c.shape.runs)ctx.fillRect(ox+i0*cell,oy+j*cell,n*cell,cell);}}}
+ const placed=[];const font=(ppt>=5?9:8)+'px "Press Start 2P",monospace';
+ if(showLabels){
+  const order=[...LM].sort((p,q)=>((q===sel)-(p===sel))||((q===hover)-(p===hover))||((q.major||0)-(p.major||0)));
+  for(const l of order){if(cam.z<7.5&&!l.major&&l!==sel&&l!==hover)continue;const [sx,sy]=scr((l.x+l.w/2)*T,(l.y+l.w)*T+3);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,nameOf(l).toUpperCase(),sx,sy,l===sel?'hi':'',font);}
+  /* the range and the valley, named while zoomed out, after the places so they give way to them */
+  if(cam.z<6){areaLabel(placed,U().ridge,196,128,232,330,font);areaLabel(placed,U().valleyName,470,292,725,424,font);}
+  if(festival()&&cam.z>=3){const [sx,sy]=scr(FEST.x*T,FEST.y*T+14);placeLabel(placed,U().festival,sx,sy,'',font);}
+  /* peaks with their heights from mid zoom; street names closer in; shop names only on request */
+  if(cam.z>=4.5)for(const f of FEAT){if(f.k!=='peak')continue;const [sx,sy]=scr(f.x*T,f.y*T+5);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;const nm=(lang==='vi'?f.n:(f.ne||f.n));placeLabel(placed,(nm?nm.toUpperCase()+' ':'')+f.e.toLocaleString('en')+' m',sx,sy,'peak',font);}
+  if(cam.z>=7.5){const sf=BODY_LABEL;for(const st of STREET_LABELS){const [sx,sy]=scr(st.x*T,st.y*T);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,st.n,sx,sy,'street',sf);}}
+  if(showShops&&cam.z>=11.5){const pf='11px "IBM Plex Sans",system-ui,sans-serif';for(const [i,ps] of poiAt){const x=i%W,y=(i/W)|0;const [sx,sy]=scr(x*T+T/2,y*T+T+1);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;const p=ps.find(q=>q.n)||ps[0];placeLabel(placed,(p.n||U().poi[p.k]).slice(0,26),sx,sy,'poi',pf);}
+   for(const h of STAYS){const [sx,sy]=scr(h.x*T,h.y*T+5);if(sx<-80||sx>cv.width+80||sy<-20||sy>cv.height+20)continue;placeLabel(placed,h.n.slice(0,26),sx,sy,'poi',pf);}}}
+ /* keyboard aim: a cross in the middle of the view, where Enter will walk to */
+ if(kbAim){const ax=Math.round(cv.width/2),ay=Math.round(cv.height/2);ctx.fillStyle='#1b1b1b';ctx.fillRect(ax-10,ay-2,20,4);ctx.fillRect(ax-2,ay-10,4,20);ctx.fillStyle=YOU_COL;ctx.fillRect(ax-9,ay-1,6,2);ctx.fillRect(ax+3,ay-1,6,2);ctx.fillRect(ax-1,ay-9,2,6);ctx.fillRect(ax-1,ay+3,2,6);}
+ /* overview map in the side panel: whole region, places, lights at night, your position and the current view */
+ mc.imageSmoothingEnabled=false;mc.globalCompositeOperation='source-over';mc.drawImage(miniImage(),0,0);
+ if(dk>0){mc.fillStyle='rgba(8,12,40,'+dk*0.75+')';mc.fillRect(0,0,W,H);if(dk>0.12){const L=lightsImages();mc.globalCompositeOperation='lighter';mc.drawImage(L.glow,0,0,W,H);mc.drawImage(L.dots,0,0);mc.globalCompositeOperation='source-over';}}
+ mc.fillStyle='#f4f4f0';for(const l of LM)mc.fillRect(l.x,l.y,3,3);
+ mc.strokeStyle='#f4f4f0';mc.lineWidth=3;mc.strokeRect(Math.max(2,vx0/T),Math.max(2,vy0/T),Math.min(W-4,viewW()/T),Math.min(H-4,viewH()/T));
+ mc.fillStyle='#1b1b1b';mc.fillRect(hero.rx-6,hero.ry-6,13,13);mc.fillStyle=YOU_COL;mc.fillRect(hero.rx-4,hero.ry-4,9,9);
+}
+const LMY=[...LM].sort((p,q)=>p.y-q.y);
+
+/* =====================================================================
+   12. SECTION STRIP: a west-east cross-section through where you stand,
+   scaled to the heights along that line so the relief fills the strip
+   ===================================================================== */
+function renderSky(){if(!showSky)return;const w=sky.width,h=sky.height,dk=darkness(hour),night=dk>0.3;sc.imageSmoothingEnabled=false;
+ const row=hero.y;let lo=1e9,hi=-1e9;for(let x=0;x<W;x++){const e=elev[row*W+x];if(e<lo)lo=e;if(e>hi)hi=e;}
+ const bot=lo-60,top=Math.max(hi,lo+400)+80;const yOf=e=>Math.round(h-3-(Math.min(top,e)-bot)/(top-bot)*(h-18));const cw=w/W;
+ sc.fillStyle=night?'#1b2748':'#9fc9e8';sc.fillRect(0,0,w,h);
+ sc.fillStyle=night?'#2c3d6b':'#7fa6c9';for(let x=0;x<W;x++){const y=yOf(colMax[x]);sc.fillRect(Math.floor(x*cw),y,Math.ceil(cw),h-y);}
+ for(let x=0;x<W;x++){const y=yOf(elev[row*W+x]);sc.fillStyle=flatColor(x,row);sc.fillRect(Math.floor(x*cw),y,Math.ceil(cw),h-y);sc.fillStyle='rgba(0,0,0,.22)';sc.fillRect(Math.floor(x*cw),y,Math.ceil(cw),2);}
+ if(night){sc.fillStyle='rgba(12,18,52,.38)';sc.fillRect(0,0,w,h);}
+ const pix='7px "Press Start 2P",monospace';const put=(s,x,y)=>{sc.font=needsBody(s)?BODY_LABEL:pix;sc.fillText(s,x,y);};
+ sc.fillStyle='#f4f4f0';put(U().section+'  '+Math.round(lo).toLocaleString('en')+'-'+Math.round(hi).toLocaleString('en')+' m',6,11);put('W',4,h-6);put('E',w-12,h-6);
+ let lastX=-999;for(const l of [...LM].sort((a,b)=>a.x-b.x)){const mid=l.w/2;if(Math.abs(l.y+mid-row)>4*K||!l.major)continue;const lx=(l.x+mid)*cw;if(lx-lastX<170||Math.abs(lx-hero.x*cw)<190)continue;lastX=lx;const ly=yOf(elev[row*W+Math.min(W-1,Math.round(l.x+mid))]);sc.fillRect(Math.round(lx),ly-6,2,6);put(nameOf(l).toUpperCase(),Math.min(w-150,lx+5),Math.max(22,ly-8));}
+ const he=eAt(hero.x,hero.y),hx=Math.round(hero.x*cw),hy=yOf(he);sc.fillStyle='#1b1b1b';sc.fillRect(hx-4,hy-8,8,8);sc.fillStyle=YOU_COL;sc.fillRect(hx-3,hy-7,6,6);sc.fillStyle='#f4f4f0';put(U().here+' '+Math.round(he).toLocaleString('en')+' m',Math.min(w-120,Math.max(4,hx+8)),Math.max(22,hy-10));}
+
+/* =====================================================================
+   13. PANEL AND UI
+   ===================================================================== */
+const card=document.getElementById('card'),list=document.getElementById('list'),hourEl=document.getElementById('hour'),hourOut=document.getElementById('hourOut'),monthEl=document.getElementById('month'),monthOut=document.getElementById('monthOut');
+const elevOf=l=>Math.round(eAt(Math.round(l.x+l.w/2),Math.round(l.y+l.w/2)));
+/* durations are written once in English; in Vietnamese the units are swapped in */
+const trv=s=>lang!=='vi'?s:String(s).replace(/(\d)\.(\d)/g,'$1,$2').replace('days trek','ngày trek').replace('loop','vòng').replace(/(\d)\s*h\b/g,'$1 giờ').replace(/\bmin\b/g,'phút');
+/* a small picture for the card: the real skyline north of the place in two layers, the land around it as the ground
+   and the place itself in front. Every place has different mountains behind it, so every card looks different. */
+function drawSketch(l,c){const g=c.getContext&&c.getContext('2d');if(!g)return;const SW=c.width,SH=c.height,cx=l.x+l.w/2,cy=l.y+l.w/2,dk=darkness(hour),hz=Math.round(SH*0.6),e0=eAt(Math.round(cx),Math.round(cy)),night=dk>0.4;
+ const sky=night?['#141a3c','#1d2550','#2a3566']:dk>0?['#4a5a9a','#c9785a','#f0b070']:['#7fb6f5','#a3cdfb','#cfe6ff'];
+ for(let b=0;b<3;b++){g.fillStyle=sky[b];g.fillRect(0,Math.floor(hz*b/3),SW,Math.ceil(hz/3)+1);}
+ g.fillStyle=night?'#f4f4f0':'#f1c232';g.fillRect(SW-18,5,6,6);
+ const ridge=(span,y0,y1,step,mPerPx,col,cap)=>{for(let i=0;i<SW;i++){const x=Math.round(cx+(i/SW-0.5)*span);let m=0;for(let y=y0;y<=y1;y+=step)m=Math.max(m,eAt(x,Math.round(cy+y)));const h=Math.max(1,Math.min(hz-3,Math.round((m-e0)/mPerPx)+cap));g.fillStyle=col;g.fillRect(i,hz-h,1,h);if(winterSnow()&&m>2800){g.fillStyle='#e8eef5';g.fillRect(i,hz-h,1,2);}}};
+ ridge(220,-130,-34,4,42,night?'#2a3358':'#7f95b8',5);
+ ridge(110,-32,-7,2,26,night?'#1f3a2a':'#4f8a5a',2);
+ /* the ground: the tiles around the place, wider apart towards the front */
+ const gh=SH-hz;for(let r=0;r<gh;r++)for(let i=0;i<SW;i+=2){const tx=Math.round(cx+(i-SW/2)/(4+6*r/gh)),ty=Math.round(cy-6+r*10/gh);g.fillStyle=(tx<0||ty<0||tx>=W||ty>=H)?'#2e7d32':flatColor(tx,ty);g.fillRect(i,hz+r,2,1);}
+ /* the place itself, with two neighbours if it is a village */
+ const z=l.big?3:4,sp=SPR[l.sp],sw=sp[0].length*z,sh=sp.length*z;
+ if(l.sp==='house'||l.sp==='dao'){drawSprite(g,l.sp,Math.round(SW*0.16),hz-10,2);drawSprite(g,l.sp,Math.round(SW*0.76),hz-6,2);}
+ drawSprite(g,l.sp,Math.round((SW-sw)/2),hz+8-sh,z);
+ if(dk>0){g.fillStyle='rgba(12,18,52,'+(dk*0.6)+')';g.fillRect(0,0,SW,SH);}}
+function renderCard(){const u=U(),l=sel;
+ if(!l){const c=u.homeCard;card.innerHTML='<p class="kicker">'+c[0]+'</p><h2>'+c[1]+'</h2><p class="vi">'+c[2]+'</p><p>'+c[3]+'</p><p class="tipline">'+u.seasons[month]+'</p><p class="src">'+c[4]+'</p>';}
+ else{const f=l.f[lang],ri=routeInfo(l);
+  /* the route the walker will really take: walking legs timed on the path, rides at their real duration */
+  const etaHtml=ri.parts.length?'<ul class="eta">'+ri.parts.map(p=>'<li>'+u.legs[p.k]+' ~'+trv(fmtMin(p.min))+'</li>').join('')+(ri.parts.length>1?'<li class="sum">'+u.total+' ~'+trv(fmtMin(ri.total))+'</li>':'')+'</ul>':'';
+  const busyHtml=u.busyWhen[l.id]?'<p class="tipline">'+(marketBusy(l.id)?u.busy[l.id]:u.busyWhen[l.id])+'</p>':'';
+  const hs=STAYS.filter(h=>h.v===l.id).slice(0,4),extraHtml=(l.eat?'<p class="tipline">'+l.eat[lang]+'</p>':'')+(hs.length?'<p class="tipline">'+u.stayLine+hs.map(h=>h.n).join(', ')+'.</p>':'');
+  card.innerHTML='<canvas class="sketch" width="112" height="56" aria-hidden="true"></canvas><p class="kicker"><span>'+l.km.toFixed(1)+' km '+u.fromChurch+'</span>'+(visited.has(l.id)?'<span class="stamp">'+u.stamp+'</span>':'')+'</p><h2>'+nameOf(l)+'</h2><p class="vi">'+altOf(l)+'</p>'+etaHtml+'<ul class="facts">'+f.map(x=>'<li>'+x+'</li>').join('')+'</ul><ul class="times"><li><span>'+u.walkT+'</span>'+trv(l.walk)+'</li><li><span>'+u.bikeT+'</span>'+trv(l.bike)+'</li><li><span>'+u.guideT+'</span>'+u.guide[l.guide]+'</li></ul><p>'+l.d[lang]+'</p>'+busyHtml+'<p class="tipline">'+l.t[lang]+'</p>'+extraHtml+'<p class="src">'+u.src[l.src]+' · '+(lang==='vi'?'độ cao trên lưới ':'grid elevation ')+elevOf(l).toLocaleString(lang==='vi'?'vi-VN':'en-US')+' m</p>';const sk=card.querySelector&&card.querySelector('.sketch');if(sk)drawSketch(l,sk);} /* the grid averages the ground over each cell, so a sharp summit reads a little low */
+ [...list.children].forEach(li=>li.firstChild.setAttribute('aria-current',li.firstChild.dataset.id===(l&&l.id)?'true':'false'));
+ document.getElementById('visitedCount').innerHTML=U().visited+' <b>'+visited.size+'</b> / '+LM.length;document.getElementById('tab-list').textContent=U().tabs[1]+' '+visited.size+'/'+LM.length;}
+const colorFor={church:'#f4f4f0',sunplaza:'#c9a227',museum:'#c9a227',hotel:'#4a5566',pagoda:'#c2412b',market:'#e07b2a',stalls:'#e07b2a',bus:'#1b1b1b',isle:'#5aa0ec',hill:'#3b8a3f',station:'#4a4a42',peak:'#c2412b',house:'#2e5e32',dao:'#c2412b',rocks:'#4a4a42',falls:'#5aa0ec',gate:'#8d8d7a',pass:'#f1c232',glass:'#5aa0ec'};
+function renderList(){list.innerHTML='';[...LM].sort((a,b)=>a.km-b.km).forEach(l=>{const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.dataset.id=l.id;
+ b.innerHTML='<i style="background:'+colorFor[l.sp]+'"></i><span>'+nameOf(l)+'</span><small>'+l.km.toFixed(1)+' km</small>'+(visited.has(l.id)?'<em>✓</em>':'');b.addEventListener('click',()=>{sel=l;showTab('place');renderCard();follow=false;cam.x=(l.x+l.w/2)*T;cam.y=(l.y+l.w/2)*T;if(cam.z<5)cam.z=5;clampCam();if(PHONE())openSheet(false);cv.focus();});li.appendChild(b);list.appendChild(li);});
+ [...list.children].forEach(li=>li.firstChild.setAttribute('aria-current',li.firstChild.dataset.id===(sel&&sel.id)?'true':'false'));}
+function applyLang(){const u=U();document.getElementById('subtitle').textContent=u.subtitle;document.getElementById('labels').textContent=u.labels;document.getElementById('routes').textContent=u.treks;weatherBtn.textContent=u.sky[skyMode];soundBtn.textContent=u.sound[soundOn?1:0];document.getElementById('lang').textContent=u.lang;document.getElementById('walk').textContent=u.walk;TABS.forEach((t,i)=>{if(t!=='list')document.getElementById('tab-'+t).textContent=u.tabs[i];});document.getElementById('skyToggle').textContent=u.skyline;document.getElementById('shops').textContent=u.shops;dayBtn.textContent=u.dayBtn+u.days[day];if(document.documentElement){document.documentElement.classList.toggle('vi',lang==='vi');document.documentElement.lang=lang;}document.getElementById('home').textContent=u.home;document.getElementById('timeLabel').textContent=u.time;document.getElementById('monthLabel').textContent=u.monthL;document.getElementById('autoTime').textContent=u.auto;
+ document.getElementById('legend').innerHTML=u.legend.map(e=>'<li><b class="'+(e[0]==='dash'?'dash':'')+'" style="'+(e[0]==='dash'?'':'background:'+e[0])+'"></b>'+e[1]+'</li>').join('');document.getElementById('help').innerHTML=u.help;document.getElementById('credits').textContent=u.credits;
+ document.getElementById('introTitle').textContent=u.welcome;document.getElementById('introBody').textContent=u.intro.replace('{n}',LM.length);document.getElementById('introBtn').textContent=u.go;applyMonth();renderList();renderCard();skyDirty=true;updateStatus();}
+function applyMonth(){monthEl.value=month;monthOut.textContent=U().months[month-1];}
+function setMonth(m){month=m;applyMonth();invalidateTerrain();pickAutoSky();renderCard();say(U().seasons[month]);saveState();}
+const weatherBtn=document.getElementById('weather'),soundBtn=document.getElementById('sound'),dayBtn=document.getElementById('dayBtn');
+/* tabs: Place, Places, Settings, Legend. On a phone the panel is a sheet at the bottom of the screen: only its tab row
+   shows until you tap a tab, and tapping the open tab again, or the map, folds it away. */
+const TABS=['place','list','settings','about'];let curTab='place';
+function showTab(id){curTab=id;for(const t of TABS){const on=t===id;document.getElementById('tab-'+t).setAttribute('aria-selected',String(on));document.getElementById('pane-'+t).hidden=!on;}}
+function openSheet(on){panelEl.classList.toggle('open',!!on);}
+TABS.forEach(t=>document.getElementById('tab-'+t).addEventListener('click',()=>{const closing=PHONE()&&panelEl.classList.contains('open')&&curTab===t;showTab(t);if(PHONE())openSheet(!closing);}));
+document.getElementById('gear').addEventListener('click',()=>{showTab('settings');if(PHONE())openSheet(true);else if(panelEl.scrollIntoView)panelEl.scrollIntoView({block:'nearest',behavior:'smooth'});});
+const skyToggle=document.getElementById('skyToggle');
+skyToggle.setAttribute('aria-pressed',String(showSky));
+skyToggle.addEventListener('click',()=>{showSky=!showSky;skyToggle.setAttribute('aria-pressed',String(showSky));sky.hidden=!showSky;resize();saveState();});
+/* status strip under the map: weekday, time, month, sky, elevation, scale bar, north */
+const stIcon=document.getElementById('stIcon'),stClock=document.getElementById('stClock'),stDay=document.getElementById('stDay'),stMonth=document.getElementById('stMonth'),stSky=document.getElementById('stSky'),stElev=document.getElementById('stElev'),stClim=document.getElementById('stClim'),scaleBar=document.getElementById('scaleBar'),scaleTxt=document.getElementById('scaleTxt');
+const NICE=[50,100,250,500,1000,2000,5000];let lastBusy='';
+function updateStatus(){const u=U(),e=eAt(hero.x,hero.y),sk=skyNow();stIcon.className=darkness(hour)>0.3?'moon':'sun';stClock.textContent=u.hourFmt(Math.round(hour*2)/2);stDay.textContent=u.days[day];stMonth.textContent=u.months[month-1].toUpperCase();
+ stSky.textContent=u.skyNames[sk===3&&winterSnow()&&e>1800?4:sk];stElev.textContent=Math.round(e).toLocaleString('en')+' m';
+ /* typical weather for the month: temperature falls about 0.6 °C for every 100 m climbed */
+ stClim.textContent='~'+Math.round(CLIM_T[month-1]-(e-1500)*0.006)+'°C · '+CLIM_R[month-1]+' mm';stClim.title=u.climTip;
+ const r=cv.getBoundingClientRect();const cssPerM=T*fitScale*cam.z/MPT*(r.width/(cv.width||1));let best=NICE[0];for(const n of NICE)if(n*cssPerM<=110)best=n;scaleBar.style.width=Math.max(6,Math.round(best*cssPerM))+'px';scaleTxt.textContent=best>=1000?(best/1000)+' km':best+' m';
+ /* say so once when a market fills up */
+ const busy=['market','nightmarket'].filter(marketBusy).join(',');if(busy!==lastBusy){lastBusy=busy;if(busy){say(u.busy[busy.split(',')[0]]);}if(sel&&u.busyWhen[sel.id])renderCard();}}
+monthEl.addEventListener('input',()=>setMonth(parseInt(monthEl.value,10)));
+dayBtn.addEventListener('click',()=>{day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];updateStatus();});
+document.getElementById('labels').addEventListener('click',e=>{showLabels=!showLabels;e.currentTarget.setAttribute('aria-pressed',String(showLabels));});
+document.getElementById('routes').addEventListener('click',e=>{showRoutes=!showRoutes;e.currentTarget.setAttribute('aria-pressed',String(showRoutes));});
+document.getElementById('shops').addEventListener('click',e=>{showShops=!showShops;e.currentTarget.setAttribute('aria-pressed',String(showShops));if(showShops&&cam.z<11.5)say(U().shopsHint);});
+weatherBtn.addEventListener('click',()=>{skyMode=(skyMode+1)%4;weatherBtn.textContent=U().sky[skyMode];});
+document.getElementById('lang').addEventListener('click',()=>{lang=lang==='en'?'vi':'en';langSet=true;applyLang();saveState();});
+document.getElementById('walk').addEventListener('click',()=>{if(sel){travel(sel);if(PHONE())openSheet(false);}else say(U().toast.pick);cv.focus();});
+document.getElementById('me').addEventListener('click',()=>{follow=true;cam.x=hero.rx*T;cam.y=hero.ry*T;if(cam.z<5)cam.z=5;clampCam();cv.focus();});
+document.getElementById('home').addEventListener('click',()=>{hero.path=[];pending=null;goal=null;hero.riding=null;rideSound(null);hero.x=START[0];hero.y=START[1];hero.rx=hero.x;hero.ry=hero.y;sel=null;follow=true;renderCard();say(U().toast.home);saveState();if(PHONE())openSheet(false);cv.focus();});
+hourEl.addEventListener('input',()=>{hour=parseFloat(hourEl.value)%24;autoTime=false;document.getElementById('autoTime').setAttribute('aria-pressed','false');hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);});
+document.getElementById('autoTime').addEventListener('click',e=>{autoTime=!autoTime;e.currentTarget.setAttribute('aria-pressed',String(autoTime));});
+document.getElementById('introBtn').addEventListener('click',()=>{document.getElementById('intro').hidden=true;try{localStorage.setItem('sapa-intro','1');}catch(e){}cv.focus();});
+try{if(!localStorage.getItem('sapa-intro'))document.getElementById('intro').hidden=false;}catch(e){document.getElementById('intro').hidden=false;}
+
+/* =====================================================================
+   14. SOUND: river, wind, market chatter and birds mixed by where you
+   stand, plus the rattle of the mountain train and the hum of the cable
+   car while you ride them
+   ===================================================================== */
+let ac=null,mix=null,birdT=null;
+function makeNoise(){const buf=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate),d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const src=ac.createBufferSource();src.buffer=buf;src.loop=true;src.start();return src;}
+function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();const master=ac.createGain();master.gain.value=0.9;master.connect(ac.destination);
+ const chain=(type,freq,q,g0)=>{const src=makeNoise(),f=ac.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=ac.createGain();g.gain.value=g0;src.connect(f).connect(g).connect(master);return g;};
+ const river=chain('lowpass',420,0.7,0),wind=chain('bandpass',260,0.6,0),chatter=chain('bandpass',1100,1.2,0),rattle=chain('bandpass',1500,2.5,0);
+ const lfo=ac.createOscillator(),lfoG=ac.createGain();lfo.frequency.value=0.13;lfoG.gain.value=0.5;lfo.connect(lfoG).connect(wind.gain);lfo.start();
+ /* cable car: a low two-note hum with a slow wobble */
+ const hum=ac.createGain();hum.gain.value=0;hum.connect(master);for(const [f,type,g] of [[92,'sine',1],[184,'triangle',0.35],[276,'sine',0.12]]){const o=ac.createOscillator(),og=ac.createGain();o.type=type;o.frequency.value=f;og.gain.value=g;o.connect(og).connect(hum);o.start();}
+ const wob=ac.createOscillator(),wobG=ac.createGain();wob.frequency.value=0.7;wobG.gain.value=0.02;wob.connect(wobG).connect(hum.gain);wob.start();
+ mix={river,wind,chatter,rattle,hum,chatterLevel:0,forest:0,ride:null};
+ setInterval(()=>{if(!soundOn||!mix)return;const t=ac.currentTime;mix.chatter.gain.linearRampToValueAtTime(mix.chatterLevel*(0.5+Math.random()),t+0.3);},350);
+ /* mountain train: clack-clack over the rail joints, twice every beat */
+ setInterval(()=>{if(!soundOn||!mix||mix.ride!=='train')return;const t=ac.currentTime,g=mix.rattle.gain;for(const d of [0,0.09]){g.setValueAtTime(0.0001,t+d);g.linearRampToValueAtTime(0.5,t+d+0.012);g.exponentialRampToValueAtTime(0.0001,t+d+0.07);}},260);}
+ ac.resume();const chirp=()=>{if(!soundOn)return;if(mix.forest>0&&Math.random()<mix.forest){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';const f=2200+Math.random()*1500,t=ac.currentTime;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*1.4,t+0.08);o.frequency.exponentialRampToValueAtTime(f*0.9,t+0.18);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.07,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+0.22);}birdT=setTimeout(chirp,900+Math.random()*3000);};chirp();}
+/* called when a ride starts ('train' or 'gondola') and when it ends (null) */
+function rideSound(kind){if(!mix||!ac)return;mix.ride=soundOn?kind:null;const t=ac.currentTime;mix.hum.gain.cancelScheduledValues(t);mix.hum.gain.linearRampToValueAtTime(mix.ride==='gondola'?0.16:0,t+0.35);if(mix.ride!=='train'){mix.rattle.gain.cancelScheduledValues(t);mix.rattle.gain.linearRampToValueAtTime(0,t+0.1);}}
+/* samples the land around you on a 77 m lattice, so distances read in the same units at any tile size */
+function updateMix(){if(!soundOn||!mix)return;let dW=12,forest=0,n=0;for(let dy=-8;dy<=8;dy++)for(let dx=-8;dx<=8;dx++){const x=hero.x+dx*K,y=hero.y+dy*K;n++;if(x<0||y<0||x>=W||y>=H)continue;const k=kind[y*W+x];if(k===KI.water)dW=Math.min(dW,Math.hypot(dx,dy));if(k===KI.forest)forest++;}
+ const e=eAt(hero.x,hero.y),td=townDist(hero.x,hero.y)/K,t=ac.currentTime,night=darkness(hour)>0.3,crowd=(marketBusy('market')||marketBusy('nightmarket'))?2:1;
+ mix.river.gain.linearRampToValueAtTime(0.32*Math.max(0,1-dW/10),t+0.8);
+ mix.wind.gain.linearRampToValueAtTime(e>2300?0.3:e>1900?0.14:0.03,t+0.8);
+ mix.chatterLevel=(td<14&&!night?0.12*(1-td/14):td<14?0.04*(1-td/14):0)*crowd;
+ mix.forest=night?0:Math.min(1,forest/n*2.2)*(skyNow()===3?0.2:1);}
+soundBtn.addEventListener('click',()=>{soundOn=!soundOn;soundBtn.setAttribute('aria-pressed',String(soundOn));soundBtn.textContent=U().sound[soundOn?1:0];if(soundOn)try{startSound();updateMix();rideSound(hero.riding?hero.riding.sprite:null);}catch(e){soundOn=false;soundBtn.textContent=U().sound[0];}else{clearTimeout(birdT);rideSound(null);ac&&ac.suspend();}});
+setInterval(updateMix,1000);
+
+/* =====================================================================
+   15. INPUT: click to walk, drag, wheel, pinch, overview, hover tooltips
+   ===================================================================== */
+/* the walker only goes where you click or tap. On a keyboard the arrow keys move the view, a cross marks its middle
+   and Enter walks there, which is the keyboard's click. */
+const PAN={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+cv.addEventListener('keydown',e=>{const d=PAN[e.key];
+ if(d){e.preventDefault();follow=false;kbAim=true;cam.x+=d[0]*viewW()/8;cam.y+=d[1]*viewH()/8;clampCam();}
+ else if((e.key==='Enter'||e.key===' ')&&kbAim){e.preventDefault();const x=cam.x/T,y=cam.y/T,l=overL(x,y);if(l)travel(l);else walkTo(Math.floor(x),Math.floor(y));}
+ if(e.key==='+'||e.key==='=')zoom(1);if(e.key==='-')zoom(-1);});
+const ZL=[1,1.8,3,5,8,12,16];
+function zoomTo(z,px,py){z=Math.max(1,Math.min(ZMAX,z));if(px!==undefined){const [wx,wy]=world(px,py);cam.z=z;const s=fitScale*cam.z;cam.x=wx-(px-cv.width/2)/s;cam.y=wy-(py-cv.height/2)/s;}else cam.z=z;clampCam();saveState();}
+function zoom(dir,px,py){let i=0;for(let k=0;k<ZL.length;k++)if(ZL[k]<=cam.z+0.01)i=k;i=Math.max(0,Math.min(ZL.length-1,i+dir));zoomTo(ZL[i],px,py);}
+document.getElementById('zin').addEventListener('click',()=>{zoom(1);cv.focus();});
+document.getElementById('zout').addEventListener('click',()=>{zoom(-1);cv.focus();});
+document.getElementById('zfit').addEventListener('click',()=>{cam.z=1;follow=false;clampCam();cv.focus();});
+cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect(),k=cv.width/r.width;zoom(e.deltaY<0?1:-1,(e.clientX-r.left)*k,(e.clientY-r.top)*k);follow=false;},{passive:false});
+function tileFromEvent(e){const r=cv.getBoundingClientRect(),k=cv.width/r.width;const [wx,wy]=world((e.clientX-r.left)*k,(e.clientY-r.top)*k);return[wx/T,wy/T];}
+/* small places need a generous finger-sized target: at least one tile of margin around the sprite */
+const overL=(x,y)=>{const m=Math.max(0.6,5/pxPerTile());return LM.find(l=>x>=l.x-m&&x<l.x+l.w+m&&y>=l.y-m&&y<l.y+l.w+m)||null;};
+const overS=(x,y)=>{const m=Math.max(0.7,5/pxPerTile());let best=null,bd=m;for(const h of STAYS){const d=Math.hypot(h.x-x,h.y-y);if(d<bd){bd=d;best=h;}}return best;};
+const stayTip=h=>'<b>'+h.n+'</b> · '+U().stay;
+const overF=(x,y)=>{const m=Math.max(1.2,6/pxPerTile());let best=null,bd=m;for(const f of FEAT){const d=Math.hypot(f.x-x,f.y-y);if(d<bd){bd=d;best=f;}}return best;};
+const ptrs=new Map();let drag=null,pinch=null,lastTap=null;
+cv.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;kbAim=false;cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(PHONE())openSheet(false);
+ if(ptrs.size===2){const [p1,p2]=[...ptrs.values()];pinch={d0:Math.hypot(p1[0]-p2[0],p1[1]-p2[1]),z0:cam.z};drag=null;}
+ else drag={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y,moved:false};});
+function showTip(e,html){tipEl.innerHTML=html;tipEl.style.display='block';const r=cv.getBoundingClientRect();tipEl.style.left=Math.max(4,Math.min(r.width-230,e.clientX-r.left+14))+'px';tipEl.style.top=(e.clientY-r.top+14)+'px';}
+const featTip=f=>{const nm=lang==='vi'?f.n:(f.ne||f.n);return'<b>'+(nm||U().feat[f.k])+'</b>'+(nm?' · '+U().feat[f.k]:'')+'<br>'+f.e.toLocaleString('en')+' m';};
+cv.addEventListener('pointermove',e=>{if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+ if(pinch&&ptrs.size===2){const [p1,p2]=[...ptrs.values()];const d=Math.hypot(p1[0]-p2[0],p1[1]-p2[1]);const r=cv.getBoundingClientRect(),k=cv.width/r.width;const mx=((p1[0]+p2[0])/2-r.left)*k,my=((p1[1]+p2[1])/2-r.top)*k;zoomTo(pinch.z0*d/pinch.d0,mx,my);follow=false;return;}
+ const [x,y]=tileFromEvent(e);hover=overL(x,y);
+ if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.hypot(dx,dy)>4){drag.moved=true;cv.classList.add('drag');follow=false;const k=cv.width/cv.getBoundingClientRect().width/(fitScale*cam.z);cam.x=drag.cx-dx*k;cam.y=drag.cy-dy*k;clampCam();}tipEl.style.display='none';}
+ else{const xi=Math.floor(x),yi=Math.floor(y),ps=poiAt.get(yi*W+xi),hs=hover?null:overS(x,y),f=hover||hs?null:overF(x,y);cv.style.cursor=hover||ps||f||hs?'pointer':'grab';
+  if(hover)showTip(e,'<b>'+nameOf(hover)+'</b><br>'+elevOf(hover)+' m');
+  else if(hs&&pxPerTile()>=5)showTip(e,stayTip(hs));
+  else if(f&&pxPerTile()>=5)showTip(e,featTip(f));
+  else if(ps&&pxPerTile()>=5)showTip(e,ps.slice(0,4).map(p=>'<b>'+(p.n||U().poi[p.k])+'</b> · '+U().poi[p.k]+(p.s&&p.s!=='yes'?' ('+p.s+')':'')).join('<br>'));
+  else if(pxPerTile()>=5&&xi>=0&&yi>=0&&xi<W&&yi<H)showTip(e,Math.round(eAt(xi,yi))+' m');else tipEl.style.display='none';}});
+function endPtr(e){ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;}
+cv.addEventListener('pointerup',e=>{const was=drag;endPtr(e);drag=null;cv.classList.remove('drag');if(!was||was.moved)return;const [x,y]=tileFromEvent(e);cv.focus();
+ /* a second tap in the same spot zooms in there, and calls off the walk the first tap started */
+ if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap.t<320&&Math.hypot(e.clientX-lastTap.x,e.clientY-lastTap.y)<30){lastTap=null;if(!hero.riding){hero.path=[];pending=null;goal=null;}const r=cv.getBoundingClientRect(),k=cv.width/r.width;zoom(1,(e.clientX-r.left)*k,(e.clientY-r.top)*k);follow=false;tipEl.style.display='none';return;}lastTap={t:now,x:e.clientX,y:e.clientY};}
+ const l=overL(x,y);if(l){travel(l);return;}
+ /* a tap on a homestay, waterfall, viewpoint or peak just says what it is */
+ if(e.pointerType!=='mouse'){const hs=overS(x,y);if(hs){showTip(e,stayTip(hs));return;}const f=overF(x,y);if(f){showTip(e,featTip(f));return;}}
+ walkTo(Math.floor(x),Math.floor(y));});
+cv.addEventListener('pointercancel',e=>{endPtr(e);drag=null;cv.classList.remove('drag');});
+cv.addEventListener('pointerleave',()=>{hover=null;tipEl.style.display='none';});
+mini.addEventListener('click',e=>{const r=mini.getBoundingClientRect();cam.x=(e.clientX-r.left)/r.width*W*T;cam.y=(e.clientY-r.top)/r.height*H*T;follow=false;clampCam();if(PHONE())openSheet(false);cv.focus();});
+/* any input wakes the loop to full frame rate for a moment */
+const poke=()=>{lastInput=performance.now();};['pointerdown','pointermove','wheel','keydown','touchstart','click'].forEach(ev=>window.addEventListener(ev,poke,{passive:true}));
+
+/* =====================================================================
+   16. BOOT AND MAIN LOOP
+   Frame pacing saves battery: full rate while you walk, ride, pan or
+   zoom; about 8 frames a second when the scene is only idling; nothing
+   at all while the tab is hidden.
+   ===================================================================== */
+let last=0,acc=0,skyAcc=0;
+function loop(ts){requestAnimationFrame(loop);
+ if(typeof document!=='undefined'&&document.hidden){last=ts;return;}
+ const active=hero.moving||hero.path.length>0||hero.riding||drag||pinch||ts-lastInput<900;
+ const raw=ts-last;if(!active&&raw<120)return;
+ const dt=Math.min(active?50:160,raw||16);last=ts;acc+=dt;if(acc>100){acc=0;frame++;}gond=(gond+dt/50)%600;
+ if(autoTime){const nh=hour+dt/7500;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);}
+ autoSkyT+=dt;if(autoSkyT>180000){autoSkyT=0;pickAutoSky();}
+ for(const c of clouds){c.x+=c.v*dt/16;if(c.x>W*T+c.r)c.x=-c.r;}
+ tick(dt);tickAmb(dt);tickShoppers(dt);render();
+ statusAcc+=dt;if(statusAcc>250){statusAcc=0;updateStatus();}
+ skyAcc+=dt;if(skyAcc>400||skyDirty||lastSkyCol!==hero.y*W+hero.x){skyAcc=0;skyDirty=false;lastSkyCol=hero.y*W+hero.x;renderSky();}}
+tickAmb(0);applyLang();loadingEl.hidden=true;
+/* pixel icons for the two map buttons that had no glyph in the pixel font */
+const pixIcon=rows=>'<svg viewBox="0 0 8 8" width="16" height="16" shape-rendering="crispEdges" aria-hidden="true">'+rows.map((r,y)=>[...r].map((ch,x)=>ch==='X'?'<rect x="'+x+'" y="'+y+'" width="1" height="1" fill="currentColor"/>':'').join('')).join('')+'</svg>';
+document.getElementById('me').innerHTML=pixIcon(['...XX...','...XX...','........','XX.XX.XX','XX.XX.XX','........','...XX...','...XX...']);
+document.getElementById('gear').innerHTML=pixIcon(['.X.XX.X.','XXXXXXXX','.XX..XX.','XX....XX','XX....XX','.XX..XX.','XXXXXXXX','.X.XX.X.']);
+/* finish applying an address view */
+hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);document.getElementById('autoTime').setAttribute('aria-pressed',String(autoTime));
+if(HASH.sel&&byId(HASH.sel)){sel=byId(HASH.sel);renderCard();}
+if(HASH.tab&&TABS.includes(HASH.tab)){showTab(HASH.tab);if(PHONE())openSheet(true);}
+if(Object.keys(HASH).some(k=>k!=='worker'))document.getElementById('intro').hidden=true;
+document.fonts&&document.fonts.load('9px "Press Start 2P"').then(()=>{skyDirty=true;}).catch(()=>{});
+booted=true;requestAnimationFrame(loop);
+globalThis.__T={walkTo,nearestOpen,reach,dryAt,STAYS,wMask,flags,stalls,FEST,get goal(){return goal;},findPath,LM,KINDS,kind,at,passable,hero,W,H,K,nearTarget,STREET_LABELS,TREKS,FEAT,WAYS,townDist,TOWN_R,estimate,walkCost,poiAt,fogLevel,TRAIN_LINE,CABLE_LINE,marketBusy,travel,tick,amb,shoppers,crews,routeInfo,elev};
+})();
+</script>
+</body>
+</html>
