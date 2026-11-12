@@ -1,8 +1,8 @@
 // Headless sanity test for the built map: runs the page script with DOM stubs in Node 20+.
-// Usage: node test-headless.js <Sapa-Pixel-Map.html>
+// Usage: node test-headless.js <index.html>
 // Checks: script runs, data unpacks, every place is reachable on foot from the church, the route plans use the
-// mountain train and cable car, the walker really makes those trips, nobody stands on water, a click on the lake goes to
-// the nearest shore, and no Vietnamese is garbled.
+// mountain train and cable car, the walker really makes those trips, nobody stands on water, no trek line runs over a
+// lake or reservoir, a click on the lake goes to the nearest shore, and no Vietnamese is garbled.
 // There is no Worker in Node, so the land is built on the main thread here. For how it looks, use shot.ps1.
 const fs=require('fs');
 const html=fs.readFileSync(process.argv[2],'utf8');
@@ -41,6 +41,11 @@ new Function(m[1])();
  {let wet=0;const dry=T.dryAt;for(const a of T.amb){if(a.kind==='train')continue;if(a.path){for(const q of a.path)if(!dry(q[0],q[1]))wet++;for(let i=0;i<a.path.length-1;i++)for(let k=1;k<8;k++)if(!dry(a.path[i][0]+(a.path[i+1][0]-a.path[i][0])*k/8,a.path[i][1]+(a.path[i+1][1]-a.path[i][1])*k/8))wet++;}else if(a.px!==undefined&&!dry(a.px/8,a.py/8))wet++;}
   for(const s of T.shoppers)if(!dry(s.x,s.y))wet++;for(const c of T.crews)if(!dry(c.x,c.y))wet++;for(const s of T.stalls)if(!dry(s.x,s.y))wet++;
   console.log('figures on water',wet,'| homestays',T.STAYS.length,[...new Set(T.STAYS.map(s=>s.v))].join(','));if(wet)bad++;}
+ // no trek line runs over a lake or reservoir (a tile at least half water); a stream it steps across is fine
+ {let wet=0;const pop=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;},where=[];
+  for(const t of T.TREKS)for(const ln of t.lines)for(let i=0;i<ln.length-1;i++){const a=ln[i],b=ln[i+1],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])*4));
+   for(let k=0;k<=n;k++){const x=Math.floor(a[0]+(b[0]-a[0])*k/n),y=Math.floor(a[1]+(b[1]-a[1])*k/n);if(x<0||y<0||x>=T.W||y>=T.H)continue;const j=y*T.W+x;if(T.KINDS[T.kind[j]]==='water'&&pop(T.wMask[j]||0xFFFF)>=8){wet++;if(where.length<3)where.push(t.id+' '+x+','+y);}}}
+  console.log('trek line samples on a lake or reservoir',wet,where.join(' | '));if(wet)bad++;}
  // a click on the lake walks to the nearest shore instead of refusing
  {const lake=by('lake'),lx=lake.x+1,ly=lake.y+1,wk=T.KINDS[T.kind[ly*T.W+lx]],n=T.nearestOpen(lx,ly);console.log('lake tile',wk,'-> nearest reachable',n&&n.join(','),n?T.KINDS[T.kind[n[1]*T.W+n[0]]]:'');if(!n||!T.reach[n[1]*T.W+n[0]]||T.reach[ly*T.W+lx])bad++;
   T.walkTo(lx,ly);const g=T.goal;console.log('walkTo lake: goal',g&&g.join(','),'path',T.hero.path.length);if(!g||!T.hero.path.length)bad++;T.hero.path.length=0;}

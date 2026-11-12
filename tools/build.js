@@ -1,5 +1,5 @@
 // Assemble the single-file map from template.html, frame.json and ./data.
-// Usage: node build.js data template.html ..\Sapa-Pixel-Map.html
+// Usage: node build.js data template.html ..\index.html
 // data must contain: elev.bin, elev.json, detail.bin, lc.bin, osm-out.json, osm2-out.json, fonts/ (manifest.txt + woff2).
 // The data goes into the page as one container: [uint32 length][JSON][binary parts], gzipped, then base64 once.
 const fs=require('fs'),zlib=require('zlib'),path=require('path');

@@ -1,6 +1,6 @@
 // Opens the built map in headless Edge in real time (no virtual clock) and checks that the land is built by the
 // background worker, which shot.ps1 cannot test because it forces the main thread.
-// Usage: node --experimental-websocket check-worker.js <Sapa-Pixel-Map.html> [out.png] [width] [height]
+// Usage: node --experimental-websocket check-worker.js <index.html> [out.png] [width] [height]
 const {spawn}=require('child_process'),fs=require('fs'),path=require('path'),os=require('os');
 const html=path.resolve(process.argv[2]),out=process.argv[3],width=+process.argv[4]||1900,height=+process.argv[5]||1000;
 const edge=['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe','C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'].find(p=>fs.existsSync(p));

@@ -1,25 +1,27 @@
 # Sapa Pixel Map build tools
 
-`Sapa-Pixel-Map.html` in the parent folder is a single self-contained file. These tools rebuild it. Everything runs on Node 20 or later; only the screenshot tool uses PowerShell. The page opens in Vietnamese; `#lang=en` or the settings tab switches to English.
+`index.html` in the parent folder is a single self-contained file. These tools rebuild it. Everything runs on Node 20 or later; only the screenshot tool uses PowerShell. The page opens in Vietnamese; `#lang=en` or the settings tab switches to English.
 
 ## Edit the page
 
 All page code lives in `template.html`. The build fills in its placeholders (`__DATA_GZ__`, `__FONT_CSS__`, `__FRAME__`, `__W__`, `__H__`). Edit the template, never the built file, then rebuild and test:
 
 ```text
-node build.js data template.html ..\Sapa-Pixel-Map.html
-node test-headless.js ..\Sapa-Pixel-Map.html
+node build.js data template.html ..\index.html
+node test-headless.js ..\index.html
 ```
 
-The test runs the page script in Node with a stubbed DOM. It checks that the data unpacks, every landmark is reachable on foot from the church, the mountain train and cable car rides work in both directions, no person, animal or stall stands on water, a click on the lake walks to the nearest shore, and no Vietnamese text is garbled. There is no worker in Node, so the test builds the land on the main thread. It cannot check how the page looks. Use the screenshot tools for that.
+The test runs the page script in Node with a stubbed DOM. It checks that the data unpacks, every landmark is reachable on foot from the church, the mountain train and cable car rides work in both directions, no person, animal or stall stands on water, no trek line runs over a lake or reservoir, a click on the lake walks to the nearest shore, and no Vietnamese text is garbled. There is no worker in Node, so the test builds the land on the main thread. It cannot check how the page looks. Use the screenshot tools for that.
 
 ## See what it looks like
 
 `shot.ps1` renders the page in headless Edge or Chrome and saves PNG screenshots:
 
 ```text
-powershell -ExecutionPolicy Bypass -File .\shot.ps1 -Html ..\Sapa-Pixel-Map.html -Out .\shots -Views "town=#h=14&m=9&z=5&at=406,199&sky=1","market=#h=8.5&d=0&z=12&at=430,192&sky=1"
+& .\shot.ps1 -Html ..\index.html -Out .\shots -Views "town=#h=14&m=9&z=5&at=406,199&sky=1","market=#h=8.5&d=0&z=12&at=430,192&sky=1"
 ```
+
+Run it like this from inside PowerShell. Through `powershell -ExecutionPolicy Bypass -File .\shot.ps1 ...` it also works, but only with a single view: a list of several arrives as one garbled view.
 
 Each view is `name=#settings`. The same settings work in a normal browser, so they also make shareable links:
 
@@ -41,7 +43,7 @@ Opening the page with any setting skips the welcome box. The first frames build 
 `check-worker.js` covers what `shot.ps1` cannot. It opens the page in real time, checks that the background worker built the land and that the page is no wider than the window, and can save a screenshot. It also emulates phone sizes, which a browser window cannot reach (the minimum window width is about 500 px):
 
 ```text
-node --experimental-websocket check-worker.js ..\Sapa-Pixel-Map.html shots\phone.png 390 800 "#sel=fansipan&tab=place"
+node --experimental-websocket check-worker.js ..\index.html shots\phone.png 390 800 "#sel=fansipan&tab=place"
 ```
 
 ## The frame
@@ -57,13 +59,13 @@ node fetch-data.js                                   # downloads into .\raw; cac
 node resample.js                                     # elevation, town detail and land-cover grids into .\data
 node parse-osm.js  raw\sapa.json  data\osm-out.json  # roads, streets, rivers, railways, cable car, places to stay, waterfalls, viewpoints, peaks
 node parse-osm2.js raw\sapa2.json data\osm2-out.json # OSM land-cover polygons, lakes with their islands, buildings, shops
-node build.js data template.html ..\Sapa-Pixel-Map.html
-node test-headless.js ..\Sapa-Pixel-Map.html
+node build.js data template.html ..\index.html
+node test-headless.js ..\index.html
 ```
 
 `node parse-osm.js raw\sapa.json data\osm-out.json --list` also prints every named place with coordinates. Use that list to check or move landmark positions in the `LM` array in the template.
 
-Both parsers clean names through `names.js`: street names typed without accents or in English get their Vietnamese form, shop names lose price notes and complaints, and names in all lower or upper case get normal capitals. Add a line there when you spot another bad name. A fix must not change the unaccented words the page matches on (`tram ton`, `ham rong`, `vmm`, `o quy ho`, `quoc lo 4d`, `tinh 152`, `lao chai`).
+Both parsers clean names through `names.js`: street names typed without accents or in English get their Vietnamese form, shop names lose price notes and complaints, and names in all lower or upper case get normal capitals. Add a line there when you spot another bad name. A fix must not change the unaccented words the page matches on (`tram ton`, `ham rong`, `vmm`, `o quy ho`, `quoc lo 4d`, `tinh 152`, `lao chai`, `muong hoa`).
 
 ## What is in `data`
 
@@ -83,6 +85,13 @@ OpenStreetMap wins where it has data: roads, rivers, lakes, buildings, and its f
 ## How water is drawn
 
 Water has its own mask of 16 bits per tile, one per art pixel. Lakes and reservoirs are filled from their OpenStreetMap outlines and islands are cut out; a tile keeps its water only if at least six of its sixteen pixels are wet. Rivers are channels one to five art pixels wide: the width at any point follows the length of river above it, tributaries included. A river whose bed falls steeply is flagged as rapids and drawn with white water. A tile with any water is closed to walking unless a road or trail crosses it there (kind `bridge`); a lake is crossed only by a real street. The art pixels a water tile does not cover show the bank beside it.
+
+Some water has no outline in OpenStreetMap and is known only from the satellite class, one whole tile at a time: the edges of the reservoirs, and small ponds. Its shore is rounded on the art grid, so it does not show as square blocks. Four rules keep it honest:
+
+- **In town it is ignored.** OpenStreetMap has the lake's true outline there, and a stray wet tile beside it would be a pond that does not exist.
+- **At a waterfall it is white water.** On steep ground near a waterfall place it is the falls themselves, so it is flagged as rapids.
+- **Beside a river it is the river.** A trail over a wet tile next to a river channel makes it part of the same footbridge.
+- **A single wet tile with a road or trail through it stays land.** The way is mapped; the pond is smaller than the tile.
 
 Terraces are drawn from the same idea: every art pixel takes the height of the ground under it, in 10 m levels, so the steps follow the real contours.
 
