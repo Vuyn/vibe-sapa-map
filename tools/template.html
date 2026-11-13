@@ -1371,13 +1371,13 @@ function flatColor(x,y){const t=at(x,y),k=t.k;flatSoft=false;if((flags[y*W+x]&2)
  if(k!=='village'&&k!=='hut'&&k!=='market'){const g=groundCol(x,y,0);if(g){flatSoft=true;return g;}}
  return FLAT[k]||'#000';}
 const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=palRGB(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16));rgbCache.set(c,v);}return v;};
-/* The first time it is done in one go. After a change of month it is redone a few rows a frame (5 ms at most), and the
+/* The first time it is done in one go. After a change of month it is redone a few rows a frame (3 ms at most), and the
    old picture stays up until the new one is whole, so the page never stops for it. miniSmall is the same picture at
    one pixel a tile, for the overview. */
 const MINI_F=2,miniCache=mkCanvas(W*MINI_F,H*MINI_F),miniSmall=mkCanvas(W,H),miniFlat=new Uint32Array(W*H),miniSoft=new Uint8Array(W*H);
 let miniDirty=true,miniJob=null,miniReady=false;
 function miniImage(){if(miniDirty){miniDirty=false;miniJob={y:0,y2:0,img:miniCache.getContext('2d').createImageData(W*MINI_F,H*MINI_F)};}
- if(miniJob){const t0=performance.now(),late=()=>miniReady&&performance.now()-t0>5,u=new Uint32Array(miniJob.img.data.buffer),W2=W*MINI_F;
+ if(miniJob){const t0=performance.now(),late=()=>miniReady&&performance.now()-t0>3,u=new Uint32Array(miniJob.img.data.buffer),W2=W*MINI_F;
   for(;miniJob.y<H;miniJob.y++){if(late())break;const y=miniJob.y;for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y));miniFlat[i]=(0xFF000000|(c[2]<<16)|(c[1]<<8)|c[0])>>>0;miniSoft[i]=flatSoft?1:0;}}
   if(miniJob.y>=H)for(;miniJob.y2<H;miniJob.y2++){if((miniJob.y2&3)===0&&late())break;const y=miniJob.y2;for(let x=0;x<W;x++){const i=y*W+x,own=miniFlat[i],soft=miniSoft[i];
     for(let q=0;q<4;q++){const sx=q&1,sy=q>>1;let c=own;if(soft){const h=hash(x*2+sx+3,y*2+sy+7);if(h<0.4){const j=h<0.2?(sx?(x<W-1?i+1:i):(x>0?i-1:i)):(sy?(y<H-1?i+W:i):(y>0?i-W:i));if(miniSoft[j])c=miniFlat[j];}}u[(y*2+sy)*W2+x*2+sx]=c;}}}
@@ -1738,7 +1738,7 @@ function busAt(i,h){const b=BUSES[i];if(h<b.a||h>b.b+BUS_RUN)return null;
    Fansipan streams and smoke leans. All of it is drawn over the painted land each frame, only for the tiles in view. */
 let windT=0,wetness=-1; /* seconds of wind so far; how wet the ground is, 0 to 1 (set from the sky on the first frame) */
 const windAmt=()=>Math.max(0,Math.min(1,0.45+0.3*Math.sin(windT/7.3)+0.25*Math.sin(windT/2.9+1.7)));
-const GUST_LUT=new Float32Array(1024);
+const GUST_LUT=new Float32Array(2048),VEG=new Uint8Array(KINDS.length);for(const k of ['terrace','grass','forest','scrub','park','orchard','garden'])VEG[KI[k]]=1; /* the ground a gust shows on */
 const CLOTHC=['#22306e','#2c3f8c','#161f4a'].map(pal),WASHC=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'].map(pal),FLYC=['#f4f4f0','#f1c232','#e07b2a','#b9dcff'].map(pal),FLAGC=['#c2412b','#e06a52','#f1c232'].map(pal);
 const FAN=byId('fansipan');
 /* mist over the rivers at dawn: a soft band one or two tiles either side of all water, gone by half past eight */
@@ -1905,21 +1905,35 @@ function render(){
  const wnd=windAmt(),tsec=windT;
  if(!lowZoom&&wetness>0.03){/* after rain the roads are dark with wet */ctx.fillStyle='rgba(18,28,64,'+(0.24*wetness).toFixed(3)+')';
   for(let i=0;i<stTiles.length;i+=2){const x=stTiles[i],y=stTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const m=stMask[y*W+x];if(m===0xFFFF){ctx.fillRect(x*T,y*T,T,T);continue;}for(let r=0;r<4;r++){const row=(m>>(r*4))&15;if(row===15)ctx.fillRect(x*T,y*T+r*S,T,S);else if(row)for(let q=0;q<4;q++)if(row&(1<<q))ctx.fillRect(x*T+q*S,y*T+r*S,S,S);}}}
- if(ppt>=12){const tx0=Math.max(0,Math.floor(vx0/T)),tx1=Math.min(W-1,Math.floor(vx1/T)),ty0=Math.max(0,Math.floor(vy0/T)),ty1=Math.min(H-1,Math.floor(vy1/T)),u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
-  /* a gust is a band crossing the map from the north-west; its strength across the band is worked out once a frame */
-  const p0=tx0*0.176+ty0*0.132-tsec*0.9,gl=GUST_LUT,gn=Math.min(gl.length,Math.ceil(((tx1-tx0)*0.176+(ty1-ty0)*0.132)*8)+2);
-  for(let q=0;q<gn;q++){const p=p0+q/8,v=Math.sin(p)+0.5*Math.sin(p*0.37+tsec*0.23);gl[q]=v>0.7?Math.min(1,(v-0.7)*2.5)*wnd:0;}
+ /* A gust is a band that crosses the map from the north-west at about four tiles a second. Its strength across the
+    band is worked out once a frame into a table; gust(x,y) reads it for any tile in view. */
+ const gtx0=Math.max(0,Math.floor(vx0/T)),gtx1=Math.min(W,Math.ceil(vx1/T)),gty0=Math.max(0,Math.floor(vy0/T)),gty1=Math.min(H,Math.ceil(vy1/T)),gp0=gtx0*0.176+gty0*0.132,gl=GUST_LUT,gn=Math.min(gl.length,Math.ceil(((gtx1-gtx0)*0.176+(gty1-gty0)*0.132)*8)+3);
+ for(let q=0;q<gn;q++){const p=gp0+q/8-tsec*0.9,v=Math.sin(p)+0.5*Math.sin(p*0.37+tsec*0.23);gl[q]=v>0.6?Math.min(1,(v-0.6)*2.2)*(0.55+0.45*wnd):0;}
+ const gust=(x,y)=>gl[Math.min(gn-1,Math.max(0,((x*0.176+y*0.132-gp0)*8)|0))];
+ /* The wave itself: where the gust is, fields, grass and tree tops catch the light, in two strengths. It is drawn at
+    every zoom, in cells of half a tile close up and of several tiles far out (never more than about forty thousand
+    cells a frame), as runs along each row, on whole screen pixels so that no seams show between the rows. */
+ {const cs=ppt>=16?0.5:ppt>=7?1:ppt>=3.5?2:4,cx0=Math.floor(gtx0/cs),cx1=Math.ceil(gtx1/cs),cy0=Math.floor(gty0/cs),cy1=Math.ceil(gty1/cs),ox=cv.width/2-cam.x*s,oy=cv.height/2-cam.y*s,q=cs*T*s;
+  ctx.setTransform(1,0,0,1,0,0);
+  const dpi=cs*0.176*8,last=gn-1;
+  for(let cy=cy0;cy<cy1;cy++){const row=Math.min(H-1,Math.floor(cy*cs))*W,y0=Math.round(oy+cy*q),y1=Math.round(oy+(cy+1)*q);let run=0,lv=0,pi=(cx0*cs*0.176+cy*cs*0.132-gp0)*8;
+   for(let cx=cx0;cx<=cx1;cx++,pi+=dpi){let l=0;if(cx<cx1&&VEG[kind[row+Math.min(W-1,Math.floor(cx*cs))]]){const g=gl[pi<0?0:pi>last?last:pi|0];l=g>0.5?2:g>0.1?1:0;}
+    if(l!==lv){if(lv){const x0=Math.round(ox+(cx-run)*q);ctx.fillStyle=lv===2?'rgba(255,250,200,0.17)':'rgba(255,250,200,0.08)';ctx.fillRect(x0,y0,Math.round(ox+cx*q)-x0,y1-y0);}lv=l;run=1;}else run++;}}
+  setWorld();}
+ if(ppt>=12){const tx0=gtx0,tx1=gtx1-1,ty0=gty0,ty1=gty1-1,u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
   const dayNow=darkness(hour)<0.2,dry3=skyNow()!==3,fly=hiTier&&month>=5&&month<=9&&dayNow&&dry3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')';
-  for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){const i=y*W+x,k=kind[i],g=gl[Math.min(gn-1,(((x-tx0)*0.176+(y-ty0)*0.132)*8)|0)],X=x*T,Y=y*T;
-   /* light running over fields, grass and tree tops where the gust is */
-   if(g>0.08&&(k===KI.terrace||k===KI.grass||k===KI.forest||k===KI.scrub||k===KI.park||k===KI.orchard)){ctx.fillStyle=k===KI.forest?'rgba(205,240,170,0.3)':'rgba(255,255,225,0.34)';const h=hash(x+7,y+3);
-    for(let q=0,nq=hiTier?(g>0.5?3:2):1;q<nq;q++)ctx.fillRect(X+sn((h*97+q*3.7+tsec*5)%7),Y+sn((h*53+q*2.9)%7.5),hiTier?1:S,u);}
+  for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){const i=y*W+x,k=kind[i],g=gust(x,y),X=x*T,Y=y*T;
+   /* inside the wave, bright strokes stream across the crop and the leaves */
+   if(g>0.1&&VEG[k]){ctx.fillStyle=k===KI.forest?'rgba(215,245,180,0.5)':'rgba(255,255,230,0.6)';const h=hash(x+7,y+3);
+    for(let q=0,nq=hiTier?(g>0.5?6:3):2;q<nq;q++)ctx.fillRect(X+sn((h*97+q*2.3+tsec*9)%7),Y+sn((h*53+q*1.37)%7.6),hiTier?1:S,u);}
    /* cloth on the rails and the washing lines: the lower half swings */
    if(hiTier&&(k===KI.village||k===KI.town)){let yv=yardC[i];if(yv===255){yardLine(x,y,0);yv=yardC[i];}
     if(yv)for(let qi=0;qi<4;qi++){const yl=(yv>>(qi*2))&3;if(!yl)continue;const a=(qi&1)*12,b=(qi>>1)*12;
-     for(let c=0;c<3;c++){const cx=a+2+c*3,sw=Math.round(Math.sin(tsec*2.4+x*1.7+c*1.3)*(0.45+1.6*g+0.5*wnd));
-      if(yl===1){const len=5+Math.floor(hash(x*7+qi+c,y*5+c)*2);ctx.fillStyle=CLOTHC[0];ctx.fillRect(X+cx/HD,Y+(b+4)/HD,2/HD,3/HD);ctx.fillRect(X+(cx+sw)/HD,Y+(b+7)/HD,2/HD,(len-3)/HD);ctx.fillStyle=CLOTHC[1];ctx.fillRect(X+cx/HD,Y+(b+4)/HD,1/HD,3/HD);ctx.fillRect(X+(cx+sw)/HD,Y+(b+7)/HD,1/HD,(len-4)/HD);ctx.fillStyle=CLOTHC[2];ctx.fillRect(X+(cx+sw)/HD,Y+(b+3+len)/HD,2/HD,1/HD);}
-      else{const len=2+(c===1?1:0);ctx.fillStyle=WASHC[Math.floor(hash(x*3+qi*5+c,y*7+c)*WASHC.length)];ctx.fillRect(X+cx/HD,Y+(b+5)/HD,2/HD,1/HD);ctx.fillRect(X+(cx+(sw>0?1:sw<0?-1:0))/HD,Y+(b+6)/HD,2/HD,len/HD);}}}}
+     for(let c=0;c<3;c++){const cx=a+2+c*3,sway=Math.sin(tsec*3.1+x*1.7+c*1.3)*(0.9+2.4*g),s1=Math.round(sway*0.5),s2=Math.round(sway),px1=v=>X+v/HD,py1=v=>Y+v/HD;
+      /* top pinned to the rail, the middle and the bottom swung out further and further */
+      if(yl===1){const len=5+Math.floor(hash(x*7+qi+c,y*5+c)*2);ctx.fillStyle=CLOTHC[0];ctx.fillRect(px1(cx),py1(b+4),2/HD,2/HD);ctx.fillRect(px1(cx+s1),py1(b+6),2/HD,2/HD);ctx.fillRect(px1(cx+s2),py1(b+8),2/HD,(len-4)/HD);
+       ctx.fillStyle=CLOTHC[1];ctx.fillRect(px1(cx),py1(b+4),1/HD,2/HD);ctx.fillRect(px1(cx+s1),py1(b+6),1/HD,2/HD);ctx.fillStyle=CLOTHC[2];ctx.fillRect(px1(cx+s2),py1(b+3+len),2/HD,1/HD);}
+      else{const len=2+(c===1?1:0);ctx.fillStyle=WASHC[Math.floor(hash(x*3+qi*5+c,y*7+c)*WASHC.length)];ctx.fillRect(px1(cx),py1(b+5),2/HD,1/HD);ctx.fillRect(px1(cx+s1),py1(b+6),2/HD,1/HD);if(len>1)ctx.fillRect(px1(cx+s2),py1(b+7),2/HD,(len-1)/HD);}}}}
    /* puddles: on the lanes, the squares and bare ground, shrinking as the ground dries */
    if(pud){const sm=stMask[i];if(sm||k===KI.plaza||k===KI.busyard||k===KI.bare||k===KI.track){const h=hash(x*3+1,y*5+2);if(h<(sm?0.3:0.14)){let cx=2+Math.floor(h*37)%4,cy=2+Math.floor(h*91)%4;
       if(sm){let bq=Math.floor(h*160)%16;for(let q=0;q<16&&!(sm&(1<<bq));q++)bq=(bq+1)%16;cx=(bq&3)*S+0.33;cy=(bq>>2)*S+0.33;}
@@ -2361,7 +2375,7 @@ const poke=()=>{lastInput=performance.now();};['pointerdown','pointermove','whee
 /* =====================================================================
    16. BOOT AND MAIN LOOP
    Frame pacing saves battery: full rate while you walk, ride, pan or
-   zoom; about 8 frames a second when the scene is only idling; nothing
+   zoom; about 12 frames a second when the scene is only idling; nothing
    at all while the tab is hidden.
    ===================================================================== */
 let last=0,acc=0,skyAcc=0;
@@ -2373,7 +2387,7 @@ for(const d of [[0,0],[1,0],[0,1],[1,1],[-1,0],[0,-1],[-1,-1],[1,-1],[-1,1]])war
 function loop(ts){requestAnimationFrame(loop);
  if(typeof document!=='undefined'&&document.hidden){last=ts;return;}
  const active=hero.moving||hero.path.length>0||hero.riding||drag||pinch||ts-lastInput<900;
- const raw=ts-last;if(!active&&raw<120)return;
+ const raw=ts-last;if(!active&&raw<83)return; /* idle: twelve frames a second, enough to see the wind move */
  if(!active&&warm.length&&ts>1500)warm.shift()();
  const dt=Math.min(active?50:160,raw||16);last=ts;acc+=dt;if(acc>100){acc=0;frame++;}gond=(gond+dt/50)%600;
  if(dayPlay>0||autoTime){const dh=dayPlay>0?Math.min(dayPlay,dt/1250):dt/7500,nh=hour+dh;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);
