@@ -52,6 +52,8 @@ new Function(m[1])();
  // the figures placed by the clock (Sunday market-goers, weekday pupils, trekking groups, marathon runners, buses)
  // are on dry ground at every quarter hour of a Sunday, a Tuesday, a Friday and a Saturday in September
  {let wet=0,most={};const where=[];for(const d of [0,2,5,6])for(let h=4;h<19;h+=0.25){T.setClock(h,d,9);const n={};for(const p of T.clockFigures()){n[p[2]]=(n[p[2]]||0)+1;if(!T.dryAt(p[0],p[1])){wet++;if(where.length<4)where.push(p[2]+' '+p[0].toFixed(1)+','+p[1].toFixed(1)+' day '+d+' '+h+'h');}}for(const k in n)most[k]=Math.max(most[k]||0,n[k]);}
+  // May, mid-morning: ducks on the flooded terraces, porters on the Fansipan trail, visitors at the viewpoints, all on dry ground
+  {T.setClock(10,2,5);const n={};for(const p of T.clockFigures()){n[p[2]]=(n[p[2]]||0)+1;if(!T.dryAt(p[0],p[1])){wet++;if(where.length<4)where.push(p[2]+' '+p[0].toFixed(1)+','+p[1].toFixed(1)+' in May');}}/* visitors stay away in rain, and the sky here is drawn by lot, so only ducks and porters must be there */for(const k of ['duck','porter','visitor']){most[k]=n[k]||0;if(!n[k]&&k!=='visitor'){console.log('no',k,'in May at 10:00');bad++;}}console.log('first duck',T.clockFigures().find(p=>p[2]==='duck'),'first visitor',T.clockFigures().find(p=>p[2]==='visitor'),'first porter',T.clockFigures().find(p=>p[2]==='porter'));}
   T.setClock(9,2,9);console.log('clock figures, most seen at once',JSON.stringify(most),'| on water',wet,where.join(' | '),'| market-goers',T.GOERS.length,'pupils',T.PUPILS.length,'runners',T.RUNNERS.length);
   if(wet||!T.GOERS.length||!most.trekker||!most.bus||!most.runner)bad++;}
  // nobody stands or walks on water: sample every walker's whole line, and everyone who stands still

@@ -190,6 +190,7 @@ canvas#mini{position:static;display:block;width:100%;height:auto;aspect-ratio:__
     </section>
     <section class="pane" id="pane-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
       <div class="row"><span class="lbl" id="timeLabel">Time</span><input type="range" id="hour" min="0" max="24" step="0.25" value="9" aria-label="Hour of day"><output id="hourOut">09:00</output><button class="btn" id="autoTime" aria-pressed="true" type="button">AUTO</button></div>
+      <div class="row"><button class="btn" id="playDay" aria-pressed="false" type="button">PLAY A DAY</button></div>
       <div class="row"><span class="lbl" id="monthLabel">Month</span><input type="range" id="month" min="1" max="12" step="1" value="9" aria-label="Month"><output id="monthOut">Sep</output></div>
       <div class="toggles">
         <button class="btn" id="weather" type="button">SKY: AUTO</button>
@@ -701,6 +702,39 @@ const FEAT=R.feat.filter(f=>!LM.some(l=>Math.hypot(f.x-l.x-l.w/2,f.y-l.y-l.w/2)<
    Everything is drawn on the 2 px art grid, so places, people and
    animals sit in the landscape at the same scale as the houses.
    ===================================================================== */
+/* ---- THE PALETTE ----
+   Every colour the map is painted in comes from these ramps. A ramp runs from dark to light, and its hue turns as it
+   goes: the dark end leans to blue, the light end to yellow, which is what makes shade look cool and sunlit ground warm
+   without any colour being grey. Colours in the code are written as before; when one is first used it is replaced by
+   the nearest palette colour (pal, palRGB), once, so this costs nothing while drawing. Shadows, glows and other
+   see-through overlays are mixed on top and are not snapped.
+   Each ramp: hue at the dark end, hue at the light end, saturation at both ends, lightness at both ends, steps. */
+const RAMPS=[
+ [118,74,40,46,18,82,16],   /* leaf: grass, gardens, young rice */
+ [138,118,50,44,10,48,12],  /* pine: forest */
+ [80,54,22,34,24,76,9],     /* olive: dry grass, winter fields */
+ [18,34,34,46,12,58,9],     /* timber: planks, posts, thatch */
+ [38,52,60,82,30,86,11],    /* gold: ripe rice, straw, lamplight yellow */
+ [20,44,26,34,14,90,13],    /* earth: wood, tracks, sand, plaster */
+ [70,52,6,12,20,90,10],     /* stone: rock, concrete, warm greys */
+ [238,214,12,16,14,84,10],  /* slate: asphalt, slate roofs, cool greys */
+ [228,204,62,84,24,94,11],  /* water */
+ [352,16,56,72,20,72,9],    /* brick: tiled roofs, reds */
+ [14,42,82,88,38,68,5],     /* ember: orange awnings, flames */
+ [332,346,58,78,42,94,7],   /* rose: blossom */
+ [242,224,50,58,16,58,7],   /* indigo: dyed cloth, deep shade */
+ [178,158,36,38,22,62,6],   /* teal: painted roofs */
+ [216,208,34,22,72,97,5],   /* ice: snow */
+ [44,52,30,10,74,97,5]];    /* cream: whitewash, awning stripes */
+const PALETTE=[[28,26,38],[240,200,160],[224,176,138]]; /* ink, and two skin tones */
+{const hsl=(h,s,l)=>{h=((h%360)+360)%360;s/=100;l/=100;const a=s*Math.min(l,1-l),f=q=>{const k=(q+h/30)%12;return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))));};return[f(0),f(8),f(4)];};
+ for(const [h0,h1,s0,s1,l0,l1,st] of RAMPS)for(let q=0;q<st;q++){const t=q/(st-1);PALETTE.push(hsl(h0+(h1-h0)*t,s0+(s1-s0)*t,l0+(l1-l0)*t));}}
+/* the nearest palette colour to an r,g,b, by a distance that weighs the channels roughly as the eye does */
+function palRGB(r,g,b){let best=PALETTE[0],bd=1e12;for(const p of PALETTE){const rm=(r+p[0])/2,dr=r-p[0],dg=g-p[1],db=b-p[2],d=(2+rm/256)*dr*dr+4*dg*dg+(2+(255-rm)/256)*db*db;if(d<bd){bd=d;best=p;}}return best;}
+/* the same for a colour written as #rrggbb or rgb(r,g,b): gives back an rgb() string, kept once worked out */
+const palC=new Map();
+function pal(col){let v=palC.get(col);if(v)return v;let r,g,b;if(col[0]==='#'){r=parseInt(col.slice(1,3),16);g=parseInt(col.slice(3,5),16);b=parseInt(col.slice(5,7),16);}else{const m=col.match(/[\d.]+/g);if(m.length>3){palC.set(col,col);return col;}r=+m[0];g=+m[1];b=+m[2];}
+ const p=palRGB(r,g,b);v='rgb('+p[0]+','+p[1]+','+p[2]+')';palC.set(col,v);return v;}
 const PAL={W:'#f4f4f0',R:'#c2412b',B:'#6d4a2a',G:'#8d8d7a',D:'#4a4a42',Y:'#f1c232',K:'#1b1b1b',L:'#5aa0ec',E:'#3b8a3f',O:'#e07b2a',P:'#f0c8a0',S:'#b9dcff',T:'#2e5e32',I:'#2a3f8a',M:'#9a7b5a',N:'#3a2a1a',C:'#c9a227',V:'#4a5566',Q:'#6b6b5b',X:'#dcd6c8'};
 const SPR={
  church:['.....K......','.....W......','....WWW.....','....WDW.....','....WDW.....','..RRRRRRRR..','.RRRRRRRRRR.','.WWWWWWQQQQ.','.WWDWWWQQQQ.','.WWDWWWQQQQ.','.WWWWWWQQQQ.','.WWDDWWQQQQ.'],
@@ -732,7 +766,7 @@ const SPR={
 };
 /* each sprite is painted once into a small canvas and stamped from there */
 const sprC=new Map();
-function sprLo(name){let c=sprC.get(name);if(c)return c;const s=SPR[name];c=document.createElement('canvas');c.width=s[0].length;c.height=s.length;const g=c.getContext('2d');for(let r=0;r<s.length;r++)for(let col=0;col<s[r].length;col++){const ch=s[r][col];if(ch!=='.'){g.fillStyle=PAL[ch];g.fillRect(col,r,1,1);}}sprC.set(name,c);return c;}
+function sprLo(name){let c=sprC.get(name);if(c)return c;const s=SPR[name];c=document.createElement('canvas');c.width=s[0].length;c.height=s.length;const g=c.getContext('2d');for(let r=0;r<s.length;r++)for(let col=0;col<s[r].length;col++){const ch=s[r][col];if(ch!=='.'){g.fillStyle=pal(PAL[ch]);g.fillRect(col,r,1,1);}}sprC.set(name,c);return c;}
 function drawSprite(c,name,px,py,z){const im=sprLo(name);c.imageSmoothingEnabled=false;c.drawImage(im,px,py,im.width*z,im.height*z);}
 /* a place is drawn at one art pixel per sprite pixel: 16 px for most, 24 px for the six big ones */
 /* ---- CLOSE-UP FIGURES ----
@@ -758,6 +792,9 @@ const FIG={
  bus:['.WWWWWWWWWWWWWWWWWWW.','WSSWSSWSSWSSWSSWSSWSW','WSSWSSWSSWSSWSSWSSWSW','RRRRRRRRRRRRRRRRRRRRR','RRWWRRRRRRRRRRRRRRRRY','RRRRRRRRRRRRRRRRRRRRR','.RKKKRRRRRRRRRRRKKKR.','..KKK...........KKK..'],
  car:['.RRRRRRRRRRRR.','RRRRRRRRRRRRRR','RWWRWWRRWWRWWR','RWWRWWRRWWRWWR','RRRRRRRRRRRRRR','CCCCCCCCCCCCCC','RRRRRRRRRRRRRR','.KK........KK.'],
  gondola:['...K...','...K...','.RRRRR.','RRRRRRR','RSSRSSR','RSSRSSR','RRRRRRR','.RRRRR.'],
+ duck:['..WW.','WWWWY','WWWW.','.WW..'],
+ /* a shoulder pole with a basket at each end */
+ pole:['NNNNNNNNNNNNN','N...........N','EEE.......OOO','MMM.......MMM','MMM.......MMM'],
  /* four kinds of stall, by what lies on the table: greens, fruit, indigo cloth and brocade, a charcoal grill */
  stall0:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','B................B','B..E...E....E..E.B','B.ETE.EEO.ETE.EEEB','BMMMMMMMMMMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
  stall1:['aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','aaWWaaWWaaWWaaWWaa','NNNNNNNNNNNNNNNNNN','B................B','B..R....Y....O...B','B.RRO.RYYR.YOO.RRB','BMMMMMMMMMMMMMMMMB','BMMMMMMMMMMMMMMMMB','B................B','B................B','B................B'],
@@ -774,8 +811,8 @@ const FIG={
 };
 const figCache=new Map();
 function fig(name,cols){const key=name+(cols?'|'+cols.b+'|'+cols.h+'|'+cols.a:'');let c=figCache.get(key);if(c)return c;const rows=FIG[name];c=mkCanvas(rows[0].length,rows.length);const g=c.getContext('2d');
- for(let r=0;r<rows.length;r++)for(let q=0;q<rows[r].length;q++){const ch=rows[r][q];if(ch==='.')continue;g.fillStyle=ch==='b'?cols.b:ch==='h'?cols.h:ch==='a'?cols.a:PAL[ch];g.fillRect(q,r,1,1);}
- c.sh=!/^(bird|m[A-Z]|basket|umbrella|gondola)/.test(name);figCache.set(key,c);return c;}
+ for(let r=0;r<rows.length;r++)for(let q=0;q<rows[r].length;q++){const ch=rows[r][q];if(ch==='.')continue;g.fillStyle=pal(ch==='b'?cols.b:ch==='h'?cols.h:ch==='a'?cols.a:PAL[ch]);g.fillRect(q,r,1,1);}
+ c.sh=!/^(bird|m[A-Z]|basket|umbrella|gondola|pole|duck)/.test(name);figCache.set(key,c);return c;}
 /* stamp a figure with the middle of its feet at world x,y; dy lifts it (a basket, an umbrella) */
 function putFig(c,x,y,flip,dy){const w=c.width/HD,h=c.height/HD;if(c.sh&&!dy){/* a figure's own small shadow, so it stands on the ground */ctx.fillStyle='rgba(12,16,48,.22)';ctx.fillRect(x-w*0.4+1/HD,y-1/HD,w*0.8,2/HD);}y-=dy||0;if(flip){ctx.save();ctx.translate(x,y);ctx.scale(-1,1);ctx.drawImage(c,-w/2,-h,w,h);ctx.restore();}else ctx.drawImage(c,x-w/2,y-h,w,h);}
 const sprHiC=new Map();
@@ -817,7 +854,7 @@ const HSPR={
  peak(r,K){const w=[10,16,22,26,30,33,36,36,36,36];for(let j=0;j<10;j++){r(18-(w[j]>>1),26+j,w[j],1,'#8d8d7a');r(18-(w[j]>>1),26+j,w[j]>>2,1,'#a3a390');r(18+(w[j]>>1)-(w[j]>>2),26+j,w[j]>>2,1,'#77776a');}
   r(9,29,6,1,'#b0b09c');r(15,31,1,4,'#6b6b5b');r(24,30,1,5,'#6b6b5b');r(4,33,8,1,'#b0b09c');r(21,33,10,1,'#6b6b5b');
   for(let j=0;j<11;j++){r(12-j,15+j,j+1,1,'#e6edf4');r(13,15+j,j,1,'#9fb0c2');}r(12,14,2,1,'#f4f8fb');r(2,25,22,1,'#77776a');
-  r(27,1,1,26,'#4a4a42');r(28,2,8,6,'#c2412b');r(28,2,8,1,'#e06a52');r(31,4,2,2,'#f1c232');r(30,5,4,1,'#f1c232');},
+  r(27,1,1,26,'#4a4a42');}, /* the flag itself is drawn every frame, so it can fly */
  /* the monastery: three tiers of red roof with upturned eaves over gilded walls and red pillars */
  pagoda(r,K){K.sh(4,34,29);const RD='#a83a28',GD='#d9b23a';r(17,0,2,3,'#c9a227');
   const tier=(y,w,h)=>{const x=18-(w>>1);for(let j=0;j<h;j++){const ww=w-4*(h-1-j);r(18-(ww>>1),y+j,ww,1,j===0?tone(RD,0.25):j===h-1?tone(RD,-0.35):RD);}r(x-1,y+h-2,2,1,RD);r(x+w-1,y+h-2,2,1,RD);r(x-2,y+h-3,1,1,tone(RD,0.2));r(x+w+1,y+h-3,1,1,tone(RD,0.2));};
@@ -919,9 +956,20 @@ const HSPR={
 };
 /* two places have a picture of their own up close */
 const SP_HI={catcat:'mill',banho:'stilt'};
-function sprHi(name){let c=sprHiC.get(name);if(c)return c;const s0=SPR[name]||SPR.house,r=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h);};c=mkCanvas(s0[0].length*3,s0.length*3);const g=c.getContext('2d');HSPR[name](r,hiKit(r));sprHiC.set(name,c);return c;}
-function drawSpr(c,name,px,py){if(hiTier&&c===ctx){const im=sprHi(name);c.drawImage(im,px,py,im.width*S/3,im.height*S/3);}else drawSprite(c,name,px,py,S);}
-function drawLandmark(c,l){drawSpr(c,(hiTier&&c===ctx&&SP_HI[l.id])||l.sp,l.x*T,l.y*T);}
+/* the windows, doors and lanterns of each close-up picture that are lit at night: x, y, width, height in its pixels */
+const HLIT={church:[[17,24,2,6],[23,24,2,6],[29,24,2,6],[7,21,2,2],[6,13,4,5]],station:[[4,20,5,9],[28,20,5,9],[12,21,12,13]],
+ sunplaza:[[4,19,2,5],[7,19,2,5],[12,19,2,5],[21,19,2,5],[27,19,2,5],[30,19,2,5],[4,27,2,5],[7,27,2,5],[12,27,2,5],[21,27,2,5],[27,27,2,5],[30,27,2,5],[16,7,4,4]],
+ pagoda:[[15,8,2,2],[19,8,2,2],[9,28,3,3],[24,28,3,3],[16,27,4,7]],museum:[[5,10,2,2],[10,10,2,2],[16,10,2,2]],
+ hotel:[[5,6,2,3],[9,6,2,3],[13,6,2,3],[17,6,2,3],[5,11,2,3],[9,11,2,3],[13,11,2,3],[17,11,2,3],[5,16,2,3],[17,16,2,3],[10,18,4,4]],
+ market:[[3,14,3,1],[11,14,3,1],[18,14,3,1]],stalls:[[1,2,2,2],[5,2,2,2],[9,2,2,2],[13,2,2,2],[17,2,2,2],[21,2,2,2]],bus:[[9,6,6,3],[4,12,2,2],[7,12,2,2],[10,12,2,2]],
+ house:[[4,16,3,3],[17,16,3,3]],dao:[[4,14,2,3]],stilt:[[6,11,3,3],[15,11,3,3]],mill:[[10,15,2,3]],glass:[[20,1,3,2]]};
+/* snow: the same picture with white lying on everything that faces the sky (a pixel with nothing above it and more
+   of the picture below it, and the pixel under that) */
+function sprHi(name,snow){const key=snow?name+'|snow':name;let c=sprHiC.get(key);if(c)return c;const s0=SPR[name]||SPR.house,r=(x,y,w,h,col)=>{g.fillStyle=pal(col);g.fillRect(x,y,w,h);};c=mkCanvas(s0[0].length*3,s0.length*3);const g=c.getContext('2d');HSPR[name](r,hiKit(r));
+ if(snow){const w=c.width,h=c.height,im=g.getImageData(0,0,w,h),d=im.data,op=(x,y)=>y>=0&&y<h&&d[(y*w+x)*4+3]>200;for(let x=0;x<w;x++)for(let y=0;y<h-2;y++)if(op(x,y)&&!op(x,y-1)&&op(x,y+1)&&op(x,y+2)){d.set([238,243,248,255],(y*w+x)*4);d.set([207,217,230,255],((y+1)*w+x)*4);}g.putImageData(im,0,0);}
+ sprHiC.set(key,c);return c;}
+function drawSpr(c,name,px,py,snow){if(hiTier&&c===ctx){const im=sprHi(name,snow);c.drawImage(im,px,py,im.width*S/3,im.height*S/3);}else drawSprite(c,name,px,py,S);}
+function drawLandmark(c,l){drawSpr(c,(hiTier&&c===ctx&&SP_HI[l.id])||l.sp,l.x*T,l.y*T,winterSnow()&&snowAt(at(l.x,l.y+l.w-1)));}
 /* people, animals and vehicles: a handful of art pixels each. x,y is where their feet touch the ground. */
 function drawPerson(c,x,y,body,head,step,hat){if(hiTier&&c===ctx){putFig(fig((hat?'f':'p')+(step?'B':'A'),{b:body,h:head}),x,y);return;}c.fillStyle=head;c.fillRect(x-1,y-6,2,2);c.fillStyle=body;c.fillRect(x-1,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(step?x-1:x,y-2,1,2);c.fillRect(step?x:x-1,y-2,1,1);}
 function drawChild(c,x,y,body){if(hiTier&&c===ctx){putFig(fig('child',{b:body,h:'#1b1b1b'}),x,y);return;}c.fillStyle='#f0c8a0';c.fillRect(x-1,y-4,2,2);c.fillStyle=body;c.fillRect(x-1,y-2,2,2);}
@@ -969,6 +1017,8 @@ function groundTone(col,lv,cool){if(!lv&&!cool)return col;let row=toneHexC.get(c
 const gcLo=new Array(W*H),gcHi=new Array(W*H);
 function groundCol(x,y,hi){if(x<0||y<0||x>=W||y>=H)return null;const i=y*W+x,cache=hi?gcHi:gcLo;let c=cache[i];if(c!==undefined)return c;
  const t=at(x,y),d=dry()?1:0;let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';c=null;
+ /* in the snow months, yards, gardens and bare ground up high are white as well; the houses stay and get white roofs */
+ if((k==='village'||k==='hut'||k==='garden'||k==='bare'||k==='park')&&snowAt(t)){cache[i]=SNOW_COL;return SNOW_COL;}
  switch(k){case 'grass':case 'orchard':case 'hut':c=GC.grass[d];break;case 'scrub':c=GC.scrub[d];break;case 'forest':c=hi?(t.e>2000?'#174d22':'#256b2a'):(t.e>2000?'#1f5e2a':'#2e7d32');break;case 'rock':c='#8d8d7a';break;case 'bare':c='#c2ad84';break;case 'garden':case 'village':c=GC.garden[d];break;case 'park':c=GC.park[d];break;
   case 'snow':cache[i]=SNOW_COL;return SNOW_COL;case 'town':case 'market':cache[i]=TOWN_COL;return TOWN_COL;}
  if(c)c=groundTone(c,Math.round((nz(x/13+5,y/13+9)*0.62+nz(x/5+31,y/5+17)*0.38-0.5)*6.5),Math.max(0,Math.min(3,Math.floor((t.e-1300)/400))));
@@ -992,14 +1042,16 @@ function waterBit(x,y,c,r){if(c<0){x--;c+=4;}else if(c>3){x++;c-=4;}if(r<0){y--;
    sticks out and filled into every corner that cuts in. bit(c,r) answers for cells -1 to 4, so the shape runs on
    smoothly into the next tile. */
 const smBuf=new Uint8Array(576);
-function smoothCells(bit){const o=smBuf;
+function smoothCells(bit,cs){const o=smBuf,cut=cs>2?2:1,fil=cs>2?3:1,w=4*cs,e=cs-1; /* cs: pixels a cell, 6 in the close-up art and 2 in the 8-pixel art */
  for(let r=0;r<4;r++)for(let c=0;c<4;c++){const on=bit(c,r),L=bit(c-1,r),Rt=bit(c+1,r),U=bit(c,r-1),D=bit(c,r+1);
-  const tl=on?(!L&&!U&&!bit(c-1,r-1)?2:0):(L&&U?3:0),tr=on?(!Rt&&!U&&!bit(c+1,r-1)?2:0):(Rt&&U?3:0),bl=on?(!L&&!D&&!bit(c-1,r+1)?2:0):(L&&D?3:0),br=on?(!Rt&&!D&&!bit(c+1,r+1)?2:0):(Rt&&D?3:0);
-  for(let py=0;py<6;py++)for(let px=0;px<6;px++){const flip=px+py<tl||(5-px)+py<tr||px+(5-py)<bl||(5-px)+(5-py)<br;o[(r*6+py)*24+c*6+px]=flip?(on?0:1):on;}}
+  const tl=on?(!L&&!U&&!bit(c-1,r-1)?cut:0):(L&&U?fil:0),tr=on?(!Rt&&!U&&!bit(c+1,r-1)?cut:0):(Rt&&U?fil:0),bl=on?(!L&&!D&&!bit(c-1,r+1)?cut:0):(L&&D?fil:0),br=on?(!Rt&&!D&&!bit(c+1,r+1)?cut:0):(Rt&&D?fil:0);
+  for(let py=0;py<cs;py++)for(let px=0;px<cs;px++){const flip=px+py<tl||(e-px)+py<tr||px+(e-py)<bl||(e-px)+(e-py)<br;o[(r*cs+py)*w+c*cs+px]=flip?(on?0:1):on;}}
  return o;}
 function drawTile(oc,x,y,t){
  const px=x*T,py=y*T,v=t.v,C=fieldPal(x,y),i=y*W+x;
  const sub=(c,r,col)=>{oc.fillStyle=col;oc.fillRect(px+c*S,py+r*S,S,S);};
+ /* lanes and water as their softened 8x8 outline (see smoothCells) */
+ const mask=(bit,col)=>{const M=smoothCells(bit,S);oc.fillStyle=col;for(let r=0;r<T;r++){let run=0;for(let c=0;c<=T;c++){if(c<T&&M[r*T+c])run++;else if(run){oc.fillRect(px+c-run,py+r,run,1);run=0;}}}};
  let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';
  const g0=groundCol(x,y,0),grassCol=g0||GC.grass[dry()?1:0],gardenCol=grassCol,terr=k==='terrace';
  /* the same soft border on the 8-pixel art: along every side one art pixel in three belongs to the ground across
@@ -1025,7 +1077,7 @@ function drawTile(oc,x,y,t){
     if(m===0xFFFF)fill('#3a7bd5');
     else{const bank=nearGround(x,y,0);if(bank===0)treads();else fill(bank||GC.park[0]);
      if(bank===null)for(let b=0;b<16;b++)if(!wet(b)&&hash(x*4+(b&3),y*4+(b>>2))<0.45)sub(b&3,b>>2,blossom()?'#f2a0b8':'#2e5e32'); /* an island: trees */
-     for(let b=0;b<16;b++)if(wet(b))sub(b&3,b>>2,'#3a7bd5');}
+     mask((c,r)=>waterBit(x,y,c,r),'#3a7bd5');}
     /* a darker line under the northern shore of wide water */
     if(pop16(m)>=8){const up=y>0?wMask[i-W]:0;for(let b=0;b<16;b++)if(wet(b)&&!(b>=4?wet(b-4):(up&(1<<(12+b)))))sub(b&3,b>>2,'#2f66b8');}
     /* rapids: white water where a river runs down steep ground */
@@ -1059,15 +1111,15 @@ function drawTile(oc,x,y,t){
   case 'town':case 'village':{const vil=k==='village';fill(g0);if(!vil&&v<0.5)sub(Math.floor(v*8)%4,Math.floor(v*5)%4,'#a8997a');const q=t.q||[0,0,0,0];
     for(let qi=0;qi<4;qi++){const st=q[qi],qx=(qi&1)*2,qy=(qi>>1)*2;
      if(!st){const free=!(stMask[i]&(1<<(qy*4+qx))),h=hash(x*5+qi,y*3+1);if(free&&h<(vil?0.55:0.35))sub(qx,qy,blossom()&&h<0.2?'#f2a0b8':vil&&h>0.35?(dry()?'#7a8f4a':'#5f9a3a'):'#6fa04a');continue;}
-     const hv=hash(x*3+qi,y*7+qi),set=ROOFS[st]||null,roof=st===2?'#4a5566':st===3?'#7d7d85':set[Math.floor(hv*set.length)];
+     const hv=hash(x*3+qi,y*7+qi),set=ROOFS[st]||null,roof=g0===SNOW_COL?'#eef3f8':st===2?'#4a5566':st===3?'#7d7d85':set[Math.floor(hv*set.length)];
      sub(qx,qy,roof);sub(qx+1,qy,roof);
      if(st>=4){sub(qx,qy+1,'#8a6238');sub(qx+1,qy+1,hv<0.5?'#b59a72':'#4a4a42');}
      else{sub(qx,qy+1,st===2?'#dcd6c8':st===3?'#c9c4b6':'#e8dcc0');sub(qx+1,qy+1,st===2?'#5aa0ec':'#4a4a42');}}break;}
-  case 'hut':{fill(grassCol);const roof=v<0.5?'#3a2a1a':'#5a3a22';sub(1,0,roof);sub(2,0,roof);for(let c=0;c<4;c++)sub(c,1,roof);sub(0,2,'#8a6238');sub(1,2,'#e8dcc0');sub(2,2,'#4a4a42');sub(3,2,'#8a6238');break;}
+  case 'hut':{fill(grassCol);const roof=g0===SNOW_COL?'#eef3f8':v<0.5?'#3a2a1a':'#5a3a22';sub(1,0,roof);sub(2,0,roof);for(let c=0;c<4;c++)sub(c,1,roof);sub(0,2,'#8a6238');sub(1,2,'#e8dcc0');sub(2,2,'#4a4a42');sub(3,2,'#8a6238');break;}
  }
  const ps=poiAt.get(i);if(ps&&k==='town'&&t.q){const qi=t.q.findIndex(st=>st);if(qi>=0)sub((qi&1)*2,(qi>>1)*2+1,POI_COL[ps[0].k]||'#2a9d8f');}
  /* thin lanes, drawn over whatever the tile is: asphalt in town, pale concrete and earth in the countryside */
- if(t.st&&k!=='water'&&k!=='bridge'){const m=stMask[i];oc.fillStyle=townDist(x,y)<TOWN_R+6*K?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2';for(let b=0;b<16;b++)if(m&(1<<b))oc.fillRect(px+(b&3)*S,py+(b>>2)*S,S,S);}
+ if(t.st&&k!=='water'&&k!=='bridge')mask((c,r)=>cellBit(stMask,x,y,c,r),townDist(x,y)<TOWN_R+6*K?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2');
  /* railway: dark rail with pale sleepers, on the same art grid */
  const rm=railMask[i];if(rm&&k!=='water'){for(let b=0;b<16;b++)if(rm&(1<<b)){oc.fillStyle=((x*4+(b&3)+y*4+(b>>2))%2)?'#3a2a1a':'#9a9a8c';oc.fillRect(px+(b&3)*S,py+(b>>2)*S,S,S);}}
  if(t.trail&&(k==='rock'||k==='snow'||k==='forest'||k==='grass'||k==='terrace'||k==='scrub'||k==='bare'||k==='garden')){oc.fillStyle='#b59a72';oc.fillRect(px+S,py+S,S*2,S*2);}
@@ -1089,6 +1141,14 @@ const wetSeason=()=>month>=6&&month<=8;
 const swell=m=>(m===0xFFFF||!wetSeason())?m:(m|((m<<1)&0xEEEE)|((m>>1)&0x7777)|(m<<4)|(m>>4))&0xFFFF;
 /* a house in the close-up art: where it stands in its quarter of the tile and how wide it is. A quarter with a lane
    through one corner gets a narrow house on the side away from the lane. Used by the tile art and by the night lights. */
+/* the stacks of straw in the yards grow once the harvest is in */
+const hayLimit=()=>month>=10||month===1?0.78:0.9;
+/* what hangs in a quarter of a village or town tile that has no house: 0 nothing, 1 a rail of indigo cloth, 2 a
+   washing line. Kept per tile until the month changes (the straw stacks take some of the yards in autumn). */
+const yardC=new Uint8Array(W*H).fill(255);
+function yardLine(x,y,qi){const i=y*W+x;let v=yardC[i];if(v===255){v=0;const vil=kind[i]===KI.village;if(vil||kind[i]===KI.town)for(let q=0;q<4;q++){if((quad[i]>>(q*3))&7)continue;const qx=(q&1)*2,qy=(q>>1)*2;if(stMask[i]&((3<<(qy*4+qx))|(3<<((qy+1)*4+qx))))continue;
+   const h=hash(x*5+q,y*3+1),cat=Math.hypot(x-CATCAT.x,y-CATCAT.y)<16;if(h<(vil?0.6:0.35)||(vil&&h>hayLimit())||!(vil?(h<0.64||h>0.82||cat):h>0.9))continue;v|=(vil&&(cat?h<0.8:h<0.64)?1:2)<<(q*2);}yardC[i]=v;}
+ return(v>>(qi*2))&3;}
 function houseBox(i,qi){const qx=(qi&1)*2,qy=(qi>>1)*2,m=stMask[i],lane=c=>(m&(1<<(qy*4+qx+c)))||(m&(1<<((qy+1)*4+qx+c))),st=(quad[i]>>(qi*3))&7;
  /* houses do not stand in rank: each is a little off its place, and the small ones differ in width */
  const tx=i%W,ty=(i/W)|0,dy=Math.floor(hash(tx*3+qi,ty*5+qi*7+1)*3),w=st===2||st===3?10:8+Math.floor(hash(tx*5+qi*3+2,ty*7+qi)*3);
@@ -1155,7 +1215,7 @@ function drawTileHi(oc,x,y,t){
     if(!inner){if(m!==0xFFFF&&bank===null)for(let q=0;q<4;q++)crown(5+Math.floor(hq(q)*14),5+Math.floor(hq(q+5)*14),2,blossom()?'#f2a0b8':'#2e5e32','#3b8a3f','#1f4a26'); /* an island: trees */
      /* the water's outline with its steps softened; shallows along the shore and the bank's shadow under a northern
         shore; the bank wet at the water's edge, with gravel and a reed here and there */
-     const M=smoothCells(wb),w2=(c,r)=>c<0||r<0||c>=n||r>=n?wb(Math.floor(c/6),Math.floor(r/6)):M[r*n+c];mask(M,'#3a7bd5');
+     const M=smoothCells(wb,6),w2=(c,r)=>c<0||r<0||c>=n||r>=n?wb(Math.floor(c/6),Math.floor(r/6)):M[r*n+c];mask(M,'#3a7bd5');
      for(let r=0;r<n;r++)for(let c=0;c<n;c++){if(M[r*n+c]){if(!w2(c,r-1))R(c,r,1,2,'#2f66b8');else if(!w2(c-1,r)||!w2(c+1,r)||!w2(c,r+1))R(c,r,1,1,'#6ea3e6');}
       else if(bank!==null&&(w2(c-1,r)||w2(c+1,r)||w2(c,r-1)||w2(c,r+1))){const h=hash(x*24+c+1,y*24+r+2);R(c,r,1,1,h<0.22?'#d9cfae':tone(bank||C[1],-0.16));if(h>0.93)R(c,r-1,1,2,'#4f7a2e');}}}
     if(m===0xFFFF){const up=y>0?wMask[i-W]:0xFFFF;for(let c=0;c<4;c++)if(up&&!(up&(1<<(12+c))))R(c*6,0,6,2,'#2f66b8');}
@@ -1217,16 +1277,17 @@ function drawTileHi(oc,x,y,t){
     const q4=t.q||[0,0,0,0];
     for(let qi=0;qi<4;qi++){const st=q4[qi],qx=(qi&1)*2,qy=(qi>>1)*2,hv=hash(x*3+qi,y*7+qi);
      if(!st){const free=!(stMask[i]&((3<<(qy*4+qx))|(3<<((qy+1)*4+qx)))),h=hash(x*5+qi,y*3+1),a=qx*6,b=qy*6;
-      if(free&&h<(vil?0.6:0.35)){if(vil&&h>0.3){R(a+2,b+3,8,6,dry()?'#8a7450':'#7a6444');for(let r=0;r<6;r+=2)for(let c=0;c<8;c+=2)R(a+2+c,b+3+r,1,1,dry()?'#7a8f4a':'#4f8a2e');}
+      /* harvest: rice spread on a mat to dry in the yard, a wooden rake beside it */
+      if(free&&vil&&(month===9||month===10)&&h>0.3&&h<0.45){R(a+2,b+10,10,1,SH);R(a+1,b+4,10,6,'#b59a72');R(a+2,b+5,8,4,'#e9cd6a');R(a+2,b+6,8,1,'#d9b23a');R(a+2,b+8,8,1,'#d9b23a');R(a+10,b+2,1,4,'#6d4a2a');R(a+9,b+2,3,1,'#6d4a2a');}
+      else if(free&&h<(vil?0.6:0.35)){if(vil&&h>0.3){R(a+2,b+3,8,6,dry()?'#8a7450':'#7a6444');for(let r=0;r<6;r+=2)for(let c=0;c<8;c+=2)R(a+2+c,b+3+r,1,1,dry()?'#7a8f4a':'#4f8a2e');}
        else{R(a+6,b+7,1,3,'#5d4037');crown(a+6,b+5,3,blossom()&&h<0.2?'#f2a0b8':'#3b8a3f','#58a65c','#2a6b30',2);}}
-      else if(free&&vil&&h>0.9){R(a+4,b+8,5,1,SH);R(a+4,b+5,4,3,'#d9b23a');R(a+5,b+4,2,1,'#e9cd6a');R(a+4,b+7,4,1,'#b8902a');}
-      /* yards: lengths of indigo cloth hung out to dry on a bamboo rail, round Cát Cát above all, where the Hmong
-         dye it; elsewhere a washing line */
-      else if(free&&(vil?(h<0.64||h>0.82||Math.hypot(x-CATCAT.x,y-CATCAT.y)<16):h>0.9)){const cat=Math.hypot(x-CATCAT.x,y-CATCAT.y)<16;
-       if(vil&&(cat?h<0.8:h<0.64)){R(a+2,b+10,9,1,SH);R(a+1,b+3,1,8,'#8a6238');R(a+10,b+3,1,8,'#8a6238');R(a+1,b+3,10,1,'#b59a72');
-        for(let c=0;c<3;c++){const cx=a+2+c*3,len=5+Math.floor(hash(x*7+qi+c,y*5+c)*2);R(cx,b+4,2,len,'#22306e');R(cx,b+4,1,len,'#2c3f8c');R(cx,b+4+len-1,2,1,'#161f4a');}}
-       else{/* a washing line: two thin posts, a cord, three things pegged to it */R(a+1,b+10,2,1,SH);R(a+10,b+10,2,1,SH);R(a+1,b+4,1,6,'#8a6238');R(a+10,b+4,1,6,'#8a6238');R(a+2,b+4,8,1,'#6b6b5b');
-        const cl=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'];for(let c=0;c<3;c++){const cx=a+2+c*3,col=cl[Math.floor(hash(x*3+qi*5+c,y*7+c)*cl.length)],len=2+(c===1?1:0);R(cx,b+5,2,len,col);R(cx,b+4+len,2,1,tone(col,-0.22));}}}
+      /* straw stacks, more of them and taller once the harvest is in */
+      else if(free&&vil&&h>hayLimit()){const big=hayLimit()<0.9;R(a+3,b+8,big?7:5,1,SH);R(a+4-(big?1:0),b+5-(big?1:0),big?6:4,big?4:3,'#d9b23a');R(a+5-(big?1:0),b+4-(big?2:0),big?4:2,1,'#e9cd6a');R(a+4-(big?1:0),b+7,big?6:4,1,'#b8902a');if(big)R(a+5,b+2,2,1,'#e9cd6a');}
+      /* yards: a bamboo rail for lengths of indigo cloth (round Cát Cát above all, where the Hmong dye it) or a washing
+         line. Only the posts are painted here; the cloth is drawn every frame so that it can move in the wind. */
+      else{const yl=yardLine(x,y,qi);
+       if(yl===1){R(a+2,b+10,9,1,SH);R(a+1,b+3,1,8,'#8a6238');R(a+10,b+3,1,8,'#8a6238');R(a+1,b+3,10,1,'#b59a72');}
+       else if(yl===2){R(a+1,b+10,2,1,SH);R(a+10,b+10,2,1,SH);R(a+1,b+4,1,6,'#8a6238');R(a+10,b+4,1,6,'#8a6238');R(a+2,b+4,8,1,'#6b6b5b');}}
       continue;}
      if(vil&&hv>0.55){/* a fence along two sides of the yard */for(let c=0;c<12;c+=2)R(qx*6+c,qy*6+11,1,1,'#8a6238');for(let r=1;r<12;r+=2)R(qx*6,qy*6+r,1,1,'#8a6238');}
      const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],wins=hiWins(st,w),gab=st!==2&&st!==3&&hash(x*7+qi*3+5,y*3+qi)<0.3,hw2=w>>1;R(X+1,Y+10,w,1,SH);R(X+w,Y+(gab?6:2),1,gab?4:8,SH);
@@ -1238,9 +1299,11 @@ function drawTileHi(oc,x,y,t){
       if(st===4){R(X,Y+1,w,1,tone(roof,0.2));R(X,Y+3,w,1,tone(roof,-0.25));R(X,Y+5,w,1,tone(roof,-0.35));}else{for(let c=0;c<w;c+=2)R(X+c,Y,1,6,tone(roof,0.22));R(X,Y+5,w,1,tone(roof,-0.3));}}
       R(X,Y+6,w,4,st===4?'#8a6238':'#b59a72');for(let c=2;c<w;c+=3)R(X+c,Y+6,1,4,'rgba(0,0,0,.14)');R(X+(w>5?3:1),Y+7,2,3,'#3a2a1a');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}
      else{const set=ROOFS[1],roof=set[Math.floor(hv*set.length)];if(gab){gable(roof);R(X,Y+6,w,4,'#e8dcc0');}else{R(X,Y,w,5,roof);R(X,Y+1,w,1,tone(roof,0.22));R(X,Y+4,w,1,tone(roof,-0.3));R(X,Y+5,w,5,'#e8dcc0');}R(X+(w>5?4:1),Y+7,2,3,'#5a4028');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}}
+    if(g0===SNOW_COL)for(let qi=0;qi<4;qi++){if(!q4[qi])continue;const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],hw2=w>>1; /* snow lying on the roof */
+     if(q4[qi]!==2&&q4[qi]!==3&&hash(x*7+qi*3+5,y*3+qi)<0.3){for(let j=0;j<3;j++){const hw=Math.min(hw2,1+j);R(X+hw2-hw,Y+j,hw*2,1,'#eef3f8');}}else{R(X,Y,w,2,'#eef3f8');R(X+1,Y+2,w-2,1,'#cfd9e6');}}
     const ps=poiAt.get(i);if(ps&&k==='town'){const qi=q4.findIndex(st=>st);if(qi>=0){const hb=houseBox(i,qi);R(hb[0]+(hb[2]>5?3:0),hb[1]+5,4,2,POI_COL[ps[0].k]||'#2a9d8f');}}
     break;}
-  case 'hut':R(0,0,n,n,grassCol);tufts(4,'#689f38');R(6,8,12,6,v<0.5?'#3a2a1a':'#5a3a22');R(7,7,10,1,'#6a4a2a');R(7,14,10,5,'#8a6238');R(11,15,2,4,'#3a2a1a');R(15,15,2,2,'#4a4a42');break;
+  case 'hut':R(0,0,n,n,grassCol);tufts(4,'#689f38');R(6,8,12,6,v<0.5?'#3a2a1a':'#5a3a22');R(7,7,10,1,'#6a4a2a');R(7,14,10,5,'#8a6238');R(11,15,2,4,'#3a2a1a');R(15,15,2,2,'#4a4a42');if(g0===SNOW_COL){R(6,8,12,2,'#eef3f8');R(7,7,10,1,'#eef3f8');}break;
  }
  /* trees on the edge of a forest stand across it, and so do trees on the line between two forest tiles, which takes
     the grid out of the canopy. Both tiles draw the same trees from the same numbers; R keeps each to its own half. */
@@ -1251,7 +1314,7 @@ function drawTileHi(oc,x,y,t){
     if(h2<(dark?0.72:e>1700?0.22:0))fir(cx,cy,tone(col,tv),lt,dk,true);else crown(cx,cy,h2>0.5?4:3,tone(col,tv),tone(lt,tv),dk,0,true);}};
   ec(x,y,true);ec(x+1,y,true);ec(x,y,false);ec(x,y+1,false);}
  /* lanes: the art-grid cells with their corners softened, and a darker kerb all along the edge */
- if(t.st&&k!=='water'&&k!=='bridge'){const col=townDist(x,y)<TOWN_R+6*K?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2',edge=tone(col,-0.2),lb=(c,r)=>cellBit(stMask,x,y,c,r),M=smoothCells(lb),on=(c,r)=>c<0||r<0||c>=n||r>=n?lb(Math.floor(c/6),Math.floor(r/6)):M[r*n+c];
+ if(t.st&&k!=='water'&&k!=='bridge'){const col=townDist(x,y)<TOWN_R+6*K?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2',edge=tone(col,-0.2),lb=(c,r)=>cellBit(stMask,x,y,c,r),M=smoothCells(lb,6),on=(c,r)=>c<0||r<0||c>=n||r>=n?lb(Math.floor(c/6),Math.floor(r/6)):M[r*n+c];
   mask(M,col);for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(M[r*n+c]&&(!on(c-1,r)||!on(c+1,r)||!on(c,r-1)||!on(c,r+1)))R(c,r,1,1,edge);}
  /* railway: ballast, sleepers and a rail */
  const rm=railMask[i];if(rm&&k!=='water')for(let b=0;b<16;b++)if(rm&(1<<b)){const c=b&3,r=b>>2;R(c*6,r*6,6,6,'#8a8474');R(c*6,r*6+1,6,1,'#3a2a1a');R(c*6,r*6+4,6,1,'#3a2a1a');R(c*6+1,r*6,1,6,'#3a2a1a');R(c*6+4,r*6,1,6,'#3a2a1a');R(c*6+2,r*6+2,2,2,'#c9c4b6');}
@@ -1270,7 +1333,7 @@ function drawTileHi(oc,x,y,t){
    ===================================================================== */
 const MAXC=300; // chunks kept at least (more when the view needs more); the least recently drawn is dropped beyond this
 const mkCanvas=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c;};
-const CH_T=16,CHW=Math.ceil(W/CH_T),CHH=Math.ceil(H/CH_T);const chunks=new Map();
+const CH_T=16,CHW=Math.ceil(W/CH_T),CHH=Math.ceil(H/CH_T);const chunks=new Map();let tierNow=-1,tierPrev=-1,tierT0=0; /* the zoom level being drawn, the one before it, and when it changed */
 /* drawTile draws at gx*T, so the chunk context is translated to make that land at the local tile */
 /* ---- THE FAST PAINTER ----
    Tile art is nothing but filled rectangles on whole pixels, so a chunk is painted into a plain pixel buffer and copied
@@ -1281,6 +1344,7 @@ const colC=new Map();
 function colOf(s){let v=colC.get(s);if(v!==undefined)return v;let r,g,b,a=255;
  if(s[0]==='#'){r=parseInt(s.slice(1,3),16);g=parseInt(s.slice(3,5),16);b=parseInt(s.slice(5,7),16);}
  else{const m=s.match(/[\d.]+/g);r=+m[0];g=+m[1];b=+m[2];if(m.length>3)a=Math.round(parseFloat(m[3])*255);}
+ if(a===255){const p=palRGB(r,g,b);r=p[0];g=p[1];b=p[2];} /* solid colours are snapped to the palette; see-through ones are mixed as they are */
  v=((a<<24)|(b<<16)|(g<<8)|r)>>>0;colC.set(s,v);return v;}
 const paintBufs=new Map();
 function painter(w,h,ox,oy){let buf=paintBufs.get(w*65536+h);if(buf)buf.fill(0);else{buf=new Uint32Array(w*h);paintBufs.set(w*65536+h,buf);}
@@ -1291,10 +1355,10 @@ function painter(w,h,ox,oy){let buf=paintBufs.get(w*65536+h);if(buf)buf.fill(0);
    else{const a=al/255,ia=1-a,r=(col&255)*a,g=((col>>8)&255)*a,b=((col>>16)&255)*a;for(let j=y;j<y1;j++)for(let o=j*w+x,e=j*w+x1;o<e;o++){const p=buf[o];buf[o]=(0xFF000000|(((p>>16&255)*ia+b)<<16)|(((p>>8&255)*ia+g)<<8)|((p&255)*ia+r))>>>0;}}},
   canvas(){const c=mkCanvas(w,h),g=c.getContext('2d'),img=g.createImageData(w,h);img.data.set(new Uint8ClampedArray(buf.buffer,0,w*h*4));g.putImageData(img,0,0);return c;}};}
 function buildChunk(cx,cy){const n=CH_T*T,p=painter(n,n,cx*n,cy*n);for(let y=0;y<CH_T;y++)for(let x=0;x<CH_T;x++){const gx=cx*CH_T+x,gy=cy*CH_T+y;if(gx>=W||gy>=H)continue;drawTile(p,gx,gy,at(gx,gy));}return p.canvas();}
-/* the close-up cache: chunks of 8 x 8 tiles at 24 px a tile */
-const CH_HI=8,MAXC_HI=160,chunksHi=new Map();
+/* the close-up cache: chunks of 4 x 4 tiles at 24 px a tile, small so that painting one never holds a frame up */
+const CH_HI=4,MAXC_HI=640,chunksHi=new Map();
 function buildChunkHi(cx,cy){const n=CH_HI*HT,p=painter(n,n,cx*n,cy*n);for(let y=0;y<CH_HI;y++)for(let x=0;x<CH_HI;x++){const gx=cx*CH_HI+x,gy=cy*CH_HI+y;if(gx>=W||gy>=H)continue;drawTileHi(p,gx,gy,at(gx,gy));}return p.canvas();}
-function invalidateTerrain(){chunks.clear();chunksHi.clear();gcLo.fill(undefined);gcHi.fill(undefined);miniDirty=true;}
+function invalidateTerrain(){chunks.clear();chunksHi.clear();gcLo.fill(undefined);gcHi.fill(undefined);yardC.fill(255);miniDirty=true;}
 /* ---- THE FAR VIEW ----
    One colour per tile, used zoomed out, under chunks that are not painted yet, in the overview and in the section
    strip. The picture has four pixels a tile so that open ground can fray into its neighbours: two pixels in five on
@@ -1306,7 +1370,7 @@ function flatColor(x,y){const t=at(x,y),k=t.k;flatSoft=false;if((flags[y*W+x]&2)
  if(k==='terrace'){flatSoft=true;const F=fieldPal(x,y);return Math.floor(t.e/25)%2?F[0]:F[2];}
  if(k!=='village'&&k!=='hut'&&k!=='market'){const g=groundCol(x,y,0);if(g){flatSoft=true;return g;}}
  return FLAT[k]||'#000';}
-const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];rgbCache.set(c,v);}return v;};
+const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=palRGB(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16));rgbCache.set(c,v);}return v;};
 /* The first time it is done in one go. After a change of month it is redone a few rows a frame (5 ms at most), and the
    old picture stays up until the new one is whole, so the page never stops for it. miniSmall is the same picture at
    one pixel a tile, for the overview. */
@@ -1424,7 +1488,7 @@ function lightsImages(){if(lightsCache)return lightsCache;const mk=(w,h)=>{const
    ===================================================================== */
 let lang='vi'; // Vietnamese first; the choice is remembered
 const UI={
- en:{subtitle:'A pixel map of Sa Pa and the Mường Hoa valley built from real elevation data and OpenStreetMap. Walk, trek, ride the cable car.',labels:'LABELS',treks:'TREKS',sky:['SKY: AUTO','SKY: CLEAR','SKY: FOG','SKY: RAIN'],sound:['SOUND OFF','SOUND ON'],lang:'TIẾNG VIỆT',walk:'WALK HERE',tabs:['PLACE','PLACES','SETTINGS','LEGEND'],skyline:'SECTION',shops:'SHOP NAMES',shopsHint:'Zoom in fully to see shop names.',section:'WEST-EAST SECTION WHERE YOU STAND',skyNames:['','CLEAR','FOG','RAIN','SNOW'],days:['SUN','MON','TUE','WED','THU','FRI','SAT'],legs:{walk:'walk',trainDown:'mountain train',trainUp:'mountain train',cableUp:'cable car',cableDown:'cable car'},total:'total',feat:{waterfall:'Waterfall',viewpoint:'Viewpoint',peak:'Peak'},ridge:'HOÀNG LIÊN SƠN RANGE',valleyName:'MƯỜNG HOA VALLEY',festival:'GẦU TÀO FESTIVAL',dayBtn:'DAY: ',busy:{market:'Market day: the villages are in town.',nightmarket:'The night market is open: Friday, Saturday and Sunday evenings.',church:'Saturday evening: the love market is on in the church square.'},busyWhen:{market:'Busiest on Sunday from 6 to 11 am.',nightmarket:'Open on Friday, Saturday and Sunday, from about 4 to 10 pm.',church:'Love market: Saturday evening from 7 pm, in the square.'},love:'LOVE MARKET',rideOpen:'Cable car and mountain train are running: today {a} to {b}.',rideClosed:'Cable car and mountain train are closed now: today they run {a} to {b}.',home:'BACK TO TOWN',time:'Time',monthL:'Month',auto:'AUTO',visited:'Visited',
+ en:{subtitle:'A pixel map of Sa Pa and the Mường Hoa valley built from real elevation data and OpenStreetMap. Walk, trek, ride the cable car.',labels:'LABELS',treks:'TREKS',sky:['SKY: AUTO','SKY: CLEAR','SKY: FOG','SKY: RAIN'],sound:['SOUND OFF','SOUND ON'],lang:'TIẾNG VIỆT',walk:'WALK HERE',tabs:['PLACE','PLACES','SETTINGS','LEGEND'],skyline:'SECTION',shops:'SHOP NAMES',shopsHint:'Zoom in fully to see shop names.',section:'WEST-EAST SECTION WHERE YOU STAND',skyNames:['','CLEAR','FOG','RAIN','SNOW'],days:['SUN','MON','TUE','WED','THU','FRI','SAT'],legs:{walk:'walk',trainDown:'mountain train',trainUp:'mountain train',cableUp:'cable car',cableDown:'cable car'},total:'total',feat:{waterfall:'Waterfall',viewpoint:'Viewpoint',peak:'Peak'},ridge:'HOÀNG LIÊN SƠN RANGE',valleyName:'MƯỜNG HOA VALLEY',festival:'GẦU TÀO FESTIVAL',dayBtn:'DAY: ',busy:{market:'Market day: the villages are in town.',nightmarket:'The night market is open: Friday, Saturday and Sunday evenings.',church:'Saturday evening: the love market is on in the church square.'},busyWhen:{market:'Busiest on Sunday from 6 to 11 am.',nightmarket:'Open on Friday, Saturday and Sunday, from about 4 to 10 pm.',church:'Love market: Saturday evening from 7 pm, in the square.'},love:'LOVE MARKET',rideOpen:'Cable car and mountain train are running: today {a} to {b}.',rideClosed:'Cable car and mountain train are closed now: today they run {a} to {b}.',home:'BACK TO TOWN',time:'Time',monthL:'Month',auto:'AUTO',playDay:'▶ A DAY IN 30 SECONDS',visited:'Visited',
   months:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
   seasons:{1:'January: dry and cold, hoarfrost on the fields at dawn, snow on the pass some years.',2:'February: peach and plum blossom for Tết, and the Hmong Gầu Tào festival.',3:'March: rhododendrons on Fansipan.',4:'April: fields ploughed, buffalo at work.',5:'May: terraces flooded like mirrors, planting begins.',6:'June: young rice, heavy rain.',7:'July: green terraces, wettest month.',8:'August: rice heads form, thunderstorms.',9:'September: harvest gold, crews cutting rice on the terraces.',10:'October: stubble and clear skies.',11:'November: dry and cool, best trekking.',12:'December: frost in the valley, fog in town.'},
   legend:[['#7cb342','Rice terraces (colour follows the month)'],['#2e7d32','Forest'],['#769f4c','Scrub'],['#8d8d7a','Rock, above 2,500 m'],['#e8eef5','Snow, January and February'],['#c2ad84','Bare ground'],['#3a7bd5','Rivers, lakes, reservoirs'],['#d2d0c6','Dam (OSM)'],['#3d6a8a','Hydropower plant (OSM)'],['#3a2a1a','Mountain railway'],['#e3d8bd','Paved roads'],['#b8a070','Tracks'],['#8a6238','Bridges'],['#6f6f78','Town streets (OSM)'],['#b5452f','Houses (OSM footprints)'],['#4a5566','Hotels (OSM)'],['#8a4a32','Village houses'],['#7fb84e','Gardens'],['#2a9d8f','Shop or café sign'],['#f1c232','Homestay (OSM)'],['dash','Trek routes']],
@@ -1437,7 +1501,7 @@ const UI={
   poi:{cafe:'Café',food:'Restaurant',bar:'Bar',pharmacy:'Pharmacy',hospital:'Hospital',atm:'ATM / bank',fuel:'Fuel',school:'School',police:'Police',post:'Post office',shop:'Shop'},
   toast:{race:'The Vietnam Mountain Marathon is on: runners are out on the course.',closed:'Cable car and mountain train are closed (they run {a} to {b}). Going on foot.',rainbow:'The rain has stopped: a rainbow.',sea:'A sea of clouds below you.',deep:'Too deep to wade.',cloud:'Above the snow line. Take the cable car or the trail.',walking:'Walking to ',arrived:'Arrived: ',cable:'Riding the cable car...',train:'Riding the mountain train...',noPath:'No path there.',near:'Walking to the nearest spot you can reach.',pick:'Pick a place first.',home:'Back at the church square.',visited:'New place in the journal: '},
   scale:'1 KM',hourFmt:h=>String(Math.floor(h)).padStart(2,'0')+':'+(h%1?'30':'00')},
- vi:{subtitle:'Bản đồ pixel Sa Pa và thung lũng Mường Hoa dựng từ dữ liệu độ cao thật và OpenStreetMap. Đi bộ, trek, đi cáp treo.',labels:'NHÃN',treks:'TREK',sky:['TRỜI: TỰ ĐỘNG','TRỜI: QUANG','TRỜI: SƯƠNG','TRỜI: MƯA'],sound:['TẮT TIẾNG','BẬT TIẾNG'],lang:'ENGLISH',walk:'ĐI TỚI ĐÂY',tabs:['ĐỊA ĐIỂM','DANH SÁCH','CÀI ĐẶT','CHÚ GIẢI'],skyline:'LÁT CẮT',shops:'TÊN QUÁN',shopsHint:'Phóng to hết cỡ để thấy tên quán.',section:'LÁT CẮT TÂY-ĐÔNG TẠI CHỖ BẠN ĐỨNG',skyNames:['','QUANG','SƯƠNG','MƯA','TUYẾT'],days:['CN','T2','T3','T4','T5','T6','T7'],legs:{walk:'đi bộ',trainDown:'tàu leo núi',trainUp:'tàu leo núi',cableUp:'cáp treo',cableDown:'cáp treo'},total:'tổng',feat:{waterfall:'Thác nước',viewpoint:'Điểm ngắm cảnh',peak:'Đỉnh núi'},ridge:'DÃY HOÀNG LIÊN SƠN',valleyName:'THUNG LŨNG MƯỜNG HOA',festival:'LỄ HỘI GẦU TÀO',dayBtn:'THỨ: ',busy:{market:'Phiên chợ: dân bản xuống chợ.',nightmarket:'Chợ đêm đang họp: tối thứ Sáu, thứ Bảy và Chủ nhật.',church:'Tối thứ Bảy: chợ tình đang diễn ra ở quảng trường nhà thờ.'},busyWhen:{market:'Đông nhất Chủ nhật từ 6 đến 11 giờ sáng.',nightmarket:'Họp thứ Sáu, thứ Bảy và Chủ nhật, khoảng 16 đến 22 giờ.',church:'Chợ tình: tối thứ Bảy từ 19 giờ, tại quảng trường.'},love:'CHỢ TÌNH',rideOpen:'Cáp treo và tàu leo núi đang chạy: hôm nay {a} đến {b}.',rideClosed:'Cáp treo và tàu leo núi đang nghỉ: hôm nay chạy {a} đến {b}.',home:'VỀ TRUNG TÂM',time:'Giờ',monthL:'Tháng',auto:'TỰ ĐỘNG',visited:'Đã ghé',
+ vi:{subtitle:'Bản đồ pixel Sa Pa và thung lũng Mường Hoa dựng từ dữ liệu độ cao thật và OpenStreetMap. Đi bộ, trek, đi cáp treo.',labels:'NHÃN',treks:'TREK',sky:['TRỜI: TỰ ĐỘNG','TRỜI: QUANG','TRỜI: SƯƠNG','TRỜI: MƯA'],sound:['TẮT TIẾNG','BẬT TIẾNG'],lang:'ENGLISH',walk:'ĐI TỚI ĐÂY',tabs:['ĐỊA ĐIỂM','DANH SÁCH','CÀI ĐẶT','CHÚ GIẢI'],skyline:'LÁT CẮT',shops:'TÊN QUÁN',shopsHint:'Phóng to hết cỡ để thấy tên quán.',section:'LÁT CẮT TÂY-ĐÔNG TẠI CHỖ BẠN ĐỨNG',skyNames:['','QUANG','SƯƠNG','MƯA','TUYẾT'],days:['CN','T2','T3','T4','T5','T6','T7'],legs:{walk:'đi bộ',trainDown:'tàu leo núi',trainUp:'tàu leo núi',cableUp:'cáp treo',cableDown:'cáp treo'},total:'tổng',feat:{waterfall:'Thác nước',viewpoint:'Điểm ngắm cảnh',peak:'Đỉnh núi'},ridge:'DÃY HOÀNG LIÊN SƠN',valleyName:'THUNG LŨNG MƯỜNG HOA',festival:'LỄ HỘI GẦU TÀO',dayBtn:'THỨ: ',busy:{market:'Phiên chợ: dân bản xuống chợ.',nightmarket:'Chợ đêm đang họp: tối thứ Sáu, thứ Bảy và Chủ nhật.',church:'Tối thứ Bảy: chợ tình đang diễn ra ở quảng trường nhà thờ.'},busyWhen:{market:'Đông nhất Chủ nhật từ 6 đến 11 giờ sáng.',nightmarket:'Họp thứ Sáu, thứ Bảy và Chủ nhật, khoảng 16 đến 22 giờ.',church:'Chợ tình: tối thứ Bảy từ 19 giờ, tại quảng trường.'},love:'CHỢ TÌNH',rideOpen:'Cáp treo và tàu leo núi đang chạy: hôm nay {a} đến {b}.',rideClosed:'Cáp treo và tàu leo núi đang nghỉ: hôm nay chạy {a} đến {b}.',home:'VỀ TRUNG TÂM',time:'Giờ',monthL:'Tháng',auto:'TỰ ĐỘNG',playDay:'▶ MỘT NGÀY TRONG 30 GIÂY',visited:'Đã ghé',
   months:['Th1','Th2','Th3','Th4','Th5','Th6','Th7','Th8','Th9','Th10','Th11','Th12'],
   seasons:{1:'Tháng 1: khô, rét, sương muối trắng ruộng lúc sáng sớm, có năm tuyết trên đèo.',2:'Tháng 2: hoa đào, hoa mận đón Tết và lễ hội Gầu Tào của người Mông.',3:'Tháng 3: đỗ quyên nở trên Fansipan.',4:'Tháng 4: cày ải, trâu ra đồng.',5:'Tháng 5: ruộng đổ nước như gương, bắt đầu cấy.',6:'Tháng 6: lúa non, mưa lớn.',7:'Tháng 7: ruộng xanh, tháng mưa nhiều nhất.',8:'Tháng 8: lúa trổ bông, giông chiều.',9:'Tháng 9: mùa vàng, người gặt lúa trên ruộng bậc thang.',10:'Tháng 10: gốc rạ, trời trong.',11:'Tháng 11: khô mát, trek đẹp nhất.',12:'Tháng 12: băng giá dưới thung lũng, sương trong phố.'},
   legend:[['#7cb342','Ruộng bậc thang (màu theo tháng)'],['#2e7d32','Rừng'],['#769f4c','Cây bụi'],['#8d8d7a','Đá, trên 2.500 m'],['#e8eef5','Tuyết, tháng 1 và tháng 2'],['#c2ad84','Đất trống'],['#3a7bd5','Suối, hồ, hồ thủy điện'],['#d2d0c6','Đập (theo OSM)'],['#3d6a8a','Nhà máy thủy điện (theo OSM)'],['#3a2a1a','Đường tàu leo núi'],['#e3d8bd','Đường nhựa'],['#b8a070','Đường đất'],['#8a6238','Cầu'],['#6f6f78','Đường phố (OSM)'],['#b5452f','Nhà (theo OSM)'],['#4a5566','Khách sạn (OSM)'],['#8a4a32','Nhà trong bản'],['#7fb84e','Vườn'],['#2a9d8f','Biển hiệu quán, cửa hàng'],['#f1c232','Homestay (theo OSM)'],['dash','Tuyến trek']],
@@ -1668,12 +1732,42 @@ function busAt(i,h){const b=BUSES[i];if(h<b.a||h>b.b+BUS_RUN)return null;
  if(!busTried){busTried=true;const s=nearTarget(byId('bus')),e=nearTarget(byId('trungchai')),p=findPath(e[0],e[1],s[0],s[1]);if(p&&p.length>20){const all=[e].concat(p);BUS_PATH=all.filter((q,j)=>j%3===0||j===all.length-1);}}
  if(!BUS_PATH)return null;const bs=byId('bus');if(h>=b.a+BUS_RUN&&h<b.b)return{x:bs.x+bs.w/2+(i-1)*1.4,y:bs.y+bs.w+0.9,fl:false,parked:true};
  const out=h>=b.b,t=out?1-(h-b.b)/BUS_RUN:(h-b.a)/BUS_RUN,p=polyAt(BUS_PATH,t),q=polyAt(BUS_PATH,Math.min(1,t+0.004));return{x:p[0]+0.5,y:p[1]+0.5,fl:out?q[0]>p[0]:q[0]<p[0]};}
+/* ---- WIND, RAIN ON THE GROUND, MIST ----
+   The wind is one number that rises and falls over a few seconds, and gusts that cross the map as bands from the
+   north-west. Where a gust passes, light runs over the fields and the tree tops, cloth lifts on the lines, the flag on
+   Fansipan streams and smoke leans. All of it is drawn over the painted land each frame, only for the tiles in view. */
+let windT=0,wetness=-1; /* seconds of wind so far; how wet the ground is, 0 to 1 (set from the sky on the first frame) */
+const windAmt=()=>Math.max(0,Math.min(1,0.45+0.3*Math.sin(windT/7.3)+0.25*Math.sin(windT/2.9+1.7)));
+const GUST_LUT=new Float32Array(1024);
+const CLOTHC=['#22306e','#2c3f8c','#161f4a'].map(pal),WASHC=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'].map(pal),FLYC=['#f4f4f0','#f1c232','#e07b2a','#b9dcff'].map(pal),FLAGC=['#c2412b','#e06a52','#f1c232'].map(pal);
+const FAN=byId('fansipan');
+/* mist over the rivers at dawn: a soft band one or two tiles either side of all water, gone by half past eight */
+let mistC=null;
+function mistMask(){if(mistC)return mistC;mistC=mkCanvas(W,H);const acc=new Uint8Array(W*H);
+ for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const j=yy*W+xx,a=acc[j]+(dx||dy?(Math.abs(dx)+Math.abs(dy)>2?12:28):64);acc[j]=a>180?180:a;}}
+ const g=mistC.getContext('2d'),img=g.createImageData(W,H),u=new Uint32Array(img.data.buffer);for(let i=0;i<W*H;i++)if(acc[i])u[i]=((acc[i]<<24)|0xF8F4F0)>>>0;g.putImageData(img,0,0);return mistC;}
+const mistAmt=h=>skyNow()===3||h<4.5||h>=8.5?0:Math.min(1,h-4.5,(8.5-h)/1.5);
+/* ducks on the flooded terraces in May, a few to a paddy; and in October, late in the day, stubble burning in some fields */
+const DUCKS=[],BURNS=[];for(let i=0;i<70;i++){const sp=fieldSpot();if(!sp||kind[sp[1]*W+sp[0]]!==KI.terrace)continue;if(i%7<4)DUCKS.push({x:sp[0]+0.5,y:sp[1]+0.5,n:3+Math.floor(rnd()*3),ph:rnd()*6.283});else BURNS.push({x:sp[0]+0.5,y:sp[1]+0.5,ph:Math.floor(rnd()*40)});}
+const ducksOut=()=>month===5&&hour>=6&&hour<18.5,burning=()=>month===10&&hour>=13.5&&hour<18&&skyNow()!==3;
+/* porters on the Fansipan trail: three parties of three with loads on their backs, up in the morning and down in the
+   afternoon, on the longest stretch of the trail that keeps clear of water */
+const PORT_RUN=(()=>{const t=TREKS.find(t=>t.id==='fansipan');let best=null;if(t)for(const ln of t.lines)for(const q of dryRuns(ln))if(!best||polyLen(q)>polyLen(best))best=q;return best&&polyLen(best)>20?best:null;})();
+function porterAt(k,m,h){if(!PORT_RUN)return null;const dep=6+k*0.6;if(h<dep||h>=18.2)return null;const tt=h<13.2?(h-dep)/(13.2-dep):1-(h-13.2)/5;return polyAt(PORT_RUN,Math.max(0,Math.min(1,tt-m*0.006)));}
+/* visitors at the viewpoints, the pass and the glass bridge: one to three people standing to look, by day in dry weather */
+const LOOKS=[];{const spots=FEAT.filter(f=>f.k!=='peak'&&f.k!=='waterfall').map(f=>[f.x,f.y+0.6]);for(const id of ['glass','pass']){const l=byId(id);if(l)spots.push([l.x+l.w/2,l.y+l.w+0.4]);}
+ for(const sp of spots)for(let q=0,m=1+Math.floor(rnd()*2.4);q<m;q++){const x=sp[0]+(q-1)*0.5,y=sp[1]+(q%2)*0.15;if(dryAt(x,y))LOOKS.push({x,y,body:pick(CLOTH),head:pick(['#1b1b1b','#f1c232','#c2412b','#f4f4f0']),ph:Math.floor(rnd()*40)});}}
+const looking=()=>hour>=8&&hour<17.5&&skyNow()!==3;
+let poleN=0; /* counts people as they are first drawn, so that one in five in town carries a shoulder pole */
 function clockFigures(){const o=[];if(day===0&&hour>=4.5&&hour<14.5){if(!goersReady)setupGoers();for(const g of GOERS){const p=goerAt(g,hour);if(p)o.push([p[0],p[1],'goer']);}}
  for(const p of PUPILS){const q=pupilAt(p,hour);if(q)o.push([q[0],q[1],'pupil']);}
  for(const g of TREK_GROUPS)for(let k=0;k<5;k++){const p=groupAt(g,k,hour);if(p)o.push([p[0],p[1],'trekker']);}
  if(raceOn())for(const r of RUNNERS){const p=runnerAt(r);o.push([p[0],p[1],'runner']);}
  for(let b=0;b<BUSES.length;b++){const p=busAt(b,hour);if(p)o.push([p.x,p.y,'bus']);}
  if(playOn())for(const p of PLAYS)for(const q of playAt(p,0))o.push([q[0],q[1],'player']);
+ if(ducksOut())for(const d of DUCKS)o.push([d.x,d.y,'duck']);
+ for(let k=0;k<3;k++)for(let m=0;m<3;m++){const p=porterAt(k,m,hour);if(p)o.push([p[0],p[1],'porter']);}
+ if(looking())for(const v of LOOKS)o.push([v.x,v.y,'visitor']);
  return o;}
 /* footprints: the walker leaves them in snow and in hoarfrost, and they fade in a minute and a half */
 const prints=[];
@@ -1795,12 +1889,44 @@ function render(){
    if(c){chunks.delete(key);chunks.set(key,c);}
    else if(performance.now()-now<6){c=buildChunk(cx,cy);c.born=performance.now();chunks.set(key,c);if(chunks.size>cap)chunks.delete(chunks.keys().next().value);}
    if(c)show(c,cx*G,cy*G,G,under);else{waiting++;under();}}}
+ /* a change of zoom level: what was painted for the level just left fades out over the new one */
+ {const tier=lowZoom?0:hiTier?2:1;if(tier!==tierNow){tierPrev=tierNow;tierNow=tier;tierT0=now;}
+  const ta=now-tierT0;if(tierPrev>=0&&ta<FADE){waiting++;ctx.globalAlpha=1-ta/FADE;
+   if(tierPrev===0)ctx.drawImage(miniImage(),0,0,W*T,H*T);
+   else{const G=(tierPrev===2?CH_HI:CH_T)*T,map=tierPrev===2?chunksHi:chunks;for(let cy=Math.max(0,Math.floor(vy0/G));cy<=Math.floor(vy1/G);cy++)for(let cx=Math.max(0,Math.floor(vx0/G));cx<=Math.floor(vx1/G);cx++){const c=map.get(cx+','+cy);if(c)ctx.drawImage(c,cx*G,cy*G,G,G);}}
+   ctx.globalAlpha=1;}}
  if(waiting)lastInput=now;
  /* the light of the hour on the slopes, and the shadows of the mountains */
  drawLight(ctx,T);
  ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c))){if(hiTier)ctx.fillRect(x*T+c*S,y*T+r*S+1,S,1/HD);/* close-up: a glint is a thin stroke, not a block */else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}}
   /* rapids flicker white */
   if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';if(hiTier){ctx.fillRect(x*T+c*S,y*T+r*S+1/HD,S*2/3,1/HD);ctx.fillRect(x*T+c*S+2/HD,y*T+r*S+1,S*2/3,1/HD);}else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
+ /* ---- what moves over the land ---- */
+ const wnd=windAmt(),tsec=windT;
+ if(!lowZoom&&wetness>0.03){/* after rain the roads are dark with wet */ctx.fillStyle='rgba(18,28,64,'+(0.24*wetness).toFixed(3)+')';
+  for(let i=0;i<stTiles.length;i+=2){const x=stTiles[i],y=stTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const m=stMask[y*W+x];if(m===0xFFFF){ctx.fillRect(x*T,y*T,T,T);continue;}for(let r=0;r<4;r++){const row=(m>>(r*4))&15;if(row===15)ctx.fillRect(x*T,y*T+r*S,T,S);else if(row)for(let q=0;q<4;q++)if(row&(1<<q))ctx.fillRect(x*T+q*S,y*T+r*S,S,S);}}}
+ if(ppt>=12){const tx0=Math.max(0,Math.floor(vx0/T)),tx1=Math.min(W-1,Math.floor(vx1/T)),ty0=Math.max(0,Math.floor(vy0/T)),ty1=Math.min(H-1,Math.floor(vy1/T)),u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
+  /* a gust is a band crossing the map from the north-west; its strength across the band is worked out once a frame */
+  const p0=tx0*0.176+ty0*0.132-tsec*0.9,gl=GUST_LUT,gn=Math.min(gl.length,Math.ceil(((tx1-tx0)*0.176+(ty1-ty0)*0.132)*8)+2);
+  for(let q=0;q<gn;q++){const p=p0+q/8,v=Math.sin(p)+0.5*Math.sin(p*0.37+tsec*0.23);gl[q]=v>0.7?Math.min(1,(v-0.7)*2.5)*wnd:0;}
+  const dayNow=darkness(hour)<0.2,dry3=skyNow()!==3,fly=hiTier&&month>=5&&month<=9&&dayNow&&dry3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')';
+  for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){const i=y*W+x,k=kind[i],g=gl[Math.min(gn-1,(((x-tx0)*0.176+(y-ty0)*0.132)*8)|0)],X=x*T,Y=y*T;
+   /* light running over fields, grass and tree tops where the gust is */
+   if(g>0.08&&(k===KI.terrace||k===KI.grass||k===KI.forest||k===KI.scrub||k===KI.park||k===KI.orchard)){ctx.fillStyle=k===KI.forest?'rgba(205,240,170,0.3)':'rgba(255,255,225,0.34)';const h=hash(x+7,y+3);
+    for(let q=0,nq=hiTier?(g>0.5?3:2):1;q<nq;q++)ctx.fillRect(X+sn((h*97+q*3.7+tsec*5)%7),Y+sn((h*53+q*2.9)%7.5),hiTier?1:S,u);}
+   /* cloth on the rails and the washing lines: the lower half swings */
+   if(hiTier&&(k===KI.village||k===KI.town)){let yv=yardC[i];if(yv===255){yardLine(x,y,0);yv=yardC[i];}
+    if(yv)for(let qi=0;qi<4;qi++){const yl=(yv>>(qi*2))&3;if(!yl)continue;const a=(qi&1)*12,b=(qi>>1)*12;
+     for(let c=0;c<3;c++){const cx=a+2+c*3,sw=Math.round(Math.sin(tsec*2.4+x*1.7+c*1.3)*(0.45+1.6*g+0.5*wnd));
+      if(yl===1){const len=5+Math.floor(hash(x*7+qi+c,y*5+c)*2);ctx.fillStyle=CLOTHC[0];ctx.fillRect(X+cx/HD,Y+(b+4)/HD,2/HD,3/HD);ctx.fillRect(X+(cx+sw)/HD,Y+(b+7)/HD,2/HD,(len-3)/HD);ctx.fillStyle=CLOTHC[1];ctx.fillRect(X+cx/HD,Y+(b+4)/HD,1/HD,3/HD);ctx.fillRect(X+(cx+sw)/HD,Y+(b+7)/HD,1/HD,(len-4)/HD);ctx.fillStyle=CLOTHC[2];ctx.fillRect(X+(cx+sw)/HD,Y+(b+3+len)/HD,2/HD,1/HD);}
+      else{const len=2+(c===1?1:0);ctx.fillStyle=WASHC[Math.floor(hash(x*3+qi*5+c,y*7+c)*WASHC.length)];ctx.fillRect(X+cx/HD,Y+(b+5)/HD,2/HD,1/HD);ctx.fillRect(X+(cx+(sw>0?1:sw<0?-1:0))/HD,Y+(b+6)/HD,2/HD,len/HD);}}}}
+   /* puddles: on the lanes, the squares and bare ground, shrinking as the ground dries */
+   if(pud){const sm=stMask[i];if(sm||k===KI.plaza||k===KI.busyard||k===KI.bare||k===KI.track){const h=hash(x*3+1,y*5+2);if(h<(sm?0.3:0.14)){let cx=2+Math.floor(h*37)%4,cy=2+Math.floor(h*91)%4;
+      if(sm){let bq=Math.floor(h*160)%16;for(let q=0;q<16&&!(sm&(1<<bq));q++)bq=(bq+1)%16;cx=(bq&3)*S+0.33;cy=(bq>>2)*S+0.33;}
+      ctx.fillStyle=pudC;ctx.fillRect(X+cx,Y+cy,1.34,0.34);ctx.fillRect(X+cx-0.33,Y+cy+0.33,2,0.34);ctx.fillRect(X+cx,Y+cy+0.67,1.34,0.33);ctx.fillStyle=pudH;ctx.fillRect(X+cx+0.33,Y+cy+0.33,0.67,0.34);}}}
+   /* butterflies over grass and gardens, May to September */
+   if(fly&&(k===KI.grass||k===KI.park||k===KI.garden)){const h=hash(x+31,y+47);if(h<0.07){const bx=sn(X+4+Math.sin(tsec*0.9+h*500)*3),by=sn(Y+4+Math.cos(tsec*1.3+h*800)*2.4);ctx.fillStyle=FLYC[((h*4000)|0)%FLYC.length];
+     if((frame+((h*1000)|0))%2)ctx.fillRect(bx-u,by,3*u,u);else ctx.fillRect(bx,by-u,u,2*u);}}}}
  if(showRoutes){ctx.lineWidth=hiTier?1:2;ctx.setLineDash(hiTier?[2,3]:[4,4]);ctx.lineDashOffset=-frame;for(const r of TREKS){ctx.strokeStyle=r.col;for(const ln of r.lines){ctx.beginPath();ln.forEach((p,i)=>i?ctx.lineTo(p[0]*T,p[1]*T):ctx.moveTo(p[0]*T,p[1]*T));ctx.stroke();}}ctx.setLineDash([]);}
  /* cable car: the real line from OSM, pylons and two gondolas */
  const ca=CABLE_LINE[0],cb=CABLE_LINE[CABLE_LINE.length-1],ax=ca[0]*T,ay=ca[1]*T-6,bx=cb[0]*T,by=cb[1]*T-4;
@@ -1822,11 +1948,15 @@ function render(){
  if(!lowZoom)for(const p of POWER){if(p.d)continue;const hx=Math.round(p.x*T/S)*S,hy=Math.round(p.y*T/S)*S;if(!seen(hx,hy,20))continue;if(hiTier){putFig(fig('mPower'),hx,hy+2);continue;}ctx.fillStyle='#3d6a8a';ctx.fillRect(hx-4,hy-4,8,2);ctx.fillStyle='#dcd6c8';ctx.fillRect(hx-4,hy-2,8,4);ctx.fillStyle='#4a4a42';ctx.fillRect(hx-2,hy,2,2);ctx.fillStyle='#5aa0ec';ctx.fillRect(hx+2,hy-2,2,2);}
  /* the summit steps and the buildings beside them */
  if(!lowZoom&&seen(SUMMIT.ax,SUMMIT.ay,160)){const {ax,ay,bx,by}=SUMMIT,n=Math.round(Math.hypot(bx-ax,by-ay)/S);for(let i=0;i<=n;i++){ctx.fillStyle=i%2?'#d8d2c0':'#9a9486';ctx.fillRect(Math.round((ax+(bx-ax)*i/n)/S)*S-S,Math.round((ay+(by-ay)*i/n)/S)*S,2*S,S);}
-  for(const d of SUMMIT.decor)drawSpr(ctx,d[0],d[1],d[2]);}
+  for(const d of SUMMIT.decor)drawSpr(ctx,d[0],d[1],d[2],winterSnow());}
  /* places: small sprites on the art grid; the selected or hovered one gets a thin frame */
  for(const l of LMY){if(!seen(l.x*T,l.y*T,60))continue;drawLandmark(ctx,l);const hi=l===sel||l===hover,wp=l.w*T;
   if(hi){ctx.fillStyle=l===sel?YOU_COL:'#f4f4f0';ctx.fillRect(l.x*T-2,l.y*T-2,wp+4,1);ctx.fillRect(l.x*T-2,l.y*T+wp+1,wp+4,1);ctx.fillRect(l.x*T-2,l.y*T-2,1,wp+4);ctx.fillRect(l.x*T+wp+1,l.y*T-2,1,wp+4);}
   if(visited.has(l.id)){const u=hiTier?0.5:1; /* the mark of a place you have been to: half the size up close */ctx.fillStyle='#2e7d32';ctx.fillRect(l.x*T+wp-2*u,l.y*T-2*u,4*u,4*u);ctx.fillStyle='#f4f4f0';ctx.fillRect(l.x*T+wp-u,l.y*T-u,2*u,2*u);}}
+ /* the flag on the summit streams in the wind (close-up; the small sprite has it painted on) */
+ if(hiTier&&seen(FAN.x*T,FAN.y*T,60)){const un=S/3,X=FAN.x*T,Y=FAN.y*T,amp=0.4+0.8*wnd;
+  for(let c=0;c<8;c++){const dy=Math.round(Math.sin(tsec*7-c*0.9)*amp*c/7),fx=X+(28+c)*un,fy=Y+(2+dy)*un;ctx.fillStyle=FLAGC[0];ctx.fillRect(fx,fy,un,6*un);ctx.fillStyle=FLAGC[1];ctx.fillRect(fx,fy,un,un);
+   if(c===3||c===4){ctx.fillStyle=FLAGC[2];ctx.fillRect(fx,fy+2*un,un,2*un);}}}
  /* the way the walker is about to take, as a dotted line */
  if(hero.path.length&&!hero.riding){const st=lowZoom?Math.max(2,Math.round(3/s)):1,d=lowZoom?Math.max(2,Math.round(1.6/s)):2;for(const pass of [0,1]){ctx.fillStyle=pass?YOU_COL:'#1b1b1b';const e=pass?0:1;for(let i=(hero.path.length-1)%st;i<hero.path.length;i+=st){const p=hero.path[i];if(seen(p[0]*T,p[1]*T,T))ctx.fillRect(p[0]*T+T/2-d/2-e,p[1]*T+T/2-d/2-e,d+2*e,d+2*e);}}}
  /* the walker's footprints in snow and hoarfrost, fading */
@@ -1862,9 +1992,20 @@ function render(){
   for(const g of TREK_GROUPS)for(let m=0;m<5;m++){const p=groupAt(g,m,hour);if(!p)continue;const px=Math.round(p[0]*T),py=Math.round(p[1]*T);if(!seen(px,py,20))continue;if(m&&hiTier)putFig(fig('basket'),px-1.4,py,false,2.4);drawPerson(ctx,px,py,m?g.cols[m][0]:'#c2412b',m?g.cols[m][1]:'#f1c232',(step2+m)%2);if(m&&!hiTier){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}}
   if(raceOn())for(const r of RUNNERS){const p=runnerAt(r),px=Math.round(p[0]*T),py=Math.round(p[1]*T);if(seen(px,py,20))drawPerson(ctx,px,py,r.body,'#f4f4f0',((frame>>1)+Math.floor(r.ph*10))%2);}
   for(let b=0;b<BUSES.length;b++){const p=busAt(b,hour);if(!p)continue;const px=Math.round(p.x*T),py=Math.round(p.y*T);if(seen(px,py,30))drawBus(ctx,px,py,p.fl);}
+  /* porters on the Fansipan trail, and visitors standing at the viewpoints; now and then one of them takes a picture */
+  for(let k=0;k<3;k++)for(let m=0;m<3;m++){const p=porterAt(k,m,hour);if(!p)continue;const px=Math.round(p[0]*T),py=Math.round(p[1]*T);if(!seen(px,py,20))continue;if(hiTier)putFig(fig('basket'),px-1.4,py,false,2.4);else{ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}drawPerson(ctx,px,py,k%2?'#4a5566':'#6d4a2a','#e9cd6a',(step2+m)%2,true);}
+  if(looking())for(const v of LOOKS){const px=Math.round(v.x*T),py=Math.round(v.y*T);if(!seen(px,py,20))continue;drawPerson(ctx,px,py,v.body,v.head,0);if((frame+v.ph)%45===0){ctx.fillStyle='#ffffff';ctx.fillRect(px-1,py-(hiTier?4:6),hiTier?1:2,hiTier?1:2);}}
+  /* ducks paddling in the flooded terraces */
+  if(ducksOut())for(const d of DUCKS){if(!seen(d.x*T,d.y*T,20))continue;for(let q=0;q<d.n;q++){const an=d.ph+q*2.1+tsec*0.25*(q%2?1:-1),px=d.x*T+Math.cos(an)*2.4,py=d.y*T+Math.sin(an)*1.6;
+    if(hiTier)putFig(fig('duck'),Math.round(px*HD)/HD,Math.round(py*HD)/HD,Math.sin(an)*(q%2?1:-1)>0,0.01);else{ctx.fillStyle='#f4f4f0';ctx.fillRect(Math.round(px)-1,Math.round(py)-1,2,1);ctx.fillStyle='#e07b2a';ctx.fillRect(Math.round(px)+1,Math.round(py)-1,1,1);}}}
+  /* stubble burning after the harvest: an ember and a column of grey smoke that leans with the wind */
+  if(burning())for(const b of BURNS){const bx=Math.round(b.x*T),by=Math.round(b.y*T);if(!seen(bx,by,40))continue;const su=hiTier?S*2/3:S,ph=(frame+b.ph)>>1;
+   ctx.fillStyle=ph%3?'#e07b2a':'#f1c232';ctx.fillRect(bx,by,su,su/2);ctx.fillStyle='#8f8f8a';for(let j=0;j<7;j++){ctx.globalAlpha=0.6-j*0.075;ctx.fillRect(bx+su*(Math.round(j*(0.4+0.9*wnd))+((ph+j)%3===0?1:0)),by-su*(j+1),su*(j>3?2:1),su);}ctx.globalAlpha=1;}
   /* everyone and everything that moves */
   for(const a of amb){const px=Math.round(a.px),py=Math.round(a.py);if(!seen(px,py,20))continue;
-   if(a.kind==='person'){if(a.load&&hiTier)putFig(fig('basket'),px-1.4,py,false,2.4);drawPerson(ctx,px,py,a.body,a.head,step2);if(a.load&&!hiTier){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}if(a.umb&&sk0===3)drawUmbrella(ctx,px,py,a.umb);}
+   if(a.kind==='person'){if(a.pole===undefined)a.pole=!a.load&&townDist(Math.floor(a.px/T),Math.floor(a.py/T))<TOWN_R&&poleN++%5===0;
+    if(a.pole){/* a street vendor with a shoulder pole */if(hiTier)putFig(fig('pole'),px,py,false,1.5);else{ctx.fillStyle='#6d4a2a';ctx.fillRect(px-3,py-5,6,1);ctx.fillStyle='#9a7b5a';ctx.fillRect(px-4,py-4,2,2);ctx.fillRect(px+2,py-4,2,2);}}
+    if(a.load&&hiTier)putFig(fig('basket'),px-1.4,py,false,2.4);drawPerson(ctx,px,py,a.body,a.head,step2);if(a.load&&!hiTier){ctx.fillStyle='#9a7b5a';ctx.fillRect(px-2,py-8,4,3);}if(a.umb&&sk0===3)drawUmbrella(ctx,px,py,a.umb);}
    else if(a.kind==='moto')drawMoto(ctx,px,py,a.fl);
    else if(a.kind==='buffalo')drawBuffalo(ctx,px,py,a.flip);
    else if(a.kind==='child')drawChild(ctx,px,py,a.body);
@@ -1875,9 +2016,9 @@ function render(){
   /* kitchen smoke at breakfast and supper time: from about one roof in six a thin pale wisp, one art pixel wide, that
      thins as it climbs, bends over at the top and wavers */
   const smk=smokeAmt(hour);if(smk>0)for(let i=0;i<windowTiles.length;i+=2){const x=windowTiles[i],y=windowTiles[i+1];if(x*T<vx0-T||x*T>vx1+T||y*T<vy0-T||y*T>vy1+3*T)continue;if(kind[y*W+x]!==KI.village)continue;const hv=hash(x+5,y+11);if(hv>0.17*smk)continue;
-   const ph=(frame+Math.floor(hv*5871))>>2,bx=x*T+S*(Math.floor(hv*5871)%3),lean=Math.floor(hv*5871)%2?1:-1,len=4+(ph%2);
+   const ph=(frame+Math.floor(hv*5871))>>2,bx=x*T+S*(Math.floor(hv*5871)%3),len=4+(ph%2);
    const su=hiTier?S*2/3:S; /* close-up: a finer wisp */
-   for(let j=0;j<len;j++){ctx.fillStyle='rgba(240,240,232,'+(0.88-j*0.15).toFixed(2)+')';ctx.fillRect(bx+lean*su*(j>=3?1+((ph+j)%2):j===2?(ph%2):0),y*T-su*(j+1),su,su);}}}
+   for(let j=0;j<len;j++){ctx.fillStyle='rgba(240,240,232,'+(0.88-j*0.15).toFixed(2)+')';ctx.fillRect(bx+su*((j>=3?1+((ph+j)%2):j===2?(ph%2):0)+Math.round(wnd*j*0.5)),y*T-su*(j+1),su,su);}}}
  /* you: the same size as everyone else, in gold, under a small bobbing marker so you can find yourself */
  {const hx=Math.round(hero.rx*T+T/2),hy=Math.round(hero.ry*T+T);
   if(hero.riding){if(hero.riding.sprite==='train')drawTrain(ctx,hx,hy-2);else drawGondola(ctx,hx,hy-10);}
@@ -1893,6 +2034,8 @@ function render(){
  /* hoarfrost on the fields, January mornings (frost, fog and the sea of clouds are one block a tile; up close their edges are blended) */
  if(hiTier)ctx.imageSmoothingEnabled=true;
  {const fr=frostAmt(hour);if(fr>0){ctx.globalAlpha=fr;ctx.drawImage(frostMask(),0,0,W*T,H*T);ctx.globalAlpha=1;}}
+ /* mist lying along the rivers at dawn, drifting a little */
+ {const ma=mistAmt(hour);if(ma>0){const mm=mistMask(),dx=Math.sin(windT*0.25)*5,dy=Math.cos(windT*0.19)*3;ctx.imageSmoothingEnabled=true;ctx.globalAlpha=0.55*ma;ctx.drawImage(mm,dx,dy,W*T,H*T);ctx.globalAlpha=0.3*ma;ctx.drawImage(mm,-dx*1.6,-dy,W*T,H*T);ctx.globalAlpha=1;ctx.imageSmoothingEnabled=hiTier;}}
  /* valley fog: one flat block per tile, in four density steps */
  const fl=fogLevel(hour);if(fl>1150)ctx.drawImage(fogMask(fl),0,0,W*T,H*T);
  /* the sea of clouds: from above the fog, the same valleys are a white floor with the ridges standing out of it */
@@ -1929,7 +2072,10 @@ function render(){
     const v=quad[j],skip=k===KI.village?3:5;for(let qi=0;qi<4;qi++){const st=(v>>(qi*3))&7;if(!st||((x*7+y*13+qi*5+Math.floor(hour))%skip)===0)continue;
      if(hiTier){/* close-up: the windows the house really has */const hb=houseBox(j,qi);for(const q of hiWins(st,hb[2]))ctx.fillRect(x*T+(hb[0]+q[0])/HD,y*T+(hb[1]+q[1])/HD,q[2]/HD,q[3]/HD);continue;}
      const qx=(qi&1)*2,qy=(qi>>1)*2;ctx.fillRect(x*T+(qx+1)*S,y*T+(qy+1)*S,S,S);if(st===2)ctx.fillRect(x*T+qx*S,y*T+(qy+1)*S,S,S);}}
-   for(const l of LM){if(!inView(l.x,l.y))continue;if(/house|dao|station|market|stalls|bus|church|sunplaza|hotel|museum|pagoda|glass/.test(l.sp)){const wp=l.w*T,u=hiTier?0.5:1/* close-up: a smaller, sharper light */;ctx.fillStyle='rgba(255,216,102,'+al+')';ctx.fillRect(l.x*T+wp/2-2*u,l.y*T+wp*0.62+2-2*u,4*u,4*u);if(l.sp==='church')ctx.fillRect(l.x*T+wp/2-2*u,l.y*T+2,4*u,6*u);
+   for(const l of LM){if(!inView(l.x,l.y))continue;if(/house|dao|station|market|stalls|bus|church|sunplaza|hotel|museum|pagoda|glass/.test(l.sp)){const wp=l.w*T,wins=hiTier&&HLIT[SP_HI[l.id]||l.sp];ctx.fillStyle='rgba(255,216,102,'+al+')';
+     /* close-up: the windows the picture really has, a few of them dark; otherwise one light, and the belfry on the church */
+     if(wins){const un=S/3,hh=Math.floor(hour);for(let q=0;q<wins.length;q++){const wv=wins[q];if(wins.length>4&&(l.x*7+q*5+hh)%4===0)continue;ctx.fillRect(l.x*T+wv[0]*un,l.y*T+wv[1]*un,wv[2]*un,wv[3]*un);}}
+     else{ctx.fillRect(l.x*T+wp/2-2,l.y*T+wp*0.62,4,4);if(l.sp==='church')ctx.fillRect(l.x*T+wp/2-2,l.y*T+2,4,6);}
     ctx.fillStyle='rgba(255,190,80,'+(0.05*al)+')';pixelDisc(ctx,l.x*T+wp/2,l.y*T+wp*0.62,7);ctx.fillStyle='rgba(255,200,100,'+(0.07*al)+')';pixelDisc(ctx,l.x*T+wp/2,l.y*T+wp*0.62,3);}}
    /* the busy market glows a little warmer */
    for(const id of ['market','nightmarket'])if(marketBusy(id)){const l=byId(id);ctx.fillStyle='rgba(255,170,70,'+(0.07*al)+')';pixelDisc(ctx,(l.x+l.w/2)*T,(l.y+l.w+1.5)*T,24);}
@@ -2030,7 +2176,7 @@ const colorFor={church:'#f4f4f0',sunplaza:'#c9a227',museum:'#c9a227',hotel:'#4a5
 function renderList(){list.innerHTML='';[...LM].sort((a,b)=>a.km-b.km).forEach(l=>{const li=document.createElement('li'),b=document.createElement('button');b.type='button';b.dataset.id=l.id;
  b.innerHTML='<i style="background:'+colorFor[l.sp]+'"></i><span>'+nameOf(l)+'</span><small>'+l.km.toFixed(1)+' km</small>'+(visited.has(l.id)?'<em>✓</em>':'');b.addEventListener('click',()=>{sel=l;showTab('place');renderCard();follow=false;cam.x=(l.x+l.w/2)*T;cam.y=(l.y+l.w/2)*T;if(cam.z<5)cam.z=5;clampCam();if(PHONE())openSheet(false);cv.focus();});li.appendChild(b);list.appendChild(li);});
  [...list.children].forEach(li=>li.firstChild.setAttribute('aria-current',li.firstChild.dataset.id===(sel&&sel.id)?'true':'false'));}
-function applyLang(){const u=U();document.getElementById('subtitle').textContent=u.subtitle;document.getElementById('labels').textContent=u.labels;document.getElementById('routes').textContent=u.treks;weatherBtn.textContent=u.sky[skyMode];soundBtn.textContent=u.sound[soundOn?1:0];document.getElementById('lang').textContent=u.lang;document.getElementById('walk').textContent=u.walk;TABS.forEach((t,i)=>{if(t!=='list')document.getElementById('tab-'+t).textContent=u.tabs[i];});document.getElementById('skyToggle').textContent=u.skyline;document.getElementById('shops').textContent=u.shops;dayBtn.textContent=u.dayBtn+u.days[day];if(document.documentElement){document.documentElement.classList.toggle('vi',lang==='vi');document.documentElement.lang=lang;}document.getElementById('home').textContent=u.home;document.getElementById('timeLabel').textContent=u.time;document.getElementById('monthLabel').textContent=u.monthL;document.getElementById('autoTime').textContent=u.auto;
+function applyLang(){const u=U();document.getElementById('subtitle').textContent=u.subtitle;document.getElementById('labels').textContent=u.labels;document.getElementById('routes').textContent=u.treks;weatherBtn.textContent=u.sky[skyMode];soundBtn.textContent=u.sound[soundOn?1:0];document.getElementById('lang').textContent=u.lang;document.getElementById('walk').textContent=u.walk;TABS.forEach((t,i)=>{if(t!=='list')document.getElementById('tab-'+t).textContent=u.tabs[i];});document.getElementById('skyToggle').textContent=u.skyline;document.getElementById('shops').textContent=u.shops;dayBtn.textContent=u.dayBtn+u.days[day];if(document.documentElement){document.documentElement.classList.toggle('vi',lang==='vi');document.documentElement.lang=lang;}document.getElementById('home').textContent=u.home;document.getElementById('timeLabel').textContent=u.time;document.getElementById('monthLabel').textContent=u.monthL;document.getElementById('autoTime').textContent=u.auto;document.getElementById('playDay').textContent=u.playDay;
  document.getElementById('legend').innerHTML=u.legend.map(e=>'<li><b class="'+(e[0]==='dash'?'dash':'')+'" style="'+(e[0]==='dash'?'':'background:'+e[0])+'"></b>'+e[1]+'</li>').join('');document.getElementById('help').innerHTML=u.help;document.getElementById('credits').textContent=u.credits;
  document.getElementById('introTitle').textContent=u.welcome;document.getElementById('introBody').textContent=u.intro.replace('{n}',LM.length);document.getElementById('introBtn').textContent=u.go;applyMonth();renderList();renderCard();skyDirty=true;updateStatus();}
 function applyMonth(){monthEl.value=month;monthOut.textContent=U().months[month-1];}
@@ -2069,8 +2215,13 @@ document.getElementById('lang').addEventListener('click',()=>{lang=lang==='en'?'
 document.getElementById('walk').addEventListener('click',()=>{if(sel){travel(sel);if(PHONE())openSheet(false);}else say(U().toast.pick);cv.focus();});
 document.getElementById('me').addEventListener('click',()=>{follow=true;cam.x=hero.rx*T;cam.y=hero.ry*T;if(cam.z<5)cam.z=5;clampCam();cv.focus();});
 document.getElementById('home').addEventListener('click',()=>{hero.path=[];pending=null;goal=null;hero.riding=null;rideSound(null);hero.x=START[0];hero.y=START[1];hero.rx=hero.x;hero.ry=hero.y;sel=null;follow=true;renderCard();say(U().toast.home);saveState();if(PHONE())openSheet(false);cv.focus();});
-hourEl.addEventListener('input',()=>{hour=parseFloat(hourEl.value)%24;autoTime=false;document.getElementById('autoTime').setAttribute('aria-pressed','false');hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);});
-document.getElementById('autoTime').addEventListener('click',e=>{autoTime=!autoTime;e.currentTarget.setAttribute('aria-pressed',String(autoTime));});
+hourEl.addEventListener('input',()=>{if(dayPlay>0){dayPlay=0;playBtn.setAttribute('aria-pressed','false');}hour=parseFloat(hourEl.value)%24;autoTime=false;document.getElementById('autoTime').setAttribute('aria-pressed','false');hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);});
+document.getElementById('autoTime').addEventListener('click',e=>{stopDay();autoTime=!autoTime;e.currentTarget.setAttribute('aria-pressed',String(autoTime));});
+/* a whole day in half a minute: shadows sweep round, markets fill and empty, lights come on. The clock goes back to
+   how it was set when the day is over, or when the button, the slider or AUTO is touched. */
+let dayPlay=0,autoWas=true;const playBtn=document.getElementById('playDay');
+function stopDay(){if(dayPlay<=0)return;dayPlay=0;autoTime=autoWas;playBtn.setAttribute('aria-pressed','false');document.getElementById('autoTime').setAttribute('aria-pressed',String(autoTime));}
+playBtn.addEventListener('click',()=>{if(dayPlay>0){stopDay();return;}autoWas=autoTime;autoTime=false;dayPlay=24;playBtn.setAttribute('aria-pressed','true');document.getElementById('autoTime').setAttribute('aria-pressed','false');});
 document.getElementById('introBtn').addEventListener('click',()=>{document.getElementById('intro').hidden=true;try{localStorage.setItem('sapa-intro','1');}catch(e){}cv.focus();});
 try{if(!localStorage.getItem('sapa-intro'))document.getElementById('intro').hidden=false;}catch(e){document.getElementById('intro').hidden=false;}
 
@@ -2080,11 +2231,22 @@ try{if(!localStorage.getItem('sapa-intro'))document.getElementById('intro').hidd
    car while you ride them
    ===================================================================== */
 let ac=null,mix=null,birdT=null;
-function makeNoise(){const buf=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate),d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const src=ac.createBufferSource();src.buffer=buf;src.loop=true;src.start();return src;}
+/* One long stretch of noise is shared by every sound made from noise (river, wind, voices, rain). Each use starts at
+   its own place in it and plays at its own speed, so no two keep step, and the loop is 23 seconds long with its ends
+   blended. The loop used to be two seconds, short enough to hear come round. */
+let noiseBuf=null;
+function makeNoise(rate){if(!noiseBuf){const len=Math.floor(ac.sampleRate*23),fade=4000;noiseBuf=ac.createBuffer(1,len,ac.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;for(let i=0;i<fade;i++){const k=i/fade;d[i]=d[i]*k+d[len-fade+i]*(1-k);}}
+ const src=ac.createBufferSource();src.buffer=noiseBuf;src.loop=true;src.loopEnd=noiseBuf.duration-4000/ac.sampleRate;src.playbackRate.value=rate;src.start(0,Math.random()*18);return src;}
 function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();const master=ac.createGain();master.gain.value=0.9;master.connect(ac.destination);
- const chain=(type,freq,q,g0)=>{const src=makeNoise(),f=ac.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=ac.createGain();g.gain.value=g0;src.connect(f).connect(g).connect(master);return g;};
- const river=chain('lowpass',420,0.7,0),wind=chain('bandpass',260,0.6,0),chatter=chain('bandpass',1100,1.2,0),rattle=chain('bandpass',1500,2.5,0);
- const lfo=ac.createOscillator(),lfoG=ac.createGain();lfo.frequency.value=0.13;lfoG.gain.value=0.5;lfo.connect(lfoG).connect(wind.gain);lfo.start();
+ /* drift: slow waves at rates that share no beat, added to a gain or a filter pitch, so a sound swells and thins
+    without ever settling into a pattern */
+ const drift=(param,depths)=>{for(const [hz,depth] of depths){const o=ac.createOscillator(),og=ac.createGain();o.frequency.value=hz;og.gain.value=depth;o.connect(og).connect(param);o.start();}};
+ const chain=(type,freq,q,g0,rate,wander)=>{const src=makeNoise(rate),f=ac.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=ac.createGain();g.gain.value=g0;src.connect(f).connect(g).connect(master);if(wander)drift(f.frequency,wander);return g;};
+ const river=chain('lowpass',420,0.7,0,1,[[0.071,70],[0.113,45]]),wind=chain('bandpass',260,0.6,0,0.83,[[0.09,80],[0.031,50]]),chatter=chain('bandpass',1100,1.2,0,1.13),rattle=chain('bandpass',1500,2.5,0,0.94);
+ /* the river has a second, brighter voice: water over stones, a share of the main one and never steady */
+ const trickle=chain('bandpass',1900,1.4,0,1.31,[[0.17,300],[0.057,220]]);
+ /* the wind: its loudness is set in updateMix from the height you stand at and the gusts on the map */
+ drift(wind.gain,[[0.13,0.35],[0.047,0.25]]);
  /* cable car: a low two-note hum with a slow wobble */
  const hum=ac.createGain();hum.gain.value=0;hum.connect(master);for(const [f,type,g] of [[92,'sine',1],[184,'triangle',0.35],[276,'sine',0.12]]){const o=ac.createOscillator(),og=ac.createGain();o.type=type;o.frequency.value=f;og.gain.value=g;o.connect(og).connect(hum);o.start();}
  const wob=ac.createOscillator(),wobG=ac.createGain();wob.frequency.value=0.7;wobG.gain.value=0.02;wob.connect(wobG).connect(hum.gain);wob.start();
@@ -2094,12 +2256,12 @@ function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioCon
  const tune=ac.createOscillator(),tuneG=ac.createGain();tune.type='square';tune.frequency.value=392;tuneG.gain.value=0.14;tune.connect(tuneG).connect(khen);tune.start();
  const KHEN=[392,440,523,587,523,440,392,330,392,523];let kn=0;setInterval(()=>{if(!soundOn||!mix||mix.khenLevel<=0)return;tune.frequency.setValueAtTime(KHEN[kn++%KHEN.length],ac.currentTime);},430);
  /* rain: a hiss that comes and goes with the sky */
- const rainS=chain('highpass',3200,0.5,0);
+ const rainS=chain('highpass',3200,0.5,0,1.21,[[0.21,500]]);
  /* bells and animal voices: each a short note or two, started when the clock says so */
  const bell=(f,at,vol,len)=>{for(const [m,g] of [[1,1],[2.01,0.45],[3.02,0.2]]){const o=ac.createOscillator(),og=ac.createGain();o.type='sine';o.frequency.value=f*m;og.gain.setValueAtTime(0.0001,at);og.gain.exponentialRampToValueAtTime(Math.max(0.0002,vol*g),at+0.02);og.gain.exponentialRampToValueAtTime(0.0001,at+len);o.connect(og).connect(master);o.start(at);o.stop(at+len+0.1);}};
  const crow=at=>{const o=ac.createOscillator(),og=ac.createGain(),bp=ac.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1400;bp.Q.value=2;o.type='sawtooth';o.frequency.setValueAtTime(520,at);o.frequency.linearRampToValueAtTime(980,at+0.18);o.frequency.setValueAtTime(980,at+0.3);o.frequency.linearRampToValueAtTime(1150,at+0.5);o.frequency.linearRampToValueAtTime(640,at+0.95);og.gain.setValueAtTime(0.0001,at);og.gain.exponentialRampToValueAtTime(0.09,at+0.05);og.gain.setValueAtTime(0.09,at+0.75);og.gain.exponentialRampToValueAtTime(0.0001,at+1);o.connect(bp).connect(og).connect(master);o.start(at);o.stop(at+1.05);};
  const croak=at=>{for(const d of [0,0.14]){const o=ac.createOscillator(),og=ac.createGain();o.type='square';o.frequency.setValueAtTime(190+Math.random()*60,at+d);og.gain.setValueAtTime(0.0001,at+d);og.gain.exponentialRampToValueAtTime(0.035,at+d+0.01);og.gain.exponentialRampToValueAtTime(0.0001,at+d+0.09);o.connect(og).connect(master);o.start(at+d);o.stop(at+d+0.1);}};
- let lastH=hour;setInterval(()=>{if(!soundOn||!mix){lastH=hour;return;}const h0=lastH,h1=hour,t=ac.currentTime+0.05;lastH=h1;const crossed=x=>(h0<x&&h1>=x)||(h1<h0&&(h0<x||h1>=x));
+ let lastH=hour;setInterval(()=>{if(!soundOn||!mix||dayPlay>0){lastH=hour;return;} /* no bells while a day is being played fast */const h0=lastH,h1=hour,t=ac.currentTime+0.05;lastH=h1;const crossed=x=>(h0<x&&h1>=x)||(h1<h0&&(h0<x||h1>=x));
    /* the church bell on the hour, within earshot of the church: one stroke, three at six, noon and six */
    if(Math.floor(h1)!==Math.floor(h0)&&mix.nearChurch>0){const n=[6,12,18].includes(Math.floor(h1))?3:1;for(let q=0;q<n;q++)bell(523,t+q*0.9,0.12*mix.nearChurch,2.2);}
    /* the monastery bell at dusk */
@@ -2108,11 +2270,25 @@ function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioCon
    if((crossed(5)||crossed(5.5)||crossed(6))&&mix.village>0){crow(t);if(mix.village>0.3)crow(t+1.4);}
    /* frogs in the flooded terraces on summer nights */
    if(mix.frogs>0&&Math.random()<mix.frogs)croak(t+Math.random()*0.2);},300);
- mix={river,wind,chatter,rattle,hum,khen,rainS,khenLevel:0,chatterLevel:0,forest:0,ride:null,nearChurch:0,nearMonastery:0,village:0,frogs:0};
+ mix={river,trickle,wind,chatter,rattle,hum,khen,rainS,khenLevel:0,chatterLevel:0,forest:0,ride:null,nearChurch:0,nearMonastery:0,village:0,frogs:0};
  setInterval(()=>{if(!soundOn||!mix)return;const t=ac.currentTime;mix.chatter.gain.linearRampToValueAtTime(mix.chatterLevel*(0.5+Math.random()),t+0.3);},350);
  /* mountain train: clack-clack over the rail joints, twice every beat */
  setInterval(()=>{if(!soundOn||!mix||mix.ride!=='train')return;const t=ac.currentTime,g=mix.rattle.gain;for(const d of [0,0.09]){g.setValueAtTime(0.0001,t+d);g.linearRampToValueAtTime(0.5,t+d+0.012);g.exponentialRampToValueAtTime(0.0001,t+d+0.07);}},260);}
- ac.resume();const chirp=()=>{if(!soundOn)return;if(mix.forest>0&&Math.random()<mix.forest){const o=ac.createOscillator(),g=ac.createGain();o.type='sine';const f=2200+Math.random()*1500,t=ac.currentTime;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(f*1.4,t+0.08);o.frequency.exponentialRampToValueAtTime(f*0.9,t+0.18);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.07,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);o.connect(g).connect(ac.destination);o.start(t);o.stop(t+0.22);}birdT=setTimeout(chirp,900+Math.random()*3000);};chirp();}
+ ac.resume();
+ /* Birds: five different calls (a chirp, two notes, a trill, a falling whistle, a low double coo), each at its own
+    pitch, loudness and side, and close together at dawn. At night in the warm months, crickets instead. */
+ const note=(f0,f1,at,len,vol,pan,type)=>{const o=ac.createOscillator(),g=ac.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f0,at);o.frequency.exponentialRampToValueAtTime(f1,at+len);g.gain.setValueAtTime(0.0001,at);g.gain.exponentialRampToValueAtTime(vol,at+Math.min(0.02,len/3));g.gain.exponentialRampToValueAtTime(0.0001,at+len);
+  if(ac.createStereoPanner){const p=ac.createStereoPanner();p.pan.value=pan;o.connect(g).connect(p).connect(ac.destination);}else o.connect(g).connect(ac.destination);o.start(at);o.stop(at+len+0.05);};
+ const chirp=()=>{if(!soundOn)return;const t=ac.currentTime+0.02,pan=Math.random()*1.6-0.8,vol=0.03+Math.random()*0.045,night=darkness(hour)>0.3;let wait=900+Math.random()*3200;
+  if(!night&&mix.forest>0&&Math.random()<mix.forest){const kind=Math.floor(Math.random()*5),f=2000+Math.random()*1700;
+   if(kind===0)note(f,f*1.4,t,0.12,vol,pan);
+   else if(kind===1){note(f*1.2,f*1.25,t,0.1,vol,pan);note(f*0.9,f*0.85,t+0.16,0.16,vol,pan);}
+   else if(kind===2){const k=4+Math.floor(Math.random()*4);for(let q=0;q<k;q++)note(f*1.1,f*1.25,t+q*0.07,0.045,vol*0.8,pan);}
+   else if(kind===3)note(f*1.5,f*0.8,t,0.32,vol*0.9,pan);
+   else{note(520+Math.random()*90,440,t,0.22,vol*1.3,pan);note(500,430,t+0.3,0.26,vol*1.3,pan);}
+   if(hour>5.3&&hour<7.5)wait*=0.45; /* the dawn chorus */}
+  else if(night&&month>=4&&month<=10&&skyNow()!==3&&mix.village+mix.forest>0){const f=4100+Math.random()*500;for(let q=0;q<3;q++)note(f,f*1.01,t+q*0.055,0.03,0.012,pan,'square');wait=500+Math.random()*1400;}
+  birdT=setTimeout(chirp,wait);};chirp();}
 /* called when a ride starts ('train' or 'gondola') and when it ends (null) */
 function rideSound(kind){if(!mix||!ac)return;mix.ride=soundOn?kind:null;const t=ac.currentTime;mix.hum.gain.cancelScheduledValues(t);mix.hum.gain.linearRampToValueAtTime(mix.ride==='gondola'?0.16:0,t+0.35);if(mix.ride!=='train'){mix.rattle.gain.cancelScheduledValues(t);mix.rattle.gain.linearRampToValueAtTime(0,t+0.1);}}
 /* samples the land around you on a 77 m lattice, so distances read in the same units at any tile size */
@@ -2120,10 +2296,10 @@ function updateMix(){if(!soundOn||!mix)return;let dW=12,forest=0,n=0,vil=0,ter=0
  const e=eAt(hero.x,hero.y),td=townDist(hero.x,hero.y)/K,t=ac.currentTime,night=darkness(hour)>0.3,crowd=(marketBusy('market')||marketBusy('nightmarket')||marketBusy('church'))?2:1;
  /* the khèn carries about twelve tiles from the square */
  mix.khenLevel=marketBusy('church')?Math.max(0,1-Math.hypot(hero.x-SQ.x,hero.y-SQ.y)/(12*K)):0;mix.khen.gain.linearRampToValueAtTime(0.3*mix.khenLevel,t+0.8);
- mix.river.gain.linearRampToValueAtTime((wetSeason()?0.45:0.32)*Math.max(0,1-dW/10),t+0.8); /* the rivers are louder in the rains */
+ {const rv=(wetSeason()?0.45:0.32)*Math.max(0,1-dW/10);mix.river.gain.linearRampToValueAtTime(rv,t+0.8);mix.trickle.gain.linearRampToValueAtTime(rv*(0.18+Math.random()*0.2),t+0.8);} /* the rivers are louder in the rains */
  mix.rainS.gain.linearRampToValueAtTime(skyNow()===3?0.09:0,t+0.8);
  {const mo=byId('monastery');mix.nearChurch=Math.max(0,1-td/9);mix.nearMonastery=Math.max(0,1-Math.hypot(hero.x-mo.x,hero.y-mo.y)/K/9);mix.village=Math.min(1,vil/n*6);mix.frogs=night&&month>=5&&month<=8&&skyNow()!==3?Math.min(0.5,ter/n*1.5):0;}
- mix.wind.gain.linearRampToValueAtTime(e>2300?0.3:e>1900?0.14:0.03,t+0.8);
+ mix.wind.gain.linearRampToValueAtTime((e>2300?0.3:e>1900?0.14:0.03)*(0.55+0.9*windAmt()),t+0.8); /* louder as the wind on the map rises */
  mix.chatterLevel=(td<14&&!night?0.12*(1-td/14):td<14?0.04*(1-td/14):0)*crowd;
  mix.forest=night?0:Math.min(1,forest/n*2.2)*(skyNow()===3?0.2:1);}
 soundBtn.addEventListener('click',()=>{soundOn=!soundOn;soundBtn.setAttribute('aria-pressed',String(soundOn));soundBtn.textContent=U().sound[soundOn?1:0];if(soundOn)try{startSound();updateMix();rideSound(hero.riding?hero.riding.sprite:null);}catch(e){soundOn=false;soundBtn.textContent=U().sound[0];}else{clearTimeout(birdT);rideSound(null);ac&&ac.suspend();}});
@@ -2189,13 +2365,21 @@ const poke=()=>{lastInput=performance.now();};['pointerdown','pointermove','whee
    at all while the tab is hidden.
    ===================================================================== */
 let last=0,acc=0,skyAcc=0;
+/* Getting ready for the first zoom in: while the page sits idle after loading, the close-up pictures of the landmarks
+   and the figures are painted and the nine close-up chunks round the walker are built, one small piece a frame. The
+   first frame of the close-up view used to take several times as long as any other. */
+const warm=[...Object.keys(HSPR).map(nm=>()=>sprHi(nm)),()=>{for(const nm of ['pA','pB','fA','fB'])fig(nm,{b:'#2a3f8a',h:'#1b1b1b'});for(const nm of ['buffalo','moto','basket','stall0','stall1','stall2','stall3','mStay','mView'])fig(nm,{b:'#3a2a1a',h:'#1b1b1b',a:'#c2412b'});}];
+for(const d of [[0,0],[1,0],[0,1],[1,1],[-1,0],[0,-1],[-1,-1],[1,-1],[-1,1]])warm.push(()=>{const cx=Math.max(0,Math.min(Math.ceil(W/CH_HI)-1,Math.floor(hero.x/CH_HI)+d[0])),cy=Math.max(0,Math.min(Math.ceil(H/CH_HI)-1,Math.floor(hero.y/CH_HI)+d[1])),key=cx+','+cy;if(!chunksHi.has(key)){const c=buildChunkHi(cx,cy);c.born=-1e9;chunksHi.set(key,c);}});
 function loop(ts){requestAnimationFrame(loop);
  if(typeof document!=='undefined'&&document.hidden){last=ts;return;}
  const active=hero.moving||hero.path.length>0||hero.riding||drag||pinch||ts-lastInput<900;
  const raw=ts-last;if(!active&&raw<120)return;
+ if(!active&&warm.length&&ts>1500)warm.shift()();
  const dt=Math.min(active?50:160,raw||16);last=ts;acc+=dt;if(acc>100){acc=0;frame++;}gond=(gond+dt/50)%600;
- if(autoTime){const nh=hour+dt/7500;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);}
+ if(dayPlay>0||autoTime){const dh=dayPlay>0?Math.min(dayPlay,dt/1250):dt/7500,nh=hour+dh;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);
+  if(dayPlay>0){lastInput=ts;dayPlay-=dh;if(dayPlay<=0){dayPlay=1e-9;stopDay();}}}
  autoSkyT+=dt;if(autoSkyT>180000){autoSkyT=0;pickAutoSky();}
+ windT+=dt/1000;{const rn=skyNow()===3;wetness=wetness<0?(rn?1:0):Math.max(0,Math.min(1,wetness+(rn?dt/15000:-dt/80000)));} /* wet in a quarter of a minute of rain, dry again in a minute and a half */
  for(const c of clouds){c.x+=c.v*dt/16;if(c.x>W*T+c.r)c.x=-c.r;}
  {const s=skyNow();if(lastSkyR===3&&s!==3&&darkness(hour)===0){rainbowUntil=ts+RAINBOW_MS;const sn=sunAt(hour,month);if(sn.alt>0.03&&sn.alt<0.73)say(U().toast.rainbow);}lastSkyR=s;if(HASH.rainbow)rainbowUntil=performance.now()+RAINBOW_MS/2;}
  tick(dt);tickAmb(dt);tickFlocks(dt);tickShoppers(dt);render();

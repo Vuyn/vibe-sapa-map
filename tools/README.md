@@ -60,6 +60,14 @@ Views that show the effects tied to the clock and the calendar:
 | Fireflies | `m=6&h=21&z=32&at=515,270&sky=1` |
 | Umbrellas | `sky=3&z=32&at=406,199` |
 | Rivers in the rains | `m=7` against `m=3`, at `z=16&at=560,310` |
+| Wet roads and puddles | `sky=3&z=40&at=412,197` (a view opened with rain starts wet) |
+| Mist along the rivers | `h=6.2&m=4&z=14&at=520,285&sky=1` |
+| Snow on roofs and landmarks | `m=1&z=40&at=232,286` |
+| Rice drying in the yards, tall straw stacks | `m=10&z=48&at=600,297` |
+| Ducks in the paddies | `m=5&h=10&z=48&at=43,418` |
+| A visitor at a viewpoint | `h=10&z=48&at=396,213&sky=1` |
+| Porters on the Fansipan trail | `h=10&z=48&at=225,224` |
+| Landmark windows lit | `h=20.5&z=40&at=407,200` |
 
 Run `check-worker.js` after every change to drawing code: the logic test never calls `render`, so an error there shows only in a real browser, and `shot.ps1` cannot report page errors. Opening the page with any setting skips the welcome box. The first frames build terrain a few chunks at a time, so the tool waits 15 seconds of page time by default (`-Budget`). Headless page time runs ahead of a background worker, so `shot.ps1` adds `worker=0` to every view.
 
@@ -158,6 +166,14 @@ The slopes are not shaded in the terrain tiles. A separate light layer, one pixe
 - **Children at play:** forty games of three children in village yards (a ball, a chase, a skipping rope), all day at the weekend and at midday and after school on school days, not in rain (`PLAYS`, `playOn`).
 - **Market stalls** come in four kinds by what is on the table: greens, fruit, indigo cloth and brocade, a charcoal grill.
 - **Sky strip:** stars and the moon in its phase at night.
+- **Wind:** one strength that rises and falls (`windAmt`) and gusts that cross the map as bands from the north-west. Where a gust passes, light runs over fields and tree tops, the indigo cloth and the washing swing, the flag on Fansipan streams, and kitchen smoke leans. Cloth and flag are drawn each frame for that reason; only their posts are in the painted land (`yardLine`).
+- **Rain on the ground:** `wetness` rises to 1 in a quarter of a minute of rain and falls away in a minute and a half after it. Roads darken, puddles lie on lanes, squares and bare ground and shrink as it dries.
+- **Mist along the rivers** from 4:30 to 8:30, a soft band either side of all water (`mistMask`), not in rain.
+- **Winter:** in January and February, yards, gardens and bare ground above the snow line are white, houses there have snow on the roof, and landmarks get a white cap on everything that faces the sky (`sprHi(name, true)`).
+- **Harvest in the yards:** in September and October rice dries on mats in village yards; from October to January the straw stacks are taller and more numerous (`hayLimit`). On October afternoons stubble burns in some fields (`BURNS`).
+- **Ducks** paddle on the flooded terraces in May (`DUCKS`); **butterflies** fly over grass and gardens from May to September, close-up only.
+- **People with a job:** one town walker in five carries a shoulder pole; three parties of porters climb the Fansipan trail in the morning and come down in the afternoon (`porterAt`); one or two visitors stand at each viewpoint, the pass and the glass bridge by day in dry weather, and now and then one takes a picture (`LOOKS`).
+- **A day in half a minute:** the button under the time slider runs the clock through 24 hours in 30 seconds and then puts it back as it was set (`dayPlay`). Bells and roosters are silent meanwhile.
 - **Sounds by the clock:** roosters at first light near villages, the church bell on the hour within earshot (three strokes at 6, 12 and 18), the monastery bell at dusk, rain, frogs on summer nights.
 
 All of these are worked out from the clock, not stored, so a shared link shows the same scene. `clockFigures()` lists every such figure for the test, which checks at each quarter hour of four weekdays that none stands on water.
@@ -181,6 +197,8 @@ node --experimental-websocket perf.js ..\index.html
 
 On 2026-11-13 the slowest frame in each action fell from 36-136 ms to 3-18 ms (headless Edge, software drawing). After the soft borders were added the same day it was 3-27 ms: the two highest are single frames, the first one in the close-up tier and the one after a change of month. Run it again after changes to drawing or to anything that runs every frame.
 
+On 2026-11-14, with wind, rain traces and the other things drawn each frame added, the figures were 4-8 ms for panning and walking, 13-24 ms for zooming and a change of month, and one frame of 20-40 ms the first time the close-up tier is entered. While the page is idle after loading it now gets the close-up pictures and the chunks round the walker ready (`warm`).
+
 To look for code that is no longer used, the parser bundled with Node is enough: parse the page script, list every declared name and count the places it is read. That check found nothing unread on 2026-11-13.
 
 ## Soft borders
@@ -196,11 +214,16 @@ The land is stored one kind a tile, but it is not drawn as squares. Added on 202
 - **Houses off the grid.** `houseBox` moves each house a little in its quarter and varies the width of the small ones; three in ten show a gable end; some village yards have a fence.
 - **The 8-pixel art** has the same idea at its own size: along every side one art pixel in three belongs to the ground across it.
 - **The far view** (`miniImage`) has four pixels a tile, and two in five on open ground take the colour of the ground beside them. `miniSmall` is the same picture at one pixel a tile for the overview.
-- **No popping.** A chunk that has just been painted fades in over the coarser picture for a fifth of a second (`show` in `render`), which also softens the change from one zoom tier to the next.
+- **No popping.** A chunk that has just been painted fades in over the coarser picture for a fifth of a second (`show` in `render`), and on a change of zoom tier, in either direction, what was painted for the tier just left fades out over the new one (`tierPrev`).
+- **The 8-pixel art has softened outlines too:** lanes and water go through `smoothCells` at two pixels a cell.
+
+## The palette
+
+Every solid colour on the map is snapped to a palette of about 150 colours built from fifteen ramps (`RAMPS`: leaf, pine, olive, timber, gold, earth, stone, slate, water, brick, ember, rose, indigo, teal, ice, cream). A ramp runs from dark to light and its hue turns on the way, cool at the dark end and warm at the light end. Colours in the code are still written as hex; `pal` and `palRGB` replace each with the nearest palette colour the first time it is used (in the chunk painter, the far view, sprites, figures and landmark pictures), so nothing is paid while drawing. See-through overlays (shadows, glows, fog) are not snapped. To change the look of the whole map, change a ramp; if two ramps lie too close, a surface flips between them as its tone drifts, which is why leaf is aligned with the grass colour and olive kept away from it.
 
 ## The close-up tier
 
-Up to 22 screen pixels a tile the map is drawn from 8-pixel tiles (`drawTile`, chunks of 16 tiles). From there to the top zoom of 48 it is drawn again at three times the detail, 24 pixels a tile (`drawTileHi`, `chunksHi`, chunks of 8 tiles): houses with roofs, doors and windows, tree crowns, firs above 2,000 m, terrace edges with the month's crop, kerbs, bridges, washing lines, and lengths of indigo cloth drying in the yards round Cát Cát. A frame paints new chunks for at most 6 ms and shows the coarser picture underneath until the fine one is ready. Nothing new is stored: the close-up art reads the same per-tile arrays.
+Up to 22 screen pixels a tile the map is drawn from 8-pixel tiles (`drawTile`, chunks of 16 tiles). From there to the top zoom of 48 it is drawn again at three times the detail, 24 pixels a tile (`drawTileHi`, `chunksHi`, chunks of 4 tiles): houses with roofs, doors and windows, tree crowns, firs above 2,000 m, terrace edges with the month's crop, kerbs, bridges, washing lines, and lengths of indigo cloth drying in the yards round Cát Cát. A frame paints new chunks for at most 6 ms and shows the coarser picture underneath until the fine one is ready. Nothing new is stored: the close-up art reads the same per-tile arrays.
 
 - **How the art is kept easy on the eye** (both tiers where it applies): ground kinds run into each other along soft borders (next section); everything that stands up throws a small cool shadow down and to the right, because the map's light comes from the upper left; crops are a quiet weave of strokes a shade off the ground rather than a grid of dark dots; trees differ a little in place, size and tone.
 
