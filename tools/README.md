@@ -168,7 +168,7 @@ The page used to stop for 60 to 140 ms at a time: every second and a half while 
 
 - **Chunks** are painted by `painter`, a plain pixel buffer that answers to `fillStyle` and `fillRect` like a canvas and is copied to the chunk's canvas in one go. Tile art must therefore use only those two, on whole pixels, with colours as `#rrggbb`, `rgb()` or `rgba()`.
 - **The light** is worked out in a worker (see above).
-- **The overview picture** is redone a few rows a frame after a change of month, and the old one stays up until the new one is whole.
+- **The far-view picture** is redone a few rows a frame after a change of month, and the old one stays up until the new one is whole.
 - **Route finding** keeps its working arrays between searches and uses a heap in two flat arrays.
 - **Points along a line** (`polyAt`) use a running length kept with the line.
 - **Fog masks** are written a whole pixel at a time; small sprites are stamped from a cached canvas.
@@ -179,16 +179,33 @@ The page used to stop for 60 to 140 ms at a time: every second and a half while 
 node --experimental-websocket perf.js ..\index.html
 ```
 
-On 2026-11-13 the slowest frame in each action fell from 36-136 ms to 3-18 ms (headless Edge, software drawing). Run it again after changes to drawing or to anything that runs every frame.
+On 2026-11-13 the slowest frame in each action fell from 36-136 ms to 3-18 ms (headless Edge, software drawing). After the soft borders were added the same day it was 3-27 ms: the two highest are single frames, the first one in the close-up tier and the one after a change of month. Run it again after changes to drawing or to anything that runs every frame.
+
+To look for code that is no longer used, the parser bundled with Node is enough: parse the page script, list every declared name and count the places it is read. That check found nothing unread on 2026-11-13.
+
+## Soft borders
+
+The land is stored one kind a tile, but it is not drawn as squares. Added on 2026-11-13, when the map still looked "stiff" where regions met.
+
+- **One source for ground colour.** `groundCol(x, y, hi)` gives the plain colour of a tile of open ground and null for anything with a hard edge (water, roads) or no single colour (fields). The colour drifts in small steps over a few hundred metres and cools with height (`groundTone`), so a meadow or a forest is not one flat green. It is kept per tile until the month changes.
+- **Wobbling borders, close-up.** Each side of a tile has a reach (`edgeReach`): how far the ground on one side runs over it, pixel by pixel, from +4 to -4. Both tiles work the reach out from the same numbers and each paints only its own pixels, so the border wobbles and runs on unbroken from tile to tile. Fields are reached into but never reach out, and get a bank drawn along the border.
+- **What strays over a border:** bushes out from a forest, stones down from rock, trodden earth round a village.
+- **Trees across an edge.** `R`, the rectangle call of the close-up art, cuts everything to the tile. A tree on a forest edge, or on the line between two forest tiles, is drawn by both tiles from the same numbers and each gets its half. That is the rule for anything that crosses a tile line: never paint outside your tile; draw the same thing from both sides.
+- **Softened outlines.** `smoothCells` turns a 4 x 4 cell pattern (lanes, water) into 24 x 24 pixels with a few pixels cut from every corner that sticks out and filled into every corner that cuts in. Lanes get a kerb all along the result; water gets shallows, a shaded northern shore, and a wet bank with gravel and reeds.
+- **Fields under rivers and roads.** A water tile, or a tile that is all road with a lane drawn on it, shows the ground beside it round the water or the lane (`nearGround`); where that ground is a field the terrace steps run right through.
+- **Houses off the grid.** `houseBox` moves each house a little in its quarter and varies the width of the small ones; three in ten show a gable end; some village yards have a fence.
+- **The 8-pixel art** has the same idea at its own size: along every side one art pixel in three belongs to the ground across it.
+- **The far view** (`miniImage`) has four pixels a tile, and two in five on open ground take the colour of the ground beside them. `miniSmall` is the same picture at one pixel a tile for the overview.
+- **No popping.** A chunk that has just been painted fades in over the coarser picture for a fifth of a second (`show` in `render`), which also softens the change from one zoom tier to the next.
 
 ## The close-up tier
 
 Up to 22 screen pixels a tile the map is drawn from 8-pixel tiles (`drawTile`, chunks of 16 tiles). From there to the top zoom of 48 it is drawn again at three times the detail, 24 pixels a tile (`drawTileHi`, `chunksHi`, chunks of 8 tiles): houses with roofs, doors and windows, tree crowns, firs above 2,000 m, terrace edges with the month's crop, kerbs, bridges, washing lines, and lengths of indigo cloth drying in the yards round Cát Cát. A frame paints new chunks for at most 6 ms and shows the coarser picture underneath until the fine one is ready. Nothing new is stored: the close-up art reads the same per-tile arrays.
 
-- **How the art is kept easy on the eye** (both tiers where it applies): where two sides of a tile meet the same other ground, the corner is rounded off in that colour (`groundCol`), so forest edges and clearings do not break into squares; everything that stands up throws a small cool shadow down and to the right, because the map's light comes from the upper left; crops are a quiet weave of strokes a shade off the ground rather than a grid of dark dots; trees differ a little in place, size and tone.
+- **How the art is kept easy on the eye** (both tiers where it applies): ground kinds run into each other along soft borders (next section); everything that stands up throws a small cool shadow down and to the right, because the map's light comes from the upper left; crops are a quiet weave of strokes a shade off the ground rather than a grid of dark dots; trees differ a little in place, size and tone.
 
 - **Figures** in close-up come from `FIG`, rows of small pixels, coloured through `fig(name, cols)` and stamped with `putFig`. The homestay, viewpoint, peak and power-plant signs have `FIG` versions too.
-- **Landmarks** each have a picture drawn for the close-up, three times the pixels of the small sprite (`HSPR`, built from rectangles with the small kit in `hiKit`). Cát Cát and Bản Hồ have one of their own up close (`SP_HI`): a house with a water wheel, a Tày house on posts. A sprite with no entry in `HSPR` falls back to the small one smoothed by the Scale3x rule.
+- **Landmarks** each have a picture drawn for the close-up, three times the pixels of the small sprite (`HSPR`, built from rectangles with the small kit in `hiKit`). Cát Cát and Bản Hồ have one of their own up close (`SP_HI`): a house with a water wheel, a Tày house on posts. Every sprite needs an entry in `HSPR`.
 - **Layers that hold one value a tile** (sun and shadow, frost, fog, the sea of clouds) are drawn with smoothing in close-up, where a tile would otherwise show as a square of 22 to 48 pixels. Night glows are cut from pixels a third the size (`pixelDisc`).
 - **Windows at night** use `houseBox` and `hiWins`, the same functions the close-up house art uses, so a lit window sits on a drawn window.
 

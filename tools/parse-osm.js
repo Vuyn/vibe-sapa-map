@@ -24,7 +24,7 @@ if(list)for(const p of pts)console.log(p.cat.padEnd(16),String(p.lat).padEnd(10)
 function dp(points,eps){if(points.length<3)return points;let maxD=0,idx=0;const [ax,ay]=points[0],[bx,by]=points[points.length-1];const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;
  for(let i=1;i<points.length-1;i++){const [px,py]=points[i];let t=l2?((px-ax)*dx+(py-ay)*dy)/l2:0;t=Math.max(0,Math.min(1,t));const d=Math.hypot(px-(ax+t*dx),py-(ay+t*dy));if(d>maxD){maxD=d;idx=i;}}
  if(maxD>eps){const l=dp(points.slice(0,idx+1),eps),r=dp(points.slice(idx),eps);return l.slice(0,-1).concat(r);}return[points[0],points[points.length-1]];}
-const roads=[],rivers=[],waters=[],streets=[],rail=[],cable=[];const counts={};
+const roads=[],rivers=[],streets=[],rail=[],cable=[];const counts={};
 for(const w of ways){const t=w.tags||{};const ps=w.nodes.map(id=>nodes.get(id)).filter(Boolean);if(ps.length<2)continue;
  const line=ps.map(p=>[toX(p.lon),toY(p.lat)]);const len=line.reduce((s,p,i)=>i?s+Math.hypot(p[0]-line[i-1][0],p[1]-line[i-1][1]):0,0);
  const key=t.highway?'highway:'+t.highway:t.waterway?'waterway:'+t.waterway:t.railway?'railway:'+t.railway:t.aerialway?'aerialway:'+t.aerialway:t.natural==='water'?'water':'other';counts[key]=(counts[key]||0)+1;
