@@ -68,6 +68,10 @@ Views that show the effects tied to the clock and the calendar:
 | A visitor at a viewpoint | `h=10&z=48&at=396,213&sky=1` |
 | Porters on the Fansipan trail | `h=10&z=48&at=225,224` |
 | Landmark windows lit | `h=20.5&z=40&at=407,200` |
+| Golden hour, blue hour | `h=17.9&m=9&z=8&at=470,250&sky=1`, then `h=18.9` |
+| Stars and the Milky Way | `h=23&m=9&z=6&at=560,330&sky=1` |
+| Rain rings on the lake | `sky=3&m=7&z=24&at=418,193` |
+| The wheel at Cát Cát, the church bell | `z=40&at=386,221`, `z=48&at=407,199` |
 
 Run `check-worker.js` after every change to drawing code: the logic test never calls `render`, so an error there shows only in a real browser, and `shot.ps1` cannot report page errors. Opening the page with any setting skips the welcome box. The first frames build terrain a few chunks at a time, so the tool waits 15 seconds of page time by default (`-Budget`). Headless page time runs ahead of a background worker, so `shot.ps1` adds `worker=0` to every view.
 
@@ -166,7 +170,14 @@ The slopes are not shaded in the terrain tiles. A separate light layer, one pixe
 - **Children at play:** forty games of three children in village yards (a ball, a chase, a skipping rope), all day at the weekend and at midday and after school on school days, not in rain (`PLAYS`, `playOn`).
 - **Market stalls** come in four kinds by what is on the table: greens, fruit, indigo cloth and brocade, a charcoal grill.
 - **Sky strip:** stars and the moon in its phase at night.
-- **Wind:** one strength that rises and falls (`windAmt`) and gusts that cross the map as bands from the north-west at about four tiles a second. The gust is drawn at every zoom as a wave of lighter ground over fields, grass and forest (cells of half a tile close up, several tiles far out), with bright strokes streaming inside it from middle zoom up. The first version drew only a few faint pixels and only above the default zoom, and nobody could see it: check anything that is meant to move by comparing the canvas at two moments, not by looking at one screenshot. Where a gust passes, the indigo cloth and the washing swing, the flag on Fansipan streams, and kitchen smoke leans. Cloth and flag are drawn each frame for that reason; only their posts are in the painted land (`yardLine`).
+- **Wind:** one strength that rises and falls (`windAmt`) and gusts that cross the map as bands from the north-west at about four tiles a second. The gust is drawn at every zoom as a wave of lighter ground over fields, grass and forest (cells of about sixteen screen pixels at any zoom), with bright strokes streaming inside it from middle zoom up. The first version drew only a few faint pixels and only above the default zoom, and nobody could see it: check anything that is meant to move by comparing the canvas at two moments, not by looking at one screenshot. Where a gust passes, the indigo cloth and the washing swing, the flag on Fansipan streams, and kitchen smoke leans. Cloth and flag are drawn each frame for that reason; only their posts are in the painted land (`yardLine`).
+- **A gust must not look like a sunbeam.** Seen from far out, a straight bright bar crossing the map read as a ray of light. The wave is therefore fainter the further out the view is (`al` in `render`), a pale green instead of yellow, and broken into soft patches by `GUSTY`, a coarse map of where the air is moving at all, read between its four nearest values (`gusty`).
+- **Trees lean** in the gust, close-up only: each forest, park and orchard tile the gust is on is drawn again one or two pixels downwind from the chunk it was painted in, before the light goes over the land.
+- **Water:** in a gust open water darkens a shade and short bright ripples run across it; in rain every drop leaves a ring that widens and fades.
+- **Working landmarks:** the water wheel at Cát Cát turns (faster from June to August) and the bell in the church tower swings for a few seconds when the hour strikes (`bellUntil`). Both are drawn each frame in the close-up and are left out of the painted picture.
+- **Golden hour and blue hour** come from the height of the sun, morning and evening: a warm wash while it is within a few degrees above the horizon, a clear blue while it is a few degrees below.
+- **Lightning:** in rain from May to September a soft double flash every ten to twenty seconds and thunder a second or two behind it (`boltNext`, `thunder`). There is no flash when the system asks for reduced motion.
+- **Stars:** on a clear night one picture of some four hundred stars and the Milky Way is laid over the view (`starField`), fainter the nearer the middle of the view is to the town, with a few stars twinkling.
 - **Rain on the ground:** `wetness` rises to 1 in a quarter of a minute of rain and falls away in a minute and a half after it. Roads darken, puddles lie on lanes, squares and bare ground and shrink as it dries.
 - **Mist along the rivers** from 4:30 to 8:30, a soft band either side of all water (`mistMask`), not in rain.
 - **Winter:** in January and February, yards, gardens and bare ground above the snow line are white, houses there have snow on the roof, and landmarks get a white cap on everything that faces the sky (`sprHi(name, true)`).

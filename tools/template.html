@@ -951,8 +951,7 @@ const HSPR={
  /* Cát Cát: a Hmong house by the stream and the water wheel beside it */
  mill(r,K){K.sh(1,22,14);K.rf(0,5,15,7,'#4a3a2c');for(let x=3;x<13;x+=3)r(x,7,1,4,'#3a2c20');K.wl(1,12,13,10,'#8a6238');for(let x=3;x<14;x+=3)r(x,13,1,9,'#6d4a2a');r(5,15,3,7,'#2c2018');r(10,15,2,3,'#2c2018');
   r(14,20,10,4,'#3a7bd5');r(15,20,4,1,'#dcecff');r(20,22,3,1,'#8fc3ff');
-  const cx=19,cy=14;for(let a=0;a<32;a++){const an=a/32*6.283;r(Math.round(cx+Math.cos(an)*5),Math.round(cy+Math.sin(an)*5),1,1,a%4?'#6d4a2a':'#b59a72');}
-  r(cx-4,cy,9,1,'#8a6238');r(cx,cy-4,1,9,'#8a6238');for(let k=1;k<4;k++){r(cx-k,cy-k,1,1,'#8a6238');r(cx+k,cy+k,1,1,'#8a6238');r(cx+k,cy-k,1,1,'#8a6238');r(cx-k,cy+k,1,1,'#8a6238');}r(cx-1,cy-1,3,3,'#3a2a1a');r(cx,cy+5,1,6,'#5a4028');},
+  r(19,19,1,6,'#5a4028');}, /* the post of the wheel; the wheel itself is drawn every frame, turning (see render) */
 };
 /* two places have a picture of their own up close */
 const SP_HI={catcat:'mill',banho:'stilt'};
@@ -1738,15 +1737,30 @@ function busAt(i,h){const b=BUSES[i];if(h<b.a||h>b.b+BUS_RUN)return null;
    Fansipan streams and smoke leans. All of it is drawn over the painted land each frame, only for the tiles in view. */
 let windT=0,wetness=-1; /* seconds of wind so far; how wet the ground is, 0 to 1 (set from the sky on the first frame) */
 const windAmt=()=>Math.max(0,Math.min(1,0.45+0.3*Math.sin(windT/7.3)+0.25*Math.sin(windT/2.9+1.7)));
-const GUST_LUT=new Float32Array(2048),VEG=new Uint8Array(KINDS.length);for(const k of ['terrace','grass','forest','scrub','park','orchard','garden'])VEG[KI[k]]=1; /* the ground a gust shows on */
+const GUST_LUT=new Float32Array(2048),VEG=new Uint8Array(KINDS.length);for(const k of ['terrace','grass','forest','scrub','park','orchard','garden'])VEG[KI[k]]=1;VEG[KI.water]=2; /* what a gust shows on: 1 growing things, 2 open water */
+/* where on the map the air is moving at all: a coarse patchwork, one value for every 8 x 8 tiles, most of it between 0 and 1 */
+const GUSTY_W=Math.ceil(W/8)+1,GUSTY_H=Math.ceil(H/8)+1,GUSTY=new Float32Array(GUSTY_W*GUSTY_H);for(let q=0;q<GUSTY.length;q++){const v=nz((q%GUSTY_W)/2.1+3,((q/GUSTY_W)|0)/2.1+7);GUSTY[q]=v<0.3?0:Math.min(1,(v-0.3)*2.4);}
+/* read between its four nearest values, so the patches have soft edges and never show as squares */
+const gusty=(x,y)=>{const fx=x/8,fy=y/8,ix=Math.min(GUSTY_W-2,fx|0),iy=Math.min(GUSTY_H-2,fy|0),a=fx-ix,b=fy-iy,j=iy*GUSTY_W+ix;return(GUSTY[j]*(1-a)+GUSTY[j+1]*a)*(1-b)+(GUSTY[j+GUSTY_W]*(1-a)+GUSTY[j+GUSTY_W+1]*a)*b;};
 const CLOTHC=['#22306e','#2c3f8c','#161f4a'].map(pal),WASHC=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'].map(pal),FLYC=['#f4f4f0','#f1c232','#e07b2a','#b9dcff'].map(pal),FLAGC=['#c2412b','#e06a52','#f1c232'].map(pal);
-const FAN=byId('fansipan');
+const FAN=byId('fansipan'),CHURCH=byId('church'),WHEELC=['#6d4a2a','#b59a72','#8a6238','#3a2a1a','#dcecff'].map(pal),BELLC=['#c9a227','#e9cd6a','#3a2a1a'].map(pal);
+let bellUntil=0; /* the church bell swings until then (set on the hour) */
 /* mist over the rivers at dawn: a soft band one or two tiles either side of all water, gone by half past eight */
 let mistC=null;
 function mistMask(){if(mistC)return mistC;mistC=mkCanvas(W,H);const acc=new Uint8Array(W*H);
  for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const j=yy*W+xx,a=acc[j]+(dx||dy?(Math.abs(dx)+Math.abs(dy)>2?12:28):64);acc[j]=a>180?180:a;}}
  const g=mistC.getContext('2d'),img=g.createImageData(W,H),u=new Uint32Array(img.data.buffer);for(let i=0;i<W*H;i++)if(acc[i])u[i]=((acc[i]<<24)|0xF8F4F0)>>>0;g.putImageData(img,0,0);return mistC;}
 const mistAmt=h=>skyNow()===3||h<4.5||h>=8.5?0:Math.min(1,h-4.5,(8.5-h)/1.5);
+/* the night sky as one picture: some four hundred stars, a few of them large, and the Milky Way as a haze of faint
+   points along a band from the lower left to the upper right. Painted once, the first clear night. */
+let starC=null;
+function starField(){if(starC)return starC;const w=1024,h=640;starC=mkCanvas(w,h);const g=starC.getContext('2d');let sd=7;const r=()=>{sd=(sd*1103515245+12345)&0x7fffffff;return sd/0x7fffffff;};
+ for(let q=0;q<2600;q++){const t=r(),off=(r()+r()+r()-1.5)*0.16,x=t*w,y=h*(0.86-0.72*t)+off*h;if(y<0||y>=h)continue;g.fillStyle='rgba(205,215,255,'+(0.1+0.25*r()*(1-Math.min(1,Math.abs(off)*5))).toFixed(2)+')';g.fillRect(x|0,y|0,r()<0.12?2:1,1);}
+ for(let q=0;q<420;q++){const b=r(),big=b>0.93?2:1;g.fillStyle='rgba(255,'+((235+20*r())|0)+','+((205+50*r())|0)+','+(0.35+0.6*b).toFixed(2)+')';g.fillRect((r()*w)|0,(r()*h)|0,big,big);}
+ return starC;}
+/* lightning: in a summer storm (rain, May to September) a flash every ten or twenty seconds, and thunder a second or
+   two behind it. No flash for people who have asked their system for less motion. */
+let boltNext=0,flashT0=-1e9;const CALM=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* ducks on the flooded terraces in May, a few to a paddy; and in October, late in the day, stubble burning in some fields */
 const DUCKS=[],BURNS=[];for(let i=0;i<70;i++){const sp=fieldSpot();if(!sp||kind[sp[1]*W+sp[0]]!==KI.terrace)continue;if(i%7<4)DUCKS.push({x:sp[0]+0.5,y:sp[1]+0.5,n:3+Math.floor(rnd()*3),ph:rnd()*6.283});else BURNS.push({x:sp[0]+0.5,y:sp[1]+0.5,ph:Math.floor(rnd()*40)});}
 const ducksOut=()=>month===5&&hour>=6&&hour<18.5,burning=()=>month===10&&hour>=13.5&&hour<18&&skyNow()!==3;
@@ -1869,6 +1883,12 @@ function render(){
  const c0x=Math.max(0,Math.floor(vx0/(CH_T*T))),c1x=Math.min(CHW-1,Math.floor(vx1/(CH_T*T))),c0y=Math.max(0,Math.floor(vy0/(CH_T*T))),c1y=Math.min(CHH-1,Math.floor(vy1/(CH_T*T)));
  /* zoomed out, tile detail is smaller than a screen pixel and turns to noise: draw one flat colour per tile instead */
  const ppt=pxPerTile(),lowZoom=ppt<6;hiTier=ppt>=HI_PPT;
+ /* A gust is a band that crosses the map from the north-west at about four tiles a second. Its strength across the
+    band is worked out once a frame into a table; gust(x,y) reads it for any tile in view and thins it by a slow
+    patchwork (GUSTY), so a gust comes as broken patches of moving air and not as one straight bar. */
+ const wnd=windAmt(),tsec=windT,gtx0=Math.max(0,Math.floor(vx0/T)),gtx1=Math.min(W,Math.ceil(vx1/T)),gty0=Math.max(0,Math.floor(vy0/T)),gty1=Math.min(H,Math.ceil(vy1/T)),gp0=gtx0*0.176+gty0*0.132,gl=GUST_LUT,gn=Math.min(gl.length,Math.ceil(((gtx1-gtx0)*0.176+(gty1-gty0)*0.132)*8)+3);
+ for(let q=0;q<gn;q++){const p=gp0+q/8-tsec*0.9,v=Math.sin(p)+0.5*Math.sin(p*0.37+tsec*0.23);gl[q]=v>0.6?Math.min(1,(v-0.6)*2.2)*(0.55+0.45*wnd):0;}
+ const gust=(x,y)=>gl[Math.min(gn-1,Math.max(0,((x*0.176+y*0.132-gp0)*8)|0))]*gusty(x,y);
  /* Land is painted a few chunks a frame (no new chunk is started after 6 ms, or 3.5 ms for the heavier close-up ones). Until a chunk is ready the coarser picture stands in for it,
     and a chunk that has just been painted fades in over that picture for a fifth of a second, so neither new land
     nor a change of zoom level pops into place. */
@@ -1896,36 +1916,41 @@ function render(){
    else{const G=(tierPrev===2?CH_HI:CH_T)*T,map=tierPrev===2?chunksHi:chunks;for(let cy=Math.max(0,Math.floor(vy0/G));cy<=Math.floor(vy1/G);cy++)for(let cx=Math.max(0,Math.floor(vx0/G));cx<=Math.floor(vx1/G);cx++){const c=map.get(cx+','+cy);if(c)ctx.drawImage(c,cx*G,cy*G,G,G);}}
    ctx.globalAlpha=1;}}
  if(waiting)lastInput=now;
+ /* Trees lean in the gust: each forest, park and orchard tile the gust is on is drawn again a pixel or two downwind,
+    then back, from the chunk it was painted in. Close-up only, and before the light goes over the land. */
+ if(hiTier){const G=CH_HI*T;for(let cy=Math.floor(gty0/CH_HI);cy*CH_HI<gty1;cy++)for(let cx=Math.floor(gtx0/CH_HI);cx*CH_HI<gtx1;cx++){const c=chunksHi.get(cx+','+cy);if(!c||now-c.born<FADE)continue;
+   for(let dy=0;dy<CH_HI;dy++)for(let dx=0;dx<CH_HI;dx++){const x=cx*CH_HI+dx,y=cy*CH_HI+dy;if(x>=W||y>=H)continue;const k=kind[y*W+x];if(k!==KI.forest&&k!==KI.park&&k!==KI.orchard)continue;const g=gust(x,y);if(g<0.2)continue;
+    const off=Math.round(Math.sin(tsec*4.2+x*0.9+y*0.7)*(0.7+1.3*g));if(off)ctx.drawImage(c,dx*HT,dy*HT,HT,HT,x*T+off/HD,y*T,T,T);}}}
  /* the light of the hour on the slopes, and the shadows of the mountains */
  drawLight(ctx,T);
  ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c))){if(hiTier)ctx.fillRect(x*T+c*S,y*T+r*S+1,S,1/HD);/* close-up: a glint is a thin stroke, not a block */else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}}
   /* rapids flicker white */
   if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';if(hiTier){ctx.fillRect(x*T+c*S,y*T+r*S+1/HD,S*2/3,1/HD);ctx.fillRect(x*T+c*S+2/HD,y*T+r*S+1,S*2/3,1/HD);}else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
  /* ---- what moves over the land ---- */
- const wnd=windAmt(),tsec=windT;
  if(!lowZoom&&wetness>0.03){/* after rain the roads are dark with wet */ctx.fillStyle='rgba(18,28,64,'+(0.24*wetness).toFixed(3)+')';
   for(let i=0;i<stTiles.length;i+=2){const x=stTiles[i],y=stTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const m=stMask[y*W+x];if(m===0xFFFF){ctx.fillRect(x*T,y*T,T,T);continue;}for(let r=0;r<4;r++){const row=(m>>(r*4))&15;if(row===15)ctx.fillRect(x*T,y*T+r*S,T,S);else if(row)for(let q=0;q<4;q++)if(row&(1<<q))ctx.fillRect(x*T+q*S,y*T+r*S,S,S);}}}
- /* A gust is a band that crosses the map from the north-west at about four tiles a second. Its strength across the
-    band is worked out once a frame into a table; gust(x,y) reads it for any tile in view. */
- const gtx0=Math.max(0,Math.floor(vx0/T)),gtx1=Math.min(W,Math.ceil(vx1/T)),gty0=Math.max(0,Math.floor(vy0/T)),gty1=Math.min(H,Math.ceil(vy1/T)),gp0=gtx0*0.176+gty0*0.132,gl=GUST_LUT,gn=Math.min(gl.length,Math.ceil(((gtx1-gtx0)*0.176+(gty1-gty0)*0.132)*8)+3);
- for(let q=0;q<gn;q++){const p=gp0+q/8-tsec*0.9,v=Math.sin(p)+0.5*Math.sin(p*0.37+tsec*0.23);gl[q]=v>0.6?Math.min(1,(v-0.6)*2.2)*(0.55+0.45*wnd):0;}
- const gust=(x,y)=>gl[Math.min(gn-1,Math.max(0,((x*0.176+y*0.132-gp0)*8)|0))];
- /* The wave itself: where the gust is, fields, grass and tree tops catch the light, in two strengths. It is drawn at
-    every zoom, in cells of half a tile close up and of several tiles far out (never more than about forty thousand
-    cells a frame), as runs along each row, on whole screen pixels so that no seams show between the rows. */
- {const cs=ppt>=16?0.5:ppt>=7?1:ppt>=3.5?2:4,cx0=Math.floor(gtx0/cs),cx1=Math.ceil(gtx1/cs),cy0=Math.floor(gty0/cs),cy1=Math.ceil(gty1/cs),ox=cv.width/2-cam.x*s,oy=cv.height/2-cam.y*s,q=cs*T*s;
+ /* The wave itself: where the gust is, fields, grass and tree tops turn a shade lighter and open water a shade
+    darker, in two strengths, fainter the further out the view is (far out it must not read as a beam of light). It is drawn at
+    every zoom, in cells of about sixteen screen pixels (half a tile close up, eight tiles far out; never more than
+    about seventeen thousand a frame), as runs along each row, on whole screen pixels so that no seams show. */
+ {const cs=ppt>=22?0.5:ppt>=12?1:ppt>=7?2:ppt>=3.5?4:8,cx0=Math.floor(gtx0/cs),cx1=Math.ceil(gtx1/cs),cy0=Math.floor(gty0/cs),cy1=Math.ceil(gty1/cs),ox=cv.width/2-cam.x*s,oy=cv.height/2-cam.y*s,q=cs*T*s;
   ctx.setTransform(1,0,0,1,0,0);
-  const dpi=cs*0.176*8,last=gn-1;
+  const dpi=cs*0.176*8,last=gn-1,al=ppt>=16?0.13:ppt>=7?0.085:0.05,LAND=['','rgba(236,248,200,'+(al/2)+')','rgba(236,248,200,'+al+')'],LAKE=['','rgba(14,40,104,'+(al*0.6)+')','rgba(14,40,104,'+(al*1.2)+')'];
   for(let cy=cy0;cy<cy1;cy++){const row=Math.min(H-1,Math.floor(cy*cs))*W,y0=Math.round(oy+cy*q),y1=Math.round(oy+(cy+1)*q);let run=0,lv=0,pi=(cx0*cs*0.176+cy*cs*0.132-gp0)*8;
-   for(let cx=cx0;cx<=cx1;cx++,pi+=dpi){let l=0;if(cx<cx1&&VEG[kind[row+Math.min(W-1,Math.floor(cx*cs))]]){const g=gl[pi<0?0:pi>last?last:pi|0];l=g>0.5?2:g>0.1?1:0;}
-    if(l!==lv){if(lv){const x0=Math.round(ox+(cx-run)*q);ctx.fillStyle=lv===2?'rgba(255,250,200,0.17)':'rgba(255,250,200,0.08)';ctx.fillRect(x0,y0,Math.round(ox+cx*q)-x0,y1-y0);}lv=l;run=1;}else run++;}}
+   for(let cx=cx0;cx<=cx1;cx++,pi+=dpi){let l=0;if(cx<cx1){const tx=Math.min(W-1,Math.floor(cx*cs)),vk=VEG[kind[row+tx]];if(vk){let g=gl[pi<0?0:pi>last?last:pi|0];if(g>0.1)g*=gusty(cx*cs,cy*cs);l=g>0.5?2:g>0.1?1:0;if(l&&vk===2)l+=2;}} /* levels 3 and 4 are water */
+    if(l!==lv){if(lv){const x0=Math.round(ox+(cx-run)*q);ctx.fillStyle=lv>2?LAKE[lv-2]:LAND[lv];ctx.fillRect(x0,y0,Math.round(ox+cx*q)-x0,y1-y0);}lv=l;run=1;}else run++;}}
   setWorld();}
  if(ppt>=12){const tx0=gtx0,tx1=gtx1-1,ty0=gty0,ty1=gty1-1,u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
-  const dayNow=darkness(hour)<0.2,dry3=skyNow()!==3,fly=hiTier&&month>=5&&month<=9&&dayNow&&dry3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')';
+  const dayNow=darkness(hour)<0.2,dry3=skyNow()!==3,raining=!dry3,RINGC=['rgba(220,235,255,0.7)','rgba(220,235,255,0.45)','rgba(220,235,255,0.22)'],fly=hiTier&&month>=5&&month<=9&&dayNow&&dry3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')';
   for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){const i=y*W+x,k=kind[i],g=gust(x,y),X=x*T,Y=y*T;
    /* inside the wave, bright strokes stream across the crop and the leaves */
-   if(g>0.1&&VEG[k]){ctx.fillStyle=k===KI.forest?'rgba(215,245,180,0.5)':'rgba(255,255,230,0.6)';const h=hash(x+7,y+3);
+   if(g>0.1&&VEG[k]===1){ctx.fillStyle=k===KI.forest?'rgba(215,245,180,0.5)':'rgba(255,255,230,0.6)';const h=hash(x+7,y+3);
     for(let q=0,nq=hiTier?(g>0.5?6:3):2;q<nq;q++)ctx.fillRect(X+sn((h*97+q*2.3+tsec*9)%7),Y+sn((h*53+q*1.37)%7.6),hiTier?1:S,u);}
+   /* water: short bright ripples run before the gust, and every drop of rain leaves a ring that widens and fades */
+   if(k===KI.water||k===KI.bridge){const wm=wMask[i]||0xFFFF,h=hash(x+3,y+9);
+    if(g>0.1){ctx.fillStyle='rgba(205,228,255,0.55)';for(let q=0,nq=g>0.5?4:2;q<nq;q++){const a=(h*97+q*2.3+tsec*7)%8,b=(h*53+q*1.9)%8;if(wm&(1<<((b>>1)*4+(a>>1))))ctx.fillRect(X+sn(a),Y+sn(b),hiTier?1:S,u);}}
+    if(raining){const ph=(tsec*1.5+h*9)%2.4;if(ph<1){const cq=Math.floor(h*160)%16;if(wm&(1<<cq)){const r=0.4+ph*1.5,rx=X+(cq&3)*S+1,ry=Y+(cq>>2)*S+1;ctx.fillStyle=ph<0.34?RINGC[0]:ph<0.67?RINGC[1]:RINGC[2];
+       ctx.fillRect(sn(rx-r),sn(ry-r*0.6),2*r,u);ctx.fillRect(sn(rx-r),sn(ry+r*0.6),2*r,u);ctx.fillRect(sn(rx-r-u),sn(ry-r*0.6+u),u,r*1.2-u);ctx.fillRect(sn(rx+r),sn(ry-r*0.6+u),u,r*1.2-u);}}}}
    /* cloth on the rails and the washing lines: the lower half swings */
    if(hiTier&&(k===KI.village||k===KI.town)){let yv=yardC[i];if(yv===255){yardLine(x,y,0);yv=yardC[i];}
     if(yv)for(let qi=0;qi<4;qi++){const yl=(yv>>(qi*2))&3;if(!yl)continue;const a=(qi&1)*12,b=(qi>>1)*12;
@@ -1971,6 +1996,14 @@ function render(){
  if(hiTier&&seen(FAN.x*T,FAN.y*T,60)){const un=S/3,X=FAN.x*T,Y=FAN.y*T,amp=0.4+0.8*wnd;
   for(let c=0;c<8;c++){const dy=Math.round(Math.sin(tsec*7-c*0.9)*amp*c/7),fx=X+(28+c)*un,fy=Y+(2+dy)*un;ctx.fillStyle=FLAGC[0];ctx.fillRect(fx,fy,un,6*un);ctx.fillStyle=FLAGC[1];ctx.fillRect(fx,fy,un,un);
    if(c===3||c===4){ctx.fillStyle=FLAGC[2];ctx.fillRect(fx,fy+2*un,un,2*un);}}}
+ /* the water wheel at Cát Cát turns, faster when the stream is full, and throws a little water off at the bottom */
+ if(hiTier&&seen(CATCAT.x*T,CATCAT.y*T,60)){const un=S/3,X=CATCAT.x*T,Y=CATCAT.y*T,a0=tsec*(wetSeason()?2.3:1.4),P=(mx,my,col)=>{ctx.fillStyle=col;ctx.fillRect(X+mx*un,Y+my*un,un,un);};
+  for(let k=0;k<4;k++){const an=a0+k*0.7854,ca=Math.cos(an),sa=Math.sin(an);for(let r=-4;r<=4;r++)if(r)P(Math.round(19+ca*r),Math.round(14+sa*r),WHEELC[2]);}
+  for(let a=0;a<32;a++){const an=a/32*6.283;P(Math.round(19+Math.cos(an)*5),Math.round(14+Math.sin(an)*5),(a+Math.floor(a0*5.1))%4?WHEELC[0]:WHEELC[1]);}
+  ctx.fillStyle=WHEELC[3];ctx.fillRect(X+18*un,Y+13*un,3*un,3*un);P(16+frame%3,20-frame%2,WHEELC[4]);P(22-frame%2,21-(frame+1)%2,WHEELC[4]);}
+ /* the bell in the church tower: it hangs still, and swings for a few seconds when the hour strikes */
+ if(hiTier&&seen(CHURCH.x*T,CHURCH.y*T,60)){const un=S/3,X=CHURCH.x*T,Y=CHURCH.y*T,sw=performance.now()<bellUntil?Math.round(Math.sin(tsec*8)*1.2):0;
+  ctx.fillStyle=BELLC[0];ctx.fillRect(X+(7+sw)*un,Y+14*un,2*un,2*un);ctx.fillRect(X+(6+(sw>0?1:0))*un,Y+16*un,3*un,un);ctx.fillStyle=BELLC[1];ctx.fillRect(X+(7+sw)*un,Y+14*un,un,un);ctx.fillStyle=BELLC[2];ctx.fillRect(X+(7+(sw<0?1:0))*un,Y+17*un,un,un);}
  /* the way the walker is about to take, as a dotted line */
  if(hero.path.length&&!hero.riding){const st=lowZoom?Math.max(2,Math.round(3/s)):1,d=lowZoom?Math.max(2,Math.round(1.6/s)):2;for(const pass of [0,1]){ctx.fillStyle=pass?YOU_COL:'#1b1b1b';const e=pass?0:1;for(let i=(hero.path.length-1)%st;i<hero.path.length;i+=st){const p=hero.path[i];if(seen(p[0]*T,p[1]*T,T))ctx.fillRect(p[0]*T+T/2-d/2-e,p[1]*T+T/2-d/2-e,d+2*e,d+2*e);}}}
  /* the walker's footprints in snow and hoarfrost, fading */
@@ -2059,9 +2092,20 @@ function render(){
  if(!lowZoom&&dk<0.3&&sk0!==3){ctx.fillStyle='#1b1b1b';const flap=(frame>>1)%2;for(const f of flocks){if(!seen(f.x,f.y,80))continue;const l=Math.hypot(f.vx,f.vy),ux=f.vx/l,uy=f.vy/l;
    for(let k=0;k<f.n;k++){const row=Math.ceil(k/2),side=k%2?1:-1,bx=Math.round(f.x-ux*row*6-uy*side*row*5),by=Math.round(f.y-uy*row*6+ux*side*row*5),w=(flap+k)%2;if(hiTier){putFig(fig(w?'birdA':'birdB'),bx,by+0.5);continue;}ctx.fillRect(bx-2,by-w,1,1);ctx.fillRect(bx-1,by+w-1,1,1);ctx.fillRect(bx,by,1,1);ctx.fillRect(bx+1,by+w-1,1,1);ctx.fillRect(bx+2,by-w,1,1);}}}
  ctx.setTransform(1,0,0,1,0,0);
- const h=hour,sk=skyNow();if(h>16.5&&h<19.5){ctx.fillStyle='rgba(230,120,50,'+(0.18*(1-Math.abs(h-18)/1.5))+')';ctx.fillRect(0,0,cv.width,cv.height);}
+ /* Golden hour and blue hour, morning and evening, from the height of the sun: warm light while it stands within a
+    few degrees above the horizon, then a clear cool blue while it is a few degrees below, before the dark. */
+ const sk=skyNow();{const deg=sunAt(hour,month).alt*57.2958,gold=sk===3?0:Math.max(0,1-Math.abs(deg-5)/9)*(sk===2?0.5:1),blue=Math.max(0,1-Math.abs(deg+6)/7);
+  if(gold>0){ctx.fillStyle='rgba(255,166,70,'+(0.2*gold).toFixed(3)+')';ctx.fillRect(0,0,cv.width,cv.height);}
+  if(blue>0){ctx.fillStyle='rgba(44,76,170,'+(0.2*blue).toFixed(3)+')';ctx.fillRect(0,0,cv.width,cv.height);}}
  if(dk>0){ctx.fillStyle='rgba(12,18,52,'+dk+')';ctx.fillRect(0,0,cv.width,cv.height);}
+ /* On a clear night the stars come out over the land, the Milky Way among them: one picture laid over the whole view,
+    fainter the nearer the middle of the view is to the lights of the town, with a few of the bright ones twinkling. */
+ if(dk>0.4&&sk===1){const far=Math.max(lowZoom?0.6:0,Math.min(1,(townDist(Math.floor(cam.x/T),Math.floor(cam.y/T))-TOWN_R*0.7)/(TOWN_R*1.4))),sa=Math.min(1,(dk-0.4)/0.18)*far;
+  if(sa>0.02){const sf=starField(),k=Math.max(cv.width/sf.width,cv.height/sf.height),sx=(cv.width-sf.width*k)/2,sy=(cv.height-sf.height*k)/2;ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.75*sa;ctx.drawImage(sf,sx,sy,sf.width*k,sf.height*k);
+   ctx.fillStyle='#ffffff';for(let q=0;q<14;q++){if((frame+q*5)%9>2)continue;ctx.globalAlpha=0.5*sa;const px=Math.round(sx+hash(q,71)*sf.width*k),py=Math.round(sy+hash(q,113)*sf.height*k),d=Math.max(1,Math.round(k));ctx.fillRect(px-d,py,3*d,d);ctx.fillRect(px,py-d,d,3*d);}
+   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';}}
  const centerE=eAt(Math.floor(cam.x/T),Math.floor(cam.y/T));const snowing=sk===3&&winterSnow()&&centerE>1800;
+ {const fl2=now-flashT0;if(fl2<420&&!CALM){/* a soft double flash */ctx.fillStyle='rgba(222,232,255,'+(fl2<70?0.3:fl2<140?0.08:fl2<210?0.2:0.2*(1-(fl2-210)/210)).toFixed(3)+')';ctx.fillRect(0,0,cv.width,cv.height);lastInput=now;}}
  if(sk===3&&!snowing){ctx.fillStyle='rgba(40,60,90,.18)';ctx.fillRect(0,0,cv.width,cv.height);ctx.strokeStyle='rgba(200,225,255,.6)';ctx.lineWidth=1;ctx.beginPath();for(const r of rain){const x=((r[0]+frame*0.004)%1)*cv.width,y=((r[1]+frame*0.03)%1)*cv.height;ctx.moveTo(x,y);ctx.lineTo(x-3,y+12);}ctx.stroke();}
  /* a rainbow for a little while after the rain stops, when the sun is low enough to make one: blocky bands on the side
     of the view away from the sun */
@@ -2303,6 +2347,9 @@ function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioCon
    if(hour>5.3&&hour<7.5)wait*=0.45; /* the dawn chorus */}
   else if(night&&month>=4&&month<=10&&skyNow()!==3&&mix.village+mix.forest>0){const f=4100+Math.random()*500;for(let q=0;q<3;q++)note(f,f*1.01,t+q*0.055,0.03,0.012,pan,'square');wait=500+Math.random()*1400;}
   birdT=setTimeout(chirp,wait);};chirp();}
+/* thunder: a low rumble cut from the shared noise, a crack, a second swell, then two seconds of dying away */
+function thunder(delay){if(!soundOn||!ac||!noiseBuf)return;setTimeout(()=>{if(!soundOn)return;const t=ac.currentTime,src=ac.createBufferSource(),lp=ac.createBiquadFilter(),g=ac.createGain();src.buffer=noiseBuf;lp.type='lowpass';lp.frequency.setValueAtTime(280,t);lp.frequency.exponentialRampToValueAtTime(70,t+2.6);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.5,t+0.08);g.gain.exponentialRampToValueAtTime(0.16,t+0.5);g.gain.exponentialRampToValueAtTime(0.28,t+0.85);g.gain.exponentialRampToValueAtTime(0.0001,t+3.2);src.connect(lp).connect(g).connect(ac.destination);src.start(t,Math.random()*15,3.4);},delay);}
 /* called when a ride starts ('train' or 'gondola') and when it ends (null) */
 function rideSound(kind){if(!mix||!ac)return;mix.ride=soundOn?kind:null;const t=ac.currentTime;mix.hum.gain.cancelScheduledValues(t);mix.hum.gain.linearRampToValueAtTime(mix.ride==='gondola'?0.16:0,t+0.35);if(mix.ride!=='train'){mix.rattle.gain.cancelScheduledValues(t);mix.rattle.gain.linearRampToValueAtTime(0,t+0.1);}}
 /* samples the land around you on a 77 m lattice, so distances read in the same units at any tile size */
@@ -2390,9 +2437,10 @@ function loop(ts){requestAnimationFrame(loop);
  const raw=ts-last;if(!active&&raw<83)return; /* idle: twelve frames a second, enough to see the wind move */
  if(!active&&warm.length&&ts>1500)warm.shift()();
  const dt=Math.min(active?50:160,raw||16);last=ts;acc+=dt;if(acc>100){acc=0;frame++;}gond=(gond+dt/50)%600;
- if(dayPlay>0||autoTime){const dh=dayPlay>0?Math.min(dayPlay,dt/1250):dt/7500,nh=hour+dh;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);
+ if(dayPlay>0||autoTime){const dh=dayPlay>0?Math.min(dayPlay,dt/1250):dt/7500,nh=hour+dh;if(Math.floor(nh)!==Math.floor(hour)&&dayPlay<=0)bellUntil=performance.now()+3500;if(nh>=24){day=(day+1)%7;dayBtn.textContent=U().dayBtn+U().days[day];}hour=nh%24;hourEl.value=hour;hourOut.textContent=U().hourFmt(Math.round(hour*2)/2);
   if(dayPlay>0){lastInput=ts;dayPlay-=dh;if(dayPlay<=0){dayPlay=1e-9;stopDay();}}}
  autoSkyT+=dt;if(autoSkyT>180000){autoSkyT=0;pickAutoSky();}
+ if(skyNow()===3&&month>=5&&month<=9){if(!boltNext)boltNext=ts+4000+Math.random()*9000;else if(ts>boltNext){boltNext=ts+8000+Math.random()*15000;flashT0=performance.now();lastInput=ts;thunder(600+Math.random()*2200);}}else boltNext=0;
  windT+=dt/1000;{const rn=skyNow()===3;wetness=wetness<0?(rn?1:0):Math.max(0,Math.min(1,wetness+(rn?dt/15000:-dt/80000)));} /* wet in a quarter of a minute of rain, dry again in a minute and a half */
  for(const c of clouds){c.x+=c.v*dt/16;if(c.x>W*T+c.r)c.x=-c.r;}
  {const s=skyNow();if(lastSkyR===3&&s!==3&&darkness(hour)===0){rainbowUntil=ts+RAINBOW_MS;const sn=sunAt(hour,month);if(sn.alt>0.03&&sn.alt<0.73)say(U().toast.rainbow);}lastSkyR=s;if(HASH.rainbow)rainbowUntil=performance.now()+RAINBOW_MS/2;}
