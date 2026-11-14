@@ -548,10 +548,14 @@ function buildTerrain(U,P,HP){
     if(lcGrid[jj]!==1||stMask[jj]||lakeT[jj]||riverT[jj]||elev[jj]>r+10||ref[jj]>=r)continue;ref[jj]=r;satOK[jj]=1;q.push(jj);}}}
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
   const i=y*W+x,e=elev[i],v=hash(x,y),sl=slopeAt(x,y),td=townDist(x,y),cx=x+.5,cy=y+.5,cv0=cover[i],lc=lcGrid[i];let k,gen=0;
-  const inSquare=Math.abs(cx-SQUARE.x)<2.6*K&&Math.abs(cy-SQUARE.y)<1.6*K;
+  /* The town square, the bus yard and the ground of the market have no outline in OpenStreetMap (a point each; only the
+     two market halls are drawn there), so each is a rounded patch with an uneven edge round its point, about as large as
+     the box it used to be. */
+  const patch=(px,py,rx,ry,seed)=>{const dx=(cx-px)/rx,dy=(cy-py)/ry;return dx*dx+dy*dy<1+(nz(x/2.3+seed,y/2.3+seed*1.7)-0.5)*0.7;};
+  const inSquare=patch(SQUARE.x,SQUARE.y,3*K,1.9*K,5);
   if(lakeT[i]||riverT[i])k=(stMask[i]||(trailF[i]&&riverT[i]))?'bridge':'water';
-  else if(Math.abs(cx-mk.x-mk.w/2)<2*K&&Math.abs(cy-mk.y-mk.w/2)<1.6*K)k='market';
-  else if(Math.abs(cx-bs.x-bs.w/2)<1.6*K&&Math.abs(cy-bs.y-bs.w/2)<1.6*K)k='busyard';
+  else if(patch(mk.x+mk.w/2,mk.y+mk.w/2,2.3*K,1.9*K,11))k='market';
+  else if(patch(bs.x+bs.w/2,bs.y+bs.w/2,1.9*K,1.8*K,17))k='busyard';
   else if(inSquare)k='plaza';
   else if((bCount[i]||hotelCnt[i])&&td<TOWN_R+8*K)k='town';
   else if(cv0===10||lakeNear[i])k='park';
@@ -648,7 +652,8 @@ function polyAt(pts,t){const n=pts.length;if(n<2)return pts[n-1];const c=polyRun
    3. TERRAIN: built in a background worker when the browser allows it,
    so the page stays responsive while it loads; on this thread otherwise.
    ===================================================================== */
-const KINDS=['water','bridge','terrace','grass','scrub','orchard','forest','rock','snow','road','track','street','plaza','park','busyard','market','hotel','big','town','hut','bare','village','garden'];
+/* every kind of ground the terrain build can give a tile ('snow' is never stored: snowy ground is drawn as it by the season) */
+const KINDS=['water','bridge','terrace','grass','scrub','orchard','forest','rock','snow','plaza','park','busyard','market','town','bare','village','garden'];
 const KI={};KINDS.forEach((k,i)=>{KI[k]=i;});
 const SPEC={W,H,T,S,K,CLS,KINDS,detail:FR.detail,church:{x:toX(CH.lon),y:toY(CH.lat)},lm:LM.map(l=>({id:l.id,x:l.x,y:l.y,w:l.w,sp:l.sp})),treks:TREKS.map(t=>({id:t.id,lines:t.lines,re:t.re||null})),square:{x:toX(103.84148),y:toY(22.33528)}};
 async function getTerrain(){
@@ -684,7 +689,7 @@ const OUTSIDE={k:'water',e:0,v:0,sl:0,trail:false,st:0,sn:0,q:null};
 const at=(x,y)=>(x<0||y<0||x>=W||y>=H)?OUTSIDE:new Tile(y*W+x);
 const TOWN_R=21*K,churchX=SPEC.church.x,churchY=SPEC.church.y;const townDist=(x,y)=>Math.hypot(x+.5-churchX,y+.5-churchY);
 const passable=(x,y)=>{if(x<0||y<0||x>=W||y>=H)return false;const i=y*W+x,k=kind[i];return k!==KI.water&&((flags[i]&1)===1||k!==KI.snow);};
-const isPaved=k=>k==='road'||k==='street'||k==='plaza'||k==='busyard'||k==='park'||k==='bridge'||k==='track';
+const isPaved=k=>k==='plaza'||k==='busyard'||k==='park'||k==='bridge';
 const pavedT=t=>isPaved(t.k)||t.st===1;
 const damAt=new Map(R.dams||[]);
 /* named dams and hydropower plants. OpenStreetMap has the names in Vietnamese only; the English label is the same name turned round */
@@ -693,7 +698,7 @@ const poiAt=new Map();for(const p of POIS){const x=Math.floor(p.x),y=Math.floor(
 /* the walkable tile closest to the foot of a landmark sprite, preferring pavement */
 function nearTarget(l){let best=null,bd=1e9;for(let dy=-l.w;dy<=l.w*2+2;dy++)for(let dx=-l.w;dx<=l.w*2;dx++){const x=l.x+dx,y=l.y+dy;if(!passable(x,y))continue;const d=Math.hypot(dx-(l.w/2-0.5),dy-(l.w+0.5))+(pavedT(at(x,y))?-0.8:0);if(d<bd){bd=d;best=[x,y];}}return best||[l.x+1,l.y+l.w];}
 /* walking cost of every tile, worked out once so route finding only reads an array */
-const costGrid=new Float32Array(W*H);{const C=new Float32Array(KINDS.length).fill(5);for(const k of ['road','street','plaza','busyard','park','bridge'])C[KI[k]]=1;C[KI.track]=1.2;for(const k of ['town','village','market','hut'])C[KI[k]]=1.6;for(const k of ['grass','terrace','orchard','bare','garden'])C[KI[k]]=2.2;C[KI.scrub]=2.8;C[KI.forest]=3.2;
+const costGrid=new Float32Array(W*H);{const C=new Float32Array(KINDS.length).fill(5);for(const k of ['plaza','busyard','park','bridge'])C[KI[k]]=1;for(const k of ['town','village','market'])C[KI[k]]=1.6;for(const k of ['grass','terrace','orchard','bare','garden'])C[KI[k]]=2.2;C[KI.scrub]=2.8;C[KI.forest]=3.2;
  for(let i=0;i<W*H;i++){const k=kind[i],tr=(flags[i]&1)===1;if(k===KI.water||(k===KI.snow&&!tr)){costGrid[i]=1e9;continue;}let c=C[k];if(stMask[i])c=Math.min(c,1);else if(tr)c=Math.min(c,1.4);costGrid[i]=c;}}
 /* waterfalls, viewpoints and peaks that are not already a place with a card */
 const FEAT=R.feat.filter(f=>!LM.some(l=>Math.hypot(f.x-l.x-l.w/2,f.y-l.y-l.w/2)<4*K));
@@ -890,7 +895,8 @@ const HSPR={
   K.tree(8,8,4,'#2e7d32');K.tree(15,10,3,'#3b8a3f');K.tree(19,9,2,'#2e5e32');},
  /* a mountain lake: pines on the shore, water in front */
  tarn(r,K){r(0,16,24,8,'#3a7bd5');r(0,16,24,1,'#2f66b8');r(2,19,5,1,'#8fc3ff');r(12,21,6,1,'#8fc3ff');r(18,18,4,1,'#8fc3ff');r(0,13,24,3,'#3b8a3f');r(0,13,24,1,'#5f9a2e');
-  const pine=(cx,y)=>{r(cx,y+9,1,3,'#4a3524');const wv=[1,3,3,5,5,7,7,9];for(let j=0;j<8;j++)r(cx-(wv[j]>>1),y+j+1,wv[j],1,j%2?'#1f4a26':'#2e5e32');r(cx-1,y+3,1,2,'#3b8a3f');r(cx-2,y+5,1,2,'#3b8a3f');};pine(5,1);pine(18,3);pine(11,4);},
+  const pine=(cx,y)=>{r(cx,y+9,1,3,'#4a3524');const wv=[1,3,3,5,5,7,7,9];for(let j=0;j<8;j++)r(cx-(wv[j]>>1),y+j+1,wv[j],1,j%2?'#1f4a26':'#2e5e32');r(cx-1,y+3,1,2,'#3b8a3f');r(cx-2,y+5,1,2,'#3b8a3f');};pine(5,1);pine(18,3);pine(11,4);
+  for(const q of [[0,13,2,1],[0,14,1,1],[22,13,2,1],[23,14,1,2],[0,22,3,2],[0,20,1,2],[3,23,2,1],[21,22,3,2],[23,19,1,3],[18,23,3,1]])K.cut(q[0],q[1],q[2],q[3]);},
  /* on the way up from the top station: the bell tower, the bronze Buddha and a pagoda */
  tower(r,K){K.sh(4,22,11);const RD='#a83a28';r(8,0,2,2,'#c9a227');
   for(let i=0;i<3;i++){const y=2+i*7,w=10+i*2,x=9-(w>>1);r(x+2,y,w-4,1,tone(RD,0.25));r(x+1,y+1,w-2,1,RD);r(x,y+2,w,1,tone(RD,-0.3));r(x-1,y+1,1,1,RD);r(x+w,y+1,1,1,RD);r(x+2,y+3,w-4,4,'#e8dcc0');r(x+w-4,y+3,2,4,'#cfc3a7');r(8,y+4,2,3,'#3a2a1a');}
@@ -927,17 +933,19 @@ const HSPR={
  falls(r,K){r(0,0,24,20,'#7a7a69');r(0,0,9,20,'#8d8d7a');r(2,3,4,2,'#a3a390');r(17,6,5,2,'#6b6b5b');r(1,11,5,2,'#a3a390');r(18,13,4,3,'#6b6b5b');
   r(0,0,5,3,'#3b8a3f');r(19,0,5,4,'#2e7d32');r(21,4,3,2,'#3b8a3f');r(0,3,2,2,'#58a65c');
   r(9,0,7,20,'#8fc3ff');r(10,0,4,20,'#dcecff');r(11,0,1,20,'#ffffff');r(14,2,1,5,'#5aa0ec');r(9,8,1,6,'#5aa0ec');r(13,10,1,7,'#b9dcff');
-  r(0,20,24,4,'#3a7bd5');r(5,19,15,2,'#dcecff');r(7,18,3,1,'#ffffff');r(15,18,3,1,'#ffffff');r(3,22,5,1,'#8fc3ff');r(16,22,6,1,'#8fc3ff');},
+  r(0,20,24,4,'#3a7bd5');r(5,19,15,2,'#dcecff');r(7,18,3,1,'#ffffff');r(15,18,3,1,'#ffffff');r(3,22,5,1,'#8fc3ff');r(16,22,6,1,'#8fc3ff');
+  /* a broken outline: rock and pool end unevenly, not on the square of the picture */
+  for(const q of [[0,0,2,1],[0,1,1,2],[22,0,2,2],[23,2,1,3],[0,9,1,4],[0,15,2,2],[23,10,1,5],[22,16,2,3],[0,19,1,2],[0,22,2,2],[0,21,1,1],[22,22,2,2],[23,20,1,2],[2,23,2,1],[19,23,3,1]])K.cut(q[0],q[1],q[2],q[3]);},
  /* the park gate at Trạm Tôn: stone posts, a roofed beam, the green signboard and a barrier */
  gate(r,K){K.sh(1,22,23);r(2,6,3,16,'#8d8d7a');r(2,6,1,16,'#b0b09c');r(19,6,3,16,'#8d8d7a');r(21,6,1,16,'#6b6b5b');
   r(0,3,24,2,'#7a5230');r(0,3,24,1,'#9a6a40');r(1,5,22,1,'#4a3524');
   r(5,7,14,5,'#2e5e32');r(5,7,14,1,'#3b8a3f');r(7,9,10,1,'#f4f4f0');r(8,10,7,1,'#f1c232');
   r(5,17,14,1,'#c2412b');for(let x=7;x<19;x+=4)r(x,17,2,1,'#f4f4f0');r(5,16,1,3,'#4a4a42');},
  /* the pass: ridges falling away on both sides, the road winding up to the sign at the top */
- pass(r,K){for(let j=0;j<8;j++){r(0,6+j,5+j,1,j?'#5f7f55':'#7f9f70');const w=6+Math.floor(j*1.5);r(24-w,5+j,w,1,j?'#4d6b4a':'#6d8b66');}
-  r(0,13,24,11,'#7fae48');r(0,13,24,1,'#9ad058');
-  for(const p of [[10,13,4],[8,15,6],[9,17,8],[13,19,7],[14,21,10]]){r(p[0],p[1],p[2],2,'#6f6f78');r(p[0]+1,p[1]+1,p[2]-2,1,'#55555c');}r(12,16,2,1,'#f4f4f0');r(15,20,2,1,'#f4f4f0');r(18,22,2,1,'#f4f4f0');
-  r(4,9,1,11,'#6d4a2a');r(1,5,8,5,'#2a6fd6');r(1,5,8,1,'#5aa0ec');r(2,7,6,1,'#f4f4f0');r(3,8,4,1,'#f4f4f0');r(3,20,4,1,'rgba(12,16,48,.3)');},
+ pass(r,K){/* the pass: the road over the saddle, the stone gate at the top and the road sign beside it; nothing behind them, so the land shows through */
+  for(const p of [[9,10,5],[7,13,7],[8,16,9],[12,19,8],[13,22,10]]){r(p[0],p[1],p[2],2,'#6f6f78');r(p[0]+1,p[1]+1,p[2]-2,1,'#55555c');}r(11,17,2,1,'#f4f4f0');r(15,20,2,1,'#f4f4f0');r(18,23,2,1,'#f4f4f0');
+  r(8,3,2,8,'#8d8d7a');r(8,3,1,8,'#b0b09c');r(14,3,2,8,'#8d8d7a');r(15,3,1,8,'#6b6b5b');r(7,1,10,2,'#7a5230');r(7,1,10,1,'#9a6a40');r(6,0,12,1,'#a83a28');r(8,11,8,1,'rgba(12,16,48,.3)');
+  r(20,8,1,9,'#6d4a2a');r(17,4,7,5,'#2a6fd6');r(17,4,7,1,'#5aa0ec');r(18,6,5,1,'#f4f4f0');r(19,7,3,1,'#f4f4f0');r(19,17,4,1,'rgba(12,16,48,.3)');},
  /* the glass bridge: a deck of glass reaching out from the cliff over the drop, the lift tower behind */
  glass(r,K){r(20,0,3,9,'#8a9ab0');r(20,0,1,9,'#b9c9dc');
   r(0,6,9,18,'#7a7a69');r(0,7,4,17,'#8d8d7a');r(5,10,3,4,'#6b6b5b');r(1,14,3,2,'#a3a390');r(0,5,7,2,'#2e7d32');r(0,5,4,1,'#58a65c');
@@ -965,7 +973,7 @@ const HLIT={church:[[17,24,2,6],[23,24,2,6],[29,24,2,6],[7,21,2,2],[6,13,4,5]],s
  house:[[4,16,3,3],[17,16,3,3]],dao:[[4,14,2,3]],stilt:[[6,11,3,3],[15,11,3,3]],mill:[[10,15,2,3]],glass:[[20,1,3,2]]};
 /* snow: the same picture with white lying on everything that faces the sky (a pixel with nothing above it and more
    of the picture below it, and the pixel under that) */
-function sprHi(name,snow){const key=snow?name+'|snow':name;let c=sprHiC.get(key);if(c)return c;const s0=SPR[name]||SPR.house,r=(x,y,w,h,col)=>{g.fillStyle=pal(col);g.fillRect(x,y,w,h);};c=mkCanvas(s0[0].length*3,s0.length*3);const g=c.getContext('2d');HSPR[name](r,hiKit(r));
+function sprHi(name,snow){const key=snow?name+'|snow':name;let c=sprHiC.get(key);if(c)return c;const s0=SPR[name]||SPR.house,r=(x,y,w,h,col)=>{g.fillStyle=pal(col);g.fillRect(x,y,w,h);};c=mkCanvas(s0[0].length*3,s0.length*3);const g=c.getContext('2d');const kit=hiKit(r);kit.cut=(x,y,w,h)=>g.clearRect(x,y,w,h); /* cut: take pixels away again, to break a straight outline */HSPR[name](r,kit);
  if(snow){const w=c.width,h=c.height,im=g.getImageData(0,0,w,h),d=im.data,op=(x,y)=>y>=0&&y<h&&d[(y*w+x)*4+3]>200;for(let x=0;x<w;x++)for(let y=0;y<h-2;y++)if(op(x,y)&&!op(x,y-1)&&op(x,y+1)&&op(x,y+2)){d.set([238,243,248,255],(y*w+x)*4);d.set([207,217,230,255],((y+1)*w+x)*4);}g.putImageData(im,0,0);}
  sprHiC.set(key,c);return c;}
 function drawSpr(c,name,px,py,snow){if(hiTier&&c===ctx){const im=sprHi(name,snow);c.drawImage(im,px,py,im.width*S/3,im.height*S/3);}else drawSprite(c,name,px,py,S);}
@@ -994,10 +1002,9 @@ function fieldPal(x,y){const C=MONTH_FIELD[month];if(!dry())return C;const w=nz(
 const ROOFS={1:['#b5452f','#7a5230','#5c6b7a','#3f7a6a'],4:['#4a3524','#5a4028','#3f2f20'],5:['#8a4a32','#9a5a3a','#7a4030'],6:['#5c6b7a','#6a7888','#50606e']};
 const TSTEP=10; // metres between terrace levels
 const pop16=v=>{let n=0;while(v){n+=v&1;v>>>=1;}return n;};
-/* the land beside a water tile, for the art pixels its water does not cover; null on an island */
-/* the ground beside a water tile (or, with road set, beside a tile that is all road), for the pixels its water or its
-   lane does not cover: a colour, 0 where that ground is a field, null on an island */
-function nearGround(x,y,hi,road){for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const kk=kind[ny*W+nx];if(kk===KI.water||kk===KI.bridge||(road&&(kk===KI.road||kk===KI.track)))continue;
+/* the ground beside a water tile, for the pixels its water does not cover: a colour, 0 where that ground is a field,
+   null on an island */
+function nearGround(x,y,hi){for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const kk=kind[ny*W+nx];if(kk===KI.water||kk===KI.bridge)continue;
   return kk===KI.terrace?0:kk===KI.busyard||kk===KI.plaza?TOWN_COL:groundCol(nx,ny,hi)||flatColor(nx,ny);}return null;}
 const CATCAT=byId('catcat');
 /* ---- GROUND ----
@@ -1006,7 +1013,7 @@ const CATCAT=byId('catcat');
    fields have no single colour. The tile art, the soft borders and the far view all take it from here. */
 /* the greens of open ground, in the growing months and in the dry ones */
 const GC={grass:['#86b956','#9aa65a'],scrub:['#769f4c','#8c9652'],garden:['#7cb052','#8fa558'],park:['#74aa4a','#74aa4a']};
-const SNOW_COL='#e8eef5',TOWN_COL='#b8a98a';
+const SNOW_COL='#e8eef5',TOWN_COL='#b8a98a',PLAZA_COL='#ddd0b0',YARD_COL='#55555c';
 /* a ground colour a step or two lighter or darker, and cooled towards blue with height; always as #rrggbb */
 const toneHexC=new Map();
 function groundTone(col,lv,cool){if(!lv&&!cool)return col;let row=toneHexC.get(col);if(!row){row=[];toneHexC.set(col,row);}const slot=(lv+4)*4+cool;let v=row[slot];if(v)return v;const k=lv*0.03,m=cool*0.045,CL=[58,98,138];v='#';
@@ -1018,11 +1025,30 @@ const gcLo=new Array(W*H),gcHi=new Array(W*H);
 function groundCol(x,y,hi){if(x<0||y<0||x>=W||y>=H)return null;const i=y*W+x,cache=hi?gcHi:gcLo;let c=cache[i];if(c!==undefined)return c;
  const t=at(x,y),d=dry()?1:0;let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';c=null;
  /* in the snow months, yards, gardens and bare ground up high are white as well; the houses stay and get white roofs */
- if((k==='village'||k==='hut'||k==='garden'||k==='bare'||k==='park')&&snowAt(t)){cache[i]=SNOW_COL;return SNOW_COL;}
- switch(k){case 'grass':case 'orchard':case 'hut':c=GC.grass[d];break;case 'scrub':c=GC.scrub[d];break;case 'forest':c=hi?(t.e>2000?'#174d22':'#256b2a'):(t.e>2000?'#1f5e2a':'#2e7d32');break;case 'rock':c='#8d8d7a';break;case 'bare':c='#c2ad84';break;case 'garden':case 'village':c=GC.garden[d];break;case 'park':c=GC.park[d];break;
-  case 'snow':cache[i]=SNOW_COL;return SNOW_COL;case 'town':case 'market':cache[i]=TOWN_COL;return TOWN_COL;}
+ if((k==='village'||k==='garden'||k==='bare'||k==='park')&&snowAt(t)){cache[i]=SNOW_COL;return SNOW_COL;}
+ switch(k){case 'grass':case 'orchard':c=GC.grass[d];break;case 'scrub':c=GC.scrub[d];break;case 'forest':c=hi?(t.e>2000?'#174d22':'#256b2a'):(t.e>2000?'#1f5e2a':'#2e7d32');break;case 'rock':c='#8d8d7a';break;case 'bare':c='#c2ad84';break;case 'garden':case 'village':c=GC.garden[d];break;case 'park':c=GC.park[d];break;
+  case 'snow':cache[i]=SNOW_COL;return SNOW_COL;case 'town':case 'market':cache[i]=TOWN_COL;return TOWN_COL;
+  case 'plaza':cache[i]=PLAZA_COL;return PLAZA_COL;case 'busyard':cache[i]=YARD_COL;return YARD_COL;}
  if(c)c=groundTone(c,Math.round((nz(x/13+5,y/13+9)*0.62+nz(x/5+31,y/5+17)*0.38-0.5)*6.5),Math.max(0,Math.min(3,Math.floor((t.e-1300)/400))));
  cache[i]=c;return c;}
+/* ---- HEIGHT ----
+   The land is drawn as it is in the top-down games it borrows from: as levels, with a face wherever one level drops to
+   the next. A level is 60 m of height (STEP_H). The view looks down from the south, so:
+   - where the ground steps down towards the bottom of the screen you see the face of the step: a band of earth, rock,
+     ice or walling seven pixels tall in the close-up, streaked and darker at the foot, under a lit lip of the ground
+     above, with its shadow on the ground below. Two levels at once make
+     a taller face, and on a steep slope the faces run together into a cliff;
+   - where it steps down away from you, you see only the far edge of the upper level, as a faint line;
+   - a step that faces east shows a narrow face in shade with its shadow beside it, one that faces west a narrow lit
+     face (the light is from the upper left).
+   The levels are read from the height of the ground under every pixel (eSub), so the faces follow the real contours
+   as curves and never the grid of tiles. Forest shows its levels as a band of shade across the tree tops. Rice
+   terraces do the same at their own 10 m. The far view darkens the upper half of a tile below an 80 m drop. */
+const STEP_H=60,CL_BUF=new Int16Array(29*38);
+const CLIFF={earth:['#8b7355','#6e5a42','#b39a78'],rock:['#62625a','#4a4a44','#b8b8a4'],snow:['#9fb0c6','#8799b2','#ffffff'],stone:['#8f8a7c','#77736a','#c9c4b6']};
+const cliffKind=k=>k==='snow'?CLIFF.snow:k==='rock'?CLIFF.rock:k==='town'||k==='plaza'||k==='busyard'||k==='market'?CLIFF.stone:CLIFF.earth;
+/* does a level line pass through or just above this tile? Read from the nine heights round it, which is all eSub uses there. */
+function stepsHere(x,y,step){let lo=1e9,hi=-1e9;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const e=eAt(x+dx,y+dy);if(e<lo)lo=e;if(e>hi)hi=e;}return Math.floor(lo/step)!==Math.floor(hi/step);}
 /* ---- SOFT BORDERS ----
    Ground does not end on the line between two tiles. In the close-up art each side of a tile has a reach: how far
    the ground on its first side (left, or top) runs over it at each of the 24 pixels along it, from +4 to -4 where the
@@ -1064,12 +1090,16 @@ function drawTile(oc,x,y,t){
    if(Nc&&Nc!==g0){h=eh(x*4+q,y*4,2);if(h<0.33)sub(q,0,Nc);}
    if(Sc&&Sc!==g0){h=eh(x*4+q,y*4+4,2);if(h>0.67)sub(q,3,Sc);}}};
  let edged=false;
- const fill=col=>{oc.fillStyle=col;oc.fillRect(px,py,T,T);if(!edged){edged=true;edges();}};
+ const fill=col=>{oc.fillStyle=col;oc.fillRect(px,py,T,T);if(!edged){edged=true;edges();cliffs();}};
  /* terraces follow the real contours: every art pixel takes the level of the ground under it, treads alternate
     between two tones, and a pixel with lower ground beside it is drawn as the wall of the step. Fields also run under
-    the river and the road where those cross them. */
+    the river where it crosses them. */
  const treads=()=>{const L=new Int16Array(36);for(let r=-1;r<=4;r++)for(let c=-1;c<=4;c++)L[(r+1)*6+c+1]=Math.floor(eSub(x+(c+.5)/4,y+(r+.5)/4)/TSTEP);
-  for(let r=0;r<4;r++)for(let c=0;c<4;c++){const j=(r+1)*6+c+1,l=L[j];sub(c,r,(L[j+6]<l||L[j+1]<l||L[j-6]<l||L[j-1]<l)?C[1]:(l&1)?C[0]:C[2]);}};
+  /* a pixel with higher ground just above it or to its left is the riser of that step; the rest is tread */
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++){const j=(r+1)*6+c+1,l=L[j];sub(c,r,(L[j-6]>l||L[j-1]>l)?C[1]:(l&1)?C[0]:C[2]);}};
+ /* the face of a 40 m step, one art pixel tall, under the ground that stands above it */
+ const cliffs=()=>{if(!g0||!stepsHere(x,y,STEP_H))return;const fc=k==='forest'?tone(g0,-0.4):cliffKind(k)[0],lp=k==='forest'?tone(g0,0.14):k==='snow'||k==='rock'||k==='town'||k==='plaza'||k==='busyard'||k==='market'?null:tone(g0,0.2);
+  for(let c=0;c<4;c++){let up=Math.floor(eSub(x+(c+.5)/4,y-.125)/STEP_H);for(let r=0;r<4;r++){const l=Math.floor(eSub(x+(c+.5)/4,y+(r+.5)/4)/STEP_H);if(up>l){sub(c,r,fc);if(r>0&&lp)sub(c,r-1,lp);}up=l;}}};
  switch(k){
   /* water is drawn from its mask: the bank shows in the art pixels the water does not cover, so a stream is a thin
      line, a river grows wider downstream and a lake keeps its real outline and its island */
@@ -1101,11 +1131,9 @@ function drawTile(oc,x,y,t){
   case 'bare':fill(g0);sub(Math.floor(v*4),Math.floor(v*9)%4,'#a8936a');if(v>0.6)sub(Math.floor(v*7)%4,Math.floor(v*3)%4,'#d4c29c');break;
   /* garden: vegetable rows and a fruit tree, pink with blossom in February */
   case 'garden':{fill(gardenCol);const r0=Math.floor(v*4);for(let c=0;c<4;c+=2)sub(c,r0,dry()?'#7a8f4a':'#5f9a3a');if(v>0.45){const tx=Math.floor(v*11)%4,ty=(r0+2)%4;sub(tx,ty,blossom()?(v>0.7?'#f2a0b8':'#f8e0e8'):'#3b8a3f');}if(v<0.18)sub(Math.floor(v*20)%4,(r0+1)%4,'#b59a72');break;}
-  /* a tile that is all road or track: where a lane is drawn on it, the ground beside it shows round the lane */
-  case 'road':case 'track':{const g=t.st?nearGround(x,y,0,true):null;if(g===0)treads();else if(g)fill(g);else if(k==='road'){fill('#e3d8bd');if(v<0.5)sub(Math.floor(v*8)%4,Math.floor(v*5)%4,'#c8bb9c');}else{fill('#b8a070');sub(1,Math.floor(v*4),'#9a8458');sub(3,Math.floor(v*7)%4,'#9a8458');}break;}
-  case 'plaza':fill('#ddd0b0');if((x+y)%2)sub(0,0,'#cdbf9f');else sub(2,2,'#cdbf9f');if(v<0.1){sub(1,1,blossom()?'#f2a0b8':'#3b8a3f');sub(2,1,blossom()?'#f8e0e8':'#3b8a3f');sub(1,2,'#5d4037');}break;
+  case 'plaza':fill(PLAZA_COL);if((x+y)%2)sub(0,0,'#cdbf9f');else sub(2,2,'#cdbf9f');if(v<0.1){sub(1,1,blossom()?'#f2a0b8':'#3b8a3f');sub(2,1,blossom()?'#f8e0e8':'#3b8a3f');sub(1,2,'#5d4037');}break;
   case 'park':fill(g0);sub(Math.floor(v*4),Math.floor(v*9)%4,blossom()&&v>0.4?'#f2a0b8':'#3b8a3f');if(v>0.6){sub(Math.floor(v*13)%4,Math.floor(v*7)%4,v>0.8?'#f1c232':'#e07b2a');}break;
-  case 'busyard':fill('#55555c');if(v<0.3){sub(0,1,'#c2412b');sub(1,1,'#c2412b');sub(2,1,'#c2412b');sub(0,2,'#f4f4f0');sub(1,2,'#f4f4f0');sub(2,2,'#f4f4f0');}else if((x+y)%2)sub(1,2,'#f4f4f0');break;
+  case 'busyard':fill(YARD_COL);if(v<0.3){sub(0,1,'#c2412b');sub(1,1,'#c2412b');sub(2,1,'#c2412b');sub(0,2,'#f4f4f0');sub(1,2,'#f4f4f0');sub(2,2,'#f4f4f0');}else if((x+y)%2)sub(1,2,'#f4f4f0');break;
   case 'market':fill('#b8a98a');for(let c=0;c<4;c++){sub(c,0,c%2?'#e07b2a':'#f4f4f0');sub(c,1,c%2?'#e07b2a':'#f4f4f0');}sub(0,3,'#6d4a2a');sub(3,3,'#6d4a2a');sub(1,2,v<0.5?'#f1c232':'#c2412b');break;
   /* town and village: small buildings in the quadrants no street crosses; villages sit in gardens with an earth doorstep */
   case 'town':case 'village':{const vil=k==='village';fill(g0);if(!vil&&v<0.5)sub(Math.floor(v*8)%4,Math.floor(v*5)%4,'#a8997a');const q=t.q||[0,0,0,0];
@@ -1115,7 +1143,6 @@ function drawTile(oc,x,y,t){
      sub(qx,qy,roof);sub(qx+1,qy,roof);
      if(st>=4){sub(qx,qy+1,'#8a6238');sub(qx+1,qy+1,hv<0.5?'#b59a72':'#4a4a42');}
      else{sub(qx,qy+1,st===2?'#dcd6c8':st===3?'#c9c4b6':'#e8dcc0');sub(qx+1,qy+1,st===2?'#5aa0ec':'#4a4a42');}}break;}
-  case 'hut':{fill(grassCol);const roof=g0===SNOW_COL?'#eef3f8':v<0.5?'#3a2a1a':'#5a3a22';sub(1,0,roof);sub(2,0,roof);for(let c=0;c<4;c++)sub(c,1,roof);sub(0,2,'#8a6238');sub(1,2,'#e8dcc0');sub(2,2,'#4a4a42');sub(3,2,'#8a6238');break;}
  }
  const ps=poiAt.get(i);if(ps&&k==='town'&&t.q){const qi=t.q.findIndex(st=>st);if(qi>=0)sub((qi&1)*2,(qi>>1)*2+1,POI_COL[ps[0].k]||'#2a9d8f');}
  /* thin lanes, drawn over whatever the tile is: asphalt in town, pale concrete and earth in the countryside */
@@ -1160,8 +1187,27 @@ function drawTileHi(oc,x,y,t){
  let edged=false;
  /* every rectangle is cut to the tile, so a tree may be drawn standing across its edge: the tile beside it draws the
     same tree and gets the other half */
- const R=(a,b,w,h,c)=>{if(a<0){w+=a;a=0;}if(b<0){h+=b;b=0;}if(a+w>n)w=n-a;if(b+h>n)h=n-b;if(w<=0||h<=0)return;oc.fillStyle=c;oc.fillRect(ox+a,oy+b,w,h);if(w===n&&h===n&&!edged){edged=true;edges();}};
+ const R=(a,b,w,h,c)=>{if(a<0){w+=a;a=0;}if(b<0){h+=b;b=0;}if(a+w>n)w=n-a;if(b+h>n)h=n-b;if(w<=0||h<=0)return;oc.fillStyle=c;oc.fillRect(ox+a,oy+b,w,h);if(w===n&&h===n&&!edged){edged=true;edges();if(t.k!=='forest'||snowAt(t))cliffs(false);}};
  const hq=q=>hash(x*13+q*7+1,y*11+q*5+2); /* more random numbers for this tile */
+ /* the levels of the land (see HEIGHT). over: laid across a forest's tree tops as a band of shade under a line of light,
+    instead of a face of earth. Rows up to seven pixels above the tile are read too, because the face of a step that
+    ends just above the tile hangs down into it; R cuts each tile's share. */
+ const cliffs=over=>{const me=groundCol(x,y,1);if(!me||!stepsHere(x,y,STEP_H))return;const HM=12,CO=3,gw=n+5,gh=n+HM+2,L=CL_BUF;
+  for(let r=0;r<gh;r++){const yy=y+(r-HM-.5)/n;for(let c=0;c<gw;c++)L[r*gw+c]=Math.floor(eSub(x+(c-CO+.5)/n,yy)/STEP_H);}
+  let kk=t.k;if(me===SNOW_COL)kk='snow';
+  const st=cliffKind(kk),lip=st===CLIFF.earth?tone(me,0.26):st[2],lip2=st===CLIFF.earth?tone(me,0.12):st[2],foot=tone(st[1],-0.2),sideL=tone(st[0],0.14);
+  /* steps that face east or west: a narrow face on the lower side of the line, dark with a shadow beside it if it
+     faces east, lit if it faces west. Lines up to three pixels outside the tile are read, for the part that falls in it. */
+  for(let r=0;r<n;r++){const row=(r+HM+1)*gw+CO;for(let c=-2;c<=n+1;c++){const a=L[row+c],l=L[row+c-1];if(a===l)continue;
+    if(l>a){if(over)R(c,r,4,1,'rgba(8,12,40,.32)');else{R(c,r,3,1,foot);R(c+3,r,2,1,SH);}}
+    else if(over)R(c,r,2,1,'rgba(255,255,200,.16)');else{R(c-2,r,2,1,sideL);R(c,r,1,1,lip);}}}
+  /* steps that face you */
+  for(let c=0;c<n;c++){const wx=x*n+c;for(let r=0;r<gh-1;r++){const a=L[r*gw+c+CO],b=L[(r+1)*gw+c+CO];if(a===b)continue;const ry=r-HM-1;
+   if(a>b){const h=a-b>1?11:7;
+    if(over){/* forest: the trees above catch the light, the trees below stand in the shade of the step */R(c,ry-1,1,2,'rgba(255,255,200,.2)');R(c,ry+1,1,h-2,'rgba(8,12,40,.4)');R(c,ry+h-1,1,2,'rgba(8,12,40,.2)');}
+    else{/* the lit lip, with a tuft hanging over here and there; the face, streaked, dark under the lip and at the foot; its shadow */
+     R(c,ry-1,1,1,lip2);R(c,ry,1,1,lip);const strk=(wx*13+a*7)%5===0||(wx*7+a*3)%11===0;R(c,ry+1,1,h,strk?st[1]:st[0]);R(c,ry+1,1,1,(wx*5+a)%4===0?lip2:st[1]);if(!strk&&(wx*3+a)%7===0)R(c,ry+3,1,2,st[2]);R(c,ry+h-1,1,2,foot);R(c,ry+1+h,1,2,SH);R(c,ry+3+h,1,1,'rgba(12,16,48,.1)');}}
+   else if(!over)R(c,ry+1,1,1,'rgba(10,14,44,.14)');}}};
  /* the soft border (see edgeReach), then what strays over it: bushes out from a forest, stones down from rock,
     trodden earth round a village */
  const edges=()=>{const me=groundCol(x,y,1),terr=t.k==='terrace';if(!me&&!terr)return;
@@ -1178,7 +1224,7 @@ function drawTileHi(oc,x,y,t){
    for(let q=0;q<3;q++){const h=hq(80+sd*5+q),p=spot(2+Math.floor(hq(100+sd*5+q)*20),nk===KI.forest?6+Math.floor(h*5):2+Math.floor(h*7)),a=p[0],b=p[1];
     if(nk===KI.forest){if(q<2&&h<0.75){R(a,b+2,4,1,SH);R(a-1,b,3,2,'#2f6a2c');R(a-1,b,2,1,'#4d8f3e');R(a,b-1,1,1,'#2f6a2c');}}
     else if(nk===KI.rock){R(a,b,2,1,'#a3a390');R(a,b+1,2,1,'#6b6b5b');}
-    else if((nk===KI.village||nk===KI.town||nk===KI.hut)&&mk!==KI.village&&q<2){R(a,b,3,2,'#b59a72');R(a+1,b,1,1,'#c9b08a');}}}};
+    else if((nk===KI.village||nk===KI.town)&&mk!==KI.village&&q<2){R(a,b,3,2,'#b59a72');R(a+1,b,1,1,'#c9b08a');}}}};
  /* everything that stands up throws a small cool shadow down and to the right: the light of this map comes from the
     upper left, and shade is blue, not black */
  const SH='rgba(12,16,48,.24)';
@@ -1190,11 +1236,13 @@ function drawTileHi(oc,x,y,t){
  const fir=(cx,cy,col,lt,dk,free)=>{if(!free){cx=Math.max(4,Math.min(n-5,cx));cy=Math.max(4,Math.min(n-7,cy));}R(cx-2,cy+5,6,1,SH);R(cx,cy+4,1,2,'#4a3524');const wv=[1,3,3,5,5,7,7];for(let j=0;j<7;j++){const w=wv[j];R(cx-(w>>1),cy-3+j,w,1,j%2?dk:col);}R(cx-1,cy-2,1,2,lt);R(cx-2,cy,1,2,lt);R(cx-3,cy+2,1,2,lt);};
  const TV=[-0.07,0,0.08];
  /* terraces: every pixel takes the level of the ground under it, so the steps are smooth curves; the walls are one
-    pixel, the treads carry the rice of the month. Fields also run under the river and the road where those cross them. */
+    pixel, the treads carry the rice of the month. Fields also run under the river where it crosses them. */
  const treads=()=>{const g=HT+2,L=new Int16Array(g*g);for(let r=-1;r<=HT;r++)for(let c=-1;c<=HT;c++)L[(r+1)*g+c+1]=Math.floor(eSub(x+(c+.5)/HT,y+(r+.5)/HT)/TSTEP);
     const flooded=month===5,young=month>=6&&month<=8,ripe=month===9,stub=month===10;
     for(let r=0;r<HT;r++){let run=0,rc=null;for(let c=0;c<=HT;c++){let col=null;if(c<HT){const j=(r+1)*g+c+1,l=L[j];
-       if(L[j+g]<l||L[j+1]<l||L[j-g]<l||L[j-1]<l)col=C[1];
+       /* the riser of the step above, facing you; the foot of a step that faces east, in shade; the lit edge of this
+          step where it drops away below; and a faint line where the ground climbs away behind */
+       if(L[j-g]>l)col=tone(C[1],-0.2);else if(L[j-1]>l)col=C[1];else if(L[j+g]<l)col=tone((l&1)?C[0]:C[2],0.22);else if(L[j+g]>l)col=tone((l&1)?C[0]:C[2],-0.08);
        else{col=(l&1)?C[0]:C[2];const a=x*HT+c,b=y*HT+r;
         /* the crop is a quiet weave of short strokes a shade off the ground, not a grid of dark dots: a busy
            texture over a whole valley tires the eye and hides the people in it */
@@ -1255,12 +1303,11 @@ function drawTileHi(oc,x,y,t){
     {const cx=v>0.45?6+Math.floor(hq(5)*12):-9,cy=v<0.5?17:6;if(cx>0){R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,3,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',3);}}
     if(v<0.18){R(18,v<0.09?4:16,4,3,'#d9b23a');R(19,v<0.09?3:15,2,1,'#e9cd6a');} /* a haystack */
     break;}
-  case 'road':case 'track':{const g=t.st?nearGround(x,y,1,true):null;if(g===0)treads();else R(0,0,n,n,g||(k==='road'?'#e3d8bd':'#b8a070'));break;}
-  case 'plaza':R(0,0,n,n,'#ddd0b0');for(let r=0;r<4;r++){R(0,r*6,n,1,'#cdbf9f');for(let c=0;c<4;c++)R(c*6+(r%2?3:0),r*6,1,6,'#cdbf9f');}
+  case 'plaza':R(0,0,n,n,PLAZA_COL);for(let r=0;r<4;r++){R(0,r*6,n,1,'#cdbf9f');for(let c=0;c<4;c++)R(c*6+(r%2?3:0),r*6,1,6,'#cdbf9f');}
     if(v<0.1){R(11,15,2,4,'#5d4037');crown(12,10,4,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',5);}else if(v>0.93){R(6,10,10,2,'#8a6238');R(6,12,1,2,'#5d4037');R(15,12,1,2,'#5d4037');}break;
   case 'park':R(0,0,n,n,g0);tufts(4,'#5f9a2e','#9ad058');for(let q=0,m=1+Math.floor(hq(8)*3);q<m;q++){const cx=4+Math.floor(hq(q)*16),cy=4+Math.floor(hq(q+2)*12),bl=blossom()&&hq(q+4)>0.4;R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,3,bl?'#f2a0b8':'#3b8a3f',bl?'#f8e0e8':'#58a65c',bl?'#d77f9c':'#2a6b30',3);}
     if(v>0.6){const a=3+Math.floor(hq(6)*14),b=17+Math.floor(hq(7)*3);R(a,b,6,3,'#5f9a2e');for(let c=0;c<6;c+=2)R(a+c,b+1,1,1,v>0.8?'#f1c232':'#e07b2a');}break;
-  case 'busyard':R(0,0,n,n,'#55555c');for(let c=0;c<4;c++)R(c*6,0,1,n,'#66666e');
+  case 'busyard':R(0,0,n,n,YARD_COL);for(let c=0;c<4;c++)R(c*6,0,1,n,'#66666e');
     if(v<0.3){R(3,8,17,9,'#c2412b');R(3,8,17,4,'#f4f4f0');for(let c=0;c<5;c++)R(5+c*3,9,2,2,'#3a4a5a');R(3,17,17,1,'rgba(0,0,0,.25)');R(5,16,3,2,'#1b1b1b');R(15,16,3,2,'#1b1b1b');R(19,13,1,2,'#f1c232');}
     else if((x+y)%2)R(8,12,8,1,'#f4f4f0');break;
   /* the market: two rows of stalls under striped awnings, with a table of goods in front of each */
@@ -1303,7 +1350,6 @@ function drawTileHi(oc,x,y,t){
      if(q4[qi]!==2&&q4[qi]!==3&&hash(x*7+qi*3+5,y*3+qi)<0.3){for(let j=0;j<3;j++){const hw=Math.min(hw2,1+j);R(X+hw2-hw,Y+j,hw*2,1,'#eef3f8');}}else{R(X,Y,w,2,'#eef3f8');R(X+1,Y+2,w-2,1,'#cfd9e6');}}
     const ps=poiAt.get(i);if(ps&&k==='town'){const qi=q4.findIndex(st=>st);if(qi>=0){const hb=houseBox(i,qi);R(hb[0]+(hb[2]>5?3:0),hb[1]+5,4,2,POI_COL[ps[0].k]||'#2a9d8f');}}
     break;}
-  case 'hut':R(0,0,n,n,grassCol);tufts(4,'#689f38');R(6,8,12,6,v<0.5?'#3a2a1a':'#5a3a22');R(7,7,10,1,'#6a4a2a');R(7,14,10,5,'#8a6238');R(11,15,2,4,'#3a2a1a');R(15,15,2,2,'#4a4a42');if(g0===SNOW_COL){R(6,8,12,2,'#eef3f8');R(7,7,10,1,'#eef3f8');}break;
  }
  /* trees on the edge of a forest stand across it, and so do trees on the line between two forest tiles, which takes
     the grid out of the canopy. Both tiles draw the same trees from the same numbers; R keeps each to its own half. */
@@ -1313,6 +1359,7 @@ function drawTileHi(oc,x,y,t){
     const cx=vert?(x===ex?0:n)+ac:al,cy=vert?al:(y===ey?0:n)+ac;
     if(h2<(dark?0.72:e>1700?0.22:0))fir(cx,cy,tone(col,tv),lt,dk,true);else crown(cx,cy,h2>0.5?4:3,tone(col,tv),tone(lt,tv),dk,0,true);}};
   ec(x,y,true);ec(x+1,y,true);ec(x,y,false);ec(x,y+1,false);}
+ if(t.k==='forest'&&!snowAt(t))cliffs(true);
  /* lanes: the art-grid cells with their corners softened, and a darker kerb all along the edge */
  if(t.st&&k!=='water'&&k!=='bridge'){const col=townDist(x,y)<TOWN_R+6*K?'#6f6f78':(flags[i]&2)?'#e6dcc2':'#d3c5a2',edge=tone(col,-0.2),lb=(c,r)=>cellBit(stMask,x,y,c,r),M=smoothCells(lb,6),on=(c,r)=>c<0||r<0||c>=n||r>=n?lb(Math.floor(c/6),Math.floor(r/6)):M[r*n+c];
   mask(M,col);for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(M[r*n+c]&&(!on(c-1,r)||!on(c+1,r)||!on(c,r-1)||!on(c,r+1)))R(c,r,1,1,edge);}
@@ -1320,7 +1367,7 @@ function drawTileHi(oc,x,y,t){
  const rm=railMask[i];if(rm&&k!=='water')for(let b=0;b<16;b++)if(rm&(1<<b)){const c=b&3,r=b>>2;R(c*6,r*6,6,6,'#8a8474');R(c*6,r*6+1,6,1,'#3a2a1a');R(c*6,r*6+4,6,1,'#3a2a1a');R(c*6+1,r*6,1,6,'#3a2a1a');R(c*6+4,r*6,1,6,'#3a2a1a');R(c*6+2,r*6+2,2,2,'#c9c4b6');}
  /* a trail: a patch of beaten earth that reaches out to every neighbour the trail goes on to */
  if(t.trail&&(k==='rock'||k==='snow'||k==='forest'||k==='grass'||k==='terrace'||k==='scrub'||k==='bare'||k==='garden')){const col='#b59a72',on=(dx,dy)=>{const xx=x+dx,yy=y+dy;return xx>=0&&yy>=0&&xx<W&&yy<H&&((flags[yy*W+xx]&1)||stMask[yy*W+xx]);};
-  R(8,8,8,8,col);if(on(-1,0))R(0,9,8,6,col);if(on(1,0))R(16,9,8,6,col);if(on(0,-1))R(9,0,6,8,col);if(on(0,1))R(9,16,6,8,col);
+  R(9,8,6,8,col);R(8,9,8,6,col);/* a rounded patch, not a square */if(on(-1,0))R(0,9,8,6,col);if(on(1,0))R(16,9,8,6,col);if(on(0,-1))R(9,0,6,8,col);if(on(0,1))R(9,16,6,8,col);
   R(10+Math.floor(v*4),10+Math.floor(hq(70)*4),1,1,'#a08660');R(12,9+Math.floor(hq(71)*5),2,1,'#c9b08a');}
  /* a dam: concrete with a lit crest and a shaded foot */
  const dm=damAt.get(i);if(dm)for(let b=0;b<16;b++)if(dm&(1<<b)){const c=b&3,r=b>>2,foot=!(b<12&&(dm&(1<<(b+4))));R(c*6,r*6,6,6,'#d2d0c6');R(c*6,r*6,6,1,'#e9e7de');if(foot)R(c*6,r*6+3,6,3,'#7c7a70');}
@@ -1363,12 +1410,12 @@ function invalidateTerrain(){chunks.clear();chunksHi.clear();gcLo.fill(undefined
    One colour per tile, used zoomed out, under chunks that are not painted yet, in the overview and in the section
    strip. The picture has four pixels a tile so that open ground can fray into its neighbours: two pixels in five on
    such a tile take the colour of the ground beside them. Roads, water and built-up tiles keep their own colour. */
-const FLAT={water:'#3a7bd5',bridge:'#8a6238',road:'#e3d8bd',track:'#b8a070',street:'#6f6f78',plaza:'#ddd0b0',busyard:'#55555c',market:'#e07b2a',hotel:'#4a5566',big:'#7d7d85',hut:'#5a3a22',village:'#9a7a58'};
+const FLAT={water:'#3a7bd5',bridge:'#8a6238',road:'#e3d8bd',plaza:'#ddd0b0',busyard:'#55555c',market:'#e07b2a',village:'#9a7a58'};
 let flatSoft=false; /* set by flatColor: is this open ground, whose edge may fray? */
 function flatColor(x,y){const t=at(x,y),k=t.k;flatSoft=false;if((flags[y*W+x]&2)&&k!=='water'&&k!=='bridge'&&k!=='plaza')return FLAT.road;
  if(k==='town'){const q=quad[y*W+x],n=(q&7?1:0)+(q&56?1:0)+(q&448?1:0)+(q&3584?1:0);return n>=3?'#a8644e':n===2?'#b9806a':'#c4b08e';}
  if(k==='terrace'){flatSoft=true;const F=fieldPal(x,y);return Math.floor(t.e/25)%2?F[0]:F[2];}
- if(k!=='village'&&k!=='hut'&&k!=='market'){const g=groundCol(x,y,0);if(g){flatSoft=true;return g;}}
+ if(k!=='village'&&k!=='market'){const g=groundCol(x,y,0);if(g){flatSoft=true;return g;}}
  return FLAT[k]||'#000';}
 const rgbCache=new Map();const rgbOf=c=>{let v=rgbCache.get(c);if(!v){v=palRGB(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16));rgbCache.set(c,v);}return v;};
 /* The first time it is done in one go. After a change of month it is redone a few rows a frame (3 ms at most), and the
@@ -1379,8 +1426,10 @@ let miniDirty=true,miniJob=null,miniReady=false;
 function miniImage(){if(miniDirty){miniDirty=false;miniJob={y:0,y2:0,img:miniCache.getContext('2d').createImageData(W*MINI_F,H*MINI_F)};}
  if(miniJob){const t0=performance.now(),late=()=>miniReady&&performance.now()-t0>3,u=new Uint32Array(miniJob.img.data.buffer),W2=W*MINI_F;
   for(;miniJob.y<H;miniJob.y++){if(late())break;const y=miniJob.y;for(let x=0;x<W;x++){const i=y*W+x,c=rgbOf(flatColor(x,y));miniFlat[i]=(0xFF000000|(c[2]<<16)|(c[1]<<8)|c[0])>>>0;miniSoft[i]=flatSoft?1:0;}}
-  if(miniJob.y>=H)for(;miniJob.y2<H;miniJob.y2++){if((miniJob.y2&3)===0&&late())break;const y=miniJob.y2;for(let x=0;x<W;x++){const i=y*W+x,own=miniFlat[i],soft=miniSoft[i];
-    for(let q=0;q<4;q++){const sx=q&1,sy=q>>1;let c=own;if(soft){const h=hash(x*2+sx+3,y*2+sy+7);if(h<0.4){const j=h<0.2?(sx?(x<W-1?i+1:i):(x>0?i-1:i)):(sy?(y<H-1?i+W:i):(y>0?i-W:i));if(miniSoft[j])c=miniFlat[j];}}u[(y*2+sy)*W2+x*2+sx]=c;}}}
+  if(miniJob.y>=H)for(;miniJob.y2<H;miniJob.y2++){if((miniJob.y2&3)===0&&late())break;const y=miniJob.y2;for(let x=0;x<W;x++){const i=y*W+x,own=miniFlat[i],soft=miniSoft[i],wet=kind[i]===KI.water||kind[i]===KI.bridge,lv=Math.floor(elev[i]/80),drop=!wet&&y>0&&Math.floor(elev[i-W]/80)>lv,lipHere=!wet&&y<H-1&&Math.floor(elev[i+W]/80)<lv;
+    for(let q=0;q<4;q++){const sx=q&1,sy=q>>1;let c=own;if(soft){const h=hash(x*2+sx+3,y*2+sy+7);if(h<0.4){const j=h<0.2?(sx?(x<W-1?i+1:i):(x>0?i-1:i)):(sy?(y<H-1?i+W:i):(y>0?i-W:i));if(miniSoft[j])c=miniFlat[j];}}
+     if(drop&&!sy)c=(0xFF000000|((((c>>16)&255)*0.76)<<16)|((((c>>8)&255)*0.76)<<8)|((c&255)*0.76))>>>0;else if(lipHere&&sy)c=(0xFF000000|(Math.min(255,((c>>16)&255)*1.08)<<16)|(Math.min(255,((c>>8)&255)*1.08)<<8)|Math.min(255,(c&255)*1.08))>>>0;
+     u[(y*2+sy)*W2+x*2+sx]=c;}}}
   if(miniJob.y2>=H){miniCache.getContext('2d').putImageData(miniJob.img,0,0);const g=miniSmall.getContext('2d');g.imageSmoothingEnabled=true;g.drawImage(miniCache,0,0,W,H);miniJob=null;miniReady=true;}else lastInput=performance.now();}
  return miniCache;}
 /* ---- THE SUN ----
@@ -1424,11 +1473,14 @@ function lightCore(P){const sx=P.sx,sy=P.sy,wS=P.wS,wN=P.wN,cast=P.cast,depth=ca
   else if(sh<-0.02){d[j]=12;d[j+1]=16;d[j+2]=48;d[j+3]=Math.round(255*0.3*-sh);}
   else d[j+3]=0;};
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,gx=(eAt(x+1,y)-eAt(x-1,y))/2,gy=(eAt(x,y+1)-eAt(x,y-1))/2;
-  const sh=inDetail(x,y)?0:Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/(55/K)));
+  /* inside the town box the finer relief below takes over, but not at a line: over four tiles in from the edge of the
+     box this coarse relief fades out and the fine one fades in */
+  const fade=inDetail(x,y)?1-Math.min(1,Math.min(x-DBX,DBX+DBS-1-x,y-DBY,DBY+DBS-1-y)/4):1;
+  const sh=fade*Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/(55/K)));
   put(d,i*4,sh,LIGHT_WEAK[kind[i]]?0.35:1,depth?cast*0.3*Math.min(1,depth[i]/12):0);}
  /* the town box: the same relief from the finer elevation there; its shadows are already in the main layer */
  for(let j=0;j<DN;j++)for(let i=0;i<DN;i++){const gx=(dAt(i+1,j)-dAt(i-1,j))/2,gy=(dAt(i,j+1)-dAt(i,j-1))/2,k=kind[(DBY+Math.floor(j/DF))*W+DBX+Math.floor(i/DF)];
-  put(dd,(j*DN+i)*4,Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/14)),LIGHT_WEAK[k]?0.35:1,0);}
+  put(dd,(j*DN+i)*4,Math.min(1,Math.min(i,DN-1-i,j,DN-1-j)/(4*DF))*Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/14)),LIGHT_WEAK[k]?0.35:1,0);}
  return{key:P.key,main:d,det:dd};}
 function lightParams(){const s=sunAt(hour,month),deg=s.alt*180/Math.PI,sk=skyNow(),up=Math.max(0,Math.min(1,deg/8)),wS=0.75*up*Math.cos(s.alt);
  /* sx,sy: the way to the sun on the map, x east and y south; wS, wN: how much of the relief the sun models, and how much the north-west glow */
@@ -1455,8 +1507,7 @@ function lightLayers(){const P=lightParams();if(P.key===lightKey)return LIGHT;
  return LIGHT;}
 const LIGHT={main:lightMain,det:lightDet};
 /* drawn over the terrain in map pixels, by the main view and by the overview (scale 1 there) */
-/* up close a tile is dozens of screen pixels, so shadow edges are blended there instead of standing as big squares */
-function drawLight(c,tile){const L=lightLayers(),soft=hiTier&&c===ctx;if(soft)c.imageSmoothingEnabled=true;c.drawImage(L.main,0,0,W*tile,H*tile);c.drawImage(L.det,DBX*tile,DBY*tile,DBS*tile,DBS*tile);if(soft)c.imageSmoothingEnabled=false;}
+function drawLight(c,tile){const L=lightLayers(),soft=c===ctx; /* on the map the light is always blended from tile to tile; the overview draws it one to one */if(soft)c.imageSmoothingEnabled=true;c.drawImage(L.main,0,0,W*tile,H*tile);c.drawImage(L.det,DBX*tile,DBY*tile,DBS*tile,DBS*tile);if(soft)c.imageSmoothingEnabled=false;}
 /* hoarfrost: a pale block on most open field tiles above 900 m, in three strengths */
 let frostC=null;function frostMask(){if(frostC)return frostC;frostC=mkCanvas(W,H);const fc=frostC.getContext('2d'),img=fc.createImageData(W,H),d=img.data;
  for(let i=0;i<W*H;i++){const k=kind[i];if((k!==KI.terrace&&k!==KI.grass&&k!==KI.garden&&k!==KI.bare)||elev[i]<=900)continue;const h=hash(i%W+3,((i/W)|0)+17);if(h<0.12)continue;d[i*4]=236;d[i*4+1]=244;d[i*4+2]=250;d[i*4+3]=Math.round(255*(0.24+0.14*Math.floor(h*3)));}
@@ -1739,6 +1790,8 @@ function busAt(i,h){const b=BUSES[i];if(h<b.a||h>b.b+BUS_RUN)return null;
 let windT=0,wetness=-1; /* seconds of wind so far; how wet the ground is, 0 to 1 (set from the sky on the first frame) */
 const windAmt=()=>Math.max(0,Math.min(1,0.45+0.3*Math.sin(windT/7.3)+0.25*Math.sin(windT/2.9+1.7)));
 const GUST_LUT=new Float32Array(2048),VEG=new Uint8Array(KINDS.length);for(const k of ['terrace','grass','forest','scrub','park','orchard','garden'])VEG[KI[k]]=1;VEG[KI.water]=2; /* what a gust shows on: 1 growing things, 2 open water */
+/* the small picture the gust is painted into each frame, one pixel a cell */
+const GUST_W=256,GUST_H=160,GUST_C=mkCanvas(GUST_W,GUST_H),GUST_G=GUST_C.getContext('2d'),GUST_ID=GUST_G.createImageData(GUST_W,GUST_H),GUST_U=new Uint32Array(GUST_ID.data.buffer);
 /* where on the map the air is moving at all: a coarse patchwork, one value for every 8 x 8 tiles, most of it between 0 and 1 */
 const GUSTY_W=Math.ceil(W/8)+1,GUSTY_H=Math.ceil(H/8)+1,GUSTY=new Float32Array(GUSTY_W*GUSTY_H);for(let q=0;q<GUSTY.length;q++){const v=nz((q%GUSTY_W)/2.1+3,((q/GUSTY_W)|0)/2.1+7);GUSTY[q]=v<0.3?0:Math.min(1,(v-0.3)*2.4);}
 /* read between its four nearest values, so the patches have soft edges and never show as squares */
@@ -1931,15 +1984,16 @@ function render(){
  if(!lowZoom&&wetness>0.03){/* after rain the roads are dark with wet */ctx.fillStyle='rgba(18,28,64,'+(0.24*wetness).toFixed(3)+')';
   for(let i=0;i<stTiles.length;i+=2){const x=stTiles[i],y=stTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const m=stMask[y*W+x];if(m===0xFFFF){ctx.fillRect(x*T,y*T,T,T);continue;}for(let r=0;r<4;r++){const row=(m>>(r*4))&15;if(row===15)ctx.fillRect(x*T,y*T+r*S,T,S);else if(row)for(let q=0;q<4;q++)if(row&(1<<q))ctx.fillRect(x*T+q*S,y*T+r*S,S,S);}}}
  /* The wave itself: where the gust is, fields, grass and tree tops turn a shade lighter and open water a shade
-    darker, in two strengths, fainter the further out the view is (far out it must not read as a beam of light). It is drawn at
+    darker, with no edge to it at all, fainter the further out the view is (far out it must not read as a beam of light). It is drawn at
     every zoom, in cells of about sixteen screen pixels (half a tile close up, eight tiles far out; never more than
-    about seventeen thousand a frame), as runs along each row, on whole screen pixels so that no seams show. */
+    about seventeen thousand a frame). */
  {const cs=ppt>=22?0.5:ppt>=12?1:ppt>=7?2:ppt>=3.5?4:8,cx0=Math.floor(gtx0/cs),cx1=Math.ceil(gtx1/cs),cy0=Math.floor(gty0/cs),cy1=Math.ceil(gty1/cs),ox=cv.width/2-cam.x*s,oy=cv.height/2-cam.y*s,q=cs*T*s;
-  ctx.setTransform(1,0,0,1,0,0);
-  const dpi=cs*0.176*8,last=gn-1,al=ppt>=16?0.13:ppt>=7?0.085:0.05,LAND=['','rgba(236,248,200,'+(al/2)+')','rgba(236,248,200,'+al+')'],LAKE=['','rgba(14,40,104,'+(al*0.6)+')','rgba(14,40,104,'+(al*1.2)+')'];
-  for(let cy=cy0;cy<cy1;cy++){const row=Math.min(H-1,Math.floor(cy*cs))*W,y0=Math.round(oy+cy*q),y1=Math.round(oy+(cy+1)*q);let run=0,lv=0,pi=(cx0*cs*0.176+cy*cs*0.132-gp0)*8;
-   for(let cx=cx0;cx<=cx1;cx++,pi+=dpi){let l=0;if(cx<cx1){const tx=Math.min(W-1,Math.floor(cx*cs)),vk=VEG[kind[row+tx]];if(vk){let g=gl[pi<0?0:pi>last?last:pi|0];if(g>0.1)g*=gusty(cx*cs,cy*cs);l=g>0.5?2:g>0.1?1:0;if(l&&vk===2)l+=2;}} /* levels 3 and 4 are water */
-    if(l!==lv){if(lv){const x0=Math.round(ox+(cx-run)*q);ctx.fillStyle=lv>2?LAKE[lv-2]:LAND[lv];ctx.fillRect(x0,y0,Math.round(ox+cx*q)-x0,y1-y0);}lv=l;run=1;}else run++;}}
+  /* one pixel a cell in a small picture, then stretched over the view with its edges blended: no steps, no squares */
+  const cols=Math.min(GUST_W-1,cx1-cx0),rows=Math.min(GUST_H-1,cy1-cy0),u=GUST_U,dpi=cs*0.176*8,last=gn-1,al=255*(ppt>=16?0.15:ppt>=7?0.1:0.06);
+  for(let ry=0;ry<=rows;ry++){const cy=cy0+ry,row=Math.min(H-1,Math.floor(cy*cs))*W,o=ry*GUST_W;let pi=(cx0*cs*0.176+cy*cs*0.132-gp0)*8;
+   for(let rx=0;rx<=cols;rx++,pi+=dpi){let v=0;if(rx<cols&&ry<rows){const tx=Math.min(W-1,Math.floor((cx0+rx)*cs)),vk=VEG[kind[row+tx]];if(vk){let g=gl[pi<0?0:pi>last?last:pi|0];if(g>0.05){g*=gusty((cx0+rx)*cs,cy*cs);if(g>0.04)v=vk===2?(((al*1.2*g)|0)<<24|0x68280e)>>>0:(((al*g)|0)<<24|0xc8f8ec)>>>0;}}}u[o+rx]=v;}}
+  GUST_G.putImageData(GUST_ID,0,0,0,0,cols+1,rows+1);ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(GUST_C,0,0,cols,rows,Math.round(ox+cx0*q),Math.round(oy+cy0*q),Math.round(cols*q),Math.round(rows*q));ctx.imageSmoothingEnabled=false;
   setWorld();}
  if(ppt>=12){const tx0=gtx0,tx1=gtx1-1,ty0=gty0,ty1=gty1-1,u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
   const dayNow=darkness(hour)<0.2,dry3=skyNow()!==3,raining=!dry3,RINGC=['rgba(220,235,255,0.7)','rgba(220,235,255,0.45)','rgba(220,235,255,0.22)'],fly=hiTier&&month>=5&&month<=9&&dayNow&&dry3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')';
@@ -1961,7 +2015,7 @@ function render(){
        ctx.fillStyle=CLOTHC[1];ctx.fillRect(px1(cx),py1(b+4),1/HD,2/HD);ctx.fillRect(px1(cx+s1),py1(b+6),1/HD,2/HD);ctx.fillStyle=CLOTHC[2];ctx.fillRect(px1(cx+s2),py1(b+3+len),2/HD,1/HD);}
       else{const len=2+(c===1?1:0);ctx.fillStyle=WASHC[Math.floor(hash(x*3+qi*5+c,y*7+c)*WASHC.length)];ctx.fillRect(px1(cx),py1(b+5),2/HD,1/HD);ctx.fillRect(px1(cx+s1),py1(b+6),2/HD,1/HD);if(len>1)ctx.fillRect(px1(cx+s2),py1(b+7),2/HD,(len-1)/HD);}}}}
    /* puddles: on the lanes, the squares and bare ground, shrinking as the ground dries */
-   if(pud){const sm=stMask[i];if(sm||k===KI.plaza||k===KI.busyard||k===KI.bare||k===KI.track){const h=hash(x*3+1,y*5+2);if(h<(sm?0.3:0.14)){let cx=2+Math.floor(h*37)%4,cy=2+Math.floor(h*91)%4;
+   if(pud){const sm=stMask[i];if(sm||k===KI.plaza||k===KI.busyard||k===KI.bare){const h=hash(x*3+1,y*5+2);if(h<(sm?0.3:0.14)){let cx=2+Math.floor(h*37)%4,cy=2+Math.floor(h*91)%4;
       if(sm){let bq=Math.floor(h*160)%16;for(let q=0;q<16&&!(sm&(1<<bq));q++)bq=(bq+1)%16;cx=(bq&3)*S+0.33;cy=(bq>>2)*S+0.33;}
       ctx.fillStyle=pudC;ctx.fillRect(X+cx,Y+cy,1.34,0.34);ctx.fillRect(X+cx-0.33,Y+cy+0.33,2,0.34);ctx.fillRect(X+cx,Y+cy+0.67,1.34,0.33);ctx.fillStyle=pudH;ctx.fillRect(X+cx+0.33,Y+cy+0.33,0.67,0.34);}}}
    /* butterflies over grass and gardens, May to September */
@@ -2077,8 +2131,12 @@ function render(){
  if(goal){const m=lowZoom?Math.max(1,Math.round(1.6/s)):1,gx=Math.round(goal[0]*T+T/2),gy=Math.round(goal[1]*T+T),bob=(frame>>2)%2;
   ctx.fillStyle='#1b1b1b';ctx.fillRect(gx-m,gy-11*m,3*m,12*m);ctx.fillRect(gx+m,gy-12*m-bob*m,6*m,6*m);
   ctx.fillStyle='#f4f4f0';ctx.fillRect(gx,gy-10*m,m,10*m);ctx.fillStyle='#c2412b';ctx.fillRect(gx+m,gy-11*m-bob*m,4*m,4*m);ctx.fillStyle=YOU_COL;ctx.fillRect(gx+2*m,gy-10*m-bob*m,2*m,2*m);}
- /* cloud shadows: blocky, snapped to the cloud cell */
- ctx.fillStyle='rgba(10,20,10,.13)';for(const c of clouds){const cell=c.cell,ox=Math.round((c.x-c.shape.cw*cell/2)/cell)*cell,oy=Math.round((c.y-c.shape.chh*cell/2)/cell)*cell;if(ox>vx1||ox+c.shape.cw*cell<vx0||oy>vy1||oy+c.shape.chh*cell<vy0)continue;for(const [j,i0,n] of c.shape.runs)ctx.fillRect(ox+i0*cell,oy+j*cell,n*cell,cell);}
+ /* cloud shadows: each cloud's shape is kept as a small picture, one pixel a cell, and stretched with its edges
+    blended, so a shadow is a soft patch that slides over the land and not a block that jumps from cell to cell */
+ ctx.imageSmoothingEnabled=true;for(const c of clouds){const cell=c.cell,cw=c.shape.cw,chh=c.shape.chh,ox=c.x-cw*cell/2,oy=c.y-chh*cell/2;if(ox>vx1||ox+cw*cell<vx0||oy>vy1||oy+chh*cell<vy0)continue;
+  if(!c.img){c.img=mkCanvas(cw+2,chh+2);const g=c.img.getContext('2d');g.fillStyle='rgba(10,20,14,.15)';for(const [j,i0,len] of c.shape.runs)g.fillRect(i0+1,j+1,len,1);}
+  ctx.drawImage(c.img,ox-cell,oy-cell,(cw+2)*cell,(chh+2)*cell);}
+ ctx.imageSmoothingEnabled=false;
  /* hoarfrost on the fields, January mornings (frost, fog and the sea of clouds are one block a tile; up close their edges are blended) */
  if(hiTier)ctx.imageSmoothingEnabled=true;
  {const fr=frostAmt(hour);if(fr>0){ctx.globalAlpha=fr;ctx.drawImage(frostMask(),0,0,W*T,H*T);ctx.globalAlpha=1;}}

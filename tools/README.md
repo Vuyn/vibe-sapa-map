@@ -212,6 +212,16 @@ On 2026-11-14, with wind, rain traces and the other things drawn each frame adde
 
 To look for code that is no longer used, the parser bundled with Node is enough: parse the page script, list every declared name and count the places it is read. That check found nothing unread on 2026-11-13.
 
+## Height
+
+Added on 2026-11-14, when the map was asked to look "2.5D", with higher and lower ground told apart as in top-down pixel games. The land is drawn as levels of 60 m (`STEP_H`), with a face wherever one level drops to the next.
+
+- **The view is from the south.** Where the ground steps down towards the bottom of the screen you see the face of the step: seven pixels of earth, rock, ice or walling in the close-up (eleven for a drop of two levels), streaked, dark at the foot, under a lit lip of the ground above and over its own shadow. Where it steps down away from you there is only a faint line. A step facing east shows a narrow face in shade, one facing west a narrow lit face. On a steep slope the faces run together into a cliff.
+- **The faces follow the contours.** The level is read from the height of the ground under every pixel (`eSub`), so a face is a curve and never follows the grid of tiles. `stepsHere` skips the tiles no level line comes near. A tile reads up to twelve pixels above itself and three to the side, because a face that starts in the next tile hangs into this one; `R` cuts each tile's share (`cliffs` in `drawTileHi`).
+- **Forest** shows its levels as a band of shade across the tree tops under a line of light, drawn after the trees. **Town ground and paving** get faces of walling, which read as the retaining walls of a hill town. **Rice terraces** do the same at their own 10 m: a dark riser where the step above faces you, a lit lip where this step drops away.
+- **The 8-pixel art** draws a face one art pixel tall under a lighter lip; **the far view** darkens the upper half of a tile that lies below an 80 m drop and lightens the lower half of the tile above it.
+- **Cost:** a tile crossed by a level line reads about a thousand heights. A close-up chunk is 16 tiles, so painting one stays inside the frame budget; `perf.js` on the day it went in: panning 3 to 9 ms, zooming and a change of month 10 to 20 ms, and one frame of about 30 ms the first time the close-up is entered, as before.
+
 ## Soft borders
 
 The land is stored one kind a tile, but it is not drawn as squares. Added on 2026-11-13, when the map still looked "stiff" where regions met.
@@ -225,6 +235,8 @@ The land is stored one kind a tile, but it is not drawn as squares. Added on 202
 - **Houses off the grid.** `houseBox` moves each house a little in its quarter and varies the width of the small ones; three in ten show a gable end; some village yards have a fence.
 - **The 8-pixel art** has the same idea at its own size: along every side one art pixel in three belongs to the ground across it.
 - **The far view** (`miniImage`) has four pixels a tile, and two in five on open ground take the colour of the ground beside them. `miniSmall` is the same picture at one pixel a tile for the overview.
+- **The town square, the bus yard and the market ground** used to be boxes stamped by the terrain build. OpenStreetMap was asked for their outlines on 2026-11-14: it has only a point for the square and points for the bus station (and outlines for the two market halls, about five tiles together, which are not used). Each is now a rounded patch with an uneven edge round its point (`patch` in `buildTerrain`), and paving and tarmac take part in the soft borders (`PLAZA_COL`, `YARD_COL` in `groundCol`).
+- **Nothing drawn over the land has a hard edge.** Cloud shadows are small pictures stretched with their edges blended. The gust is painted into a small picture each frame (`GUST_C`) and stretched the same way. Slope light and mountain shadows are blended at every zoom, and the fine relief of the town box fades in over four tiles instead of starting at a line. Landmark pictures do not sit on a rectangle of their own ground (`kit.cut` breaks a straight outline).
 - **No popping.** A chunk that has just been painted fades in over the coarser picture for a fifth of a second (`show` in `render`), and on a change of zoom tier, in either direction, what was painted for the tier just left fades out over the new one (`tierPrev`).
 - **The 8-pixel art has softened outlines too:** lanes and water go through `smoothCells` at two pixels a cell.
 
@@ -257,6 +269,7 @@ On screens up to 900 px wide the title and side panel give way to the map: the p
 
 - The text on the place cards (the `LM` array in the template) was checked against sources on 2026-11-12. The parts most likely to go out of date are the hotel's name (Victoria Sapa became The Myst Sapa Resort in September 2026), the cable car's first and last departures, the days of the night market and the love market, whether the Móng Sến viaduct is open, and commune names (Sa Pa has been a ward, not a town-level unit, since 1 July 2025; the Vietnamese text says "trung tâm Sa Pa", not "thị xã"). Check these again before a new release.
 - Five places have no point of their own in OpenStreetMap and are placed by hand (`src:'approx'`): the bus station, Sín Chải (at Sin Chai Ecolodge), Ý Linh Hồ, Giàng Tả Chải and Lếch Dao (on the houses beside the GeoNames point for Bản Lếch, north of Topas Ecolodge).
+- Six kinds of ground that no rule ever assigned (`road`, `track`, `street`, `hotel`, `big`, `hut`) were removed on 2026-11-14 with their drawing code. `orchard` is kept: no tile has it with today's data, but OpenStreetMap land cover can produce it.
 - `raw` is not in the repository, and `.gitignore` keeps it out, together with a `shots` folder for screenshots. `parse-osm.js` and `parse-osm2.js` reproduced the committed `osm-out.json` and `osm2-out.json` exactly from the saved download on 2026-11-12, before dams were added. A fresh fetch will pick up whatever has changed in OpenStreetMap since.
 - The cached download in `raw` was made before guest houses were added to the query. The missing ones were merged in by hand once; a fresh `node fetch-data.js --force` asks for them itself.
 - Overpass servers are often busy. `fetch-data.js` splits the request into parts, tries three mirrors, and retries three rounds.
