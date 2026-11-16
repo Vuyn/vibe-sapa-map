@@ -1,6 +1,7 @@
 // Assemble the single-file map from template.html, frame.json and ./data.
 // Usage: node build.js data template.html ..\index.html
-// data must contain: elev.bin, elev.json, lc.bin, osm-out.json, osm2-out.json, fonts/ (manifest.txt + woff2).
+// data must contain: elev.bin, elev.json, lc.bin, osm-out.json, osm2-out.json, fonts/ (manifest.txt + woff2),
+// tiles/<pack>/tilemap_packed.png for the four tile packs the close-up art is drawn from (each with its License.txt).
 // The data goes into the page as one container: [uint32 length][JSON][binary parts], gzipped, then base64 once.
 const fs=require('fs'),zlib=require('zlib'),path=require('path');
 const [,,dataDir,templatePath,outPath]=process.argv;
@@ -18,8 +19,11 @@ for(const line of rd('fonts/manifest.txt').split(/\r?\n/)){const [file,fam,weigh
  const b64=fs.readFileSync(path.join(dataDir,'fonts',file)).toString('base64');
  fontCss+=`@font-face{font-family:'${fam}';font-style:normal;font-weight:${weight};font-display:swap;src:url(data:font/woff2;base64,${b64}) format('woff2');unicode-range:${range}}\n`;}
 let html=fs.readFileSync(templatePath,'utf8');
-for(const ph of ['__DATA_GZ__','__FONT_CSS__','__FRAME__','__W__','__H__'])if(!html.includes(ph))throw new Error('template placeholder missing: '+ph);
+// the tile sheets, each as it came in its pack, as data URLs; the page reads them by these short names
+const TILE_PACKS={tt:'tiny-town',tf:'tiny-farm',td:'tiny-dungeon',tk:'tiny-ski'},tiles={};
+for(const k of Object.keys(TILE_PACKS))tiles[k]='data:image/png;base64,'+fs.readFileSync(path.join(dataDir,'tiles',TILE_PACKS[k],'tilemap_packed.png')).toString('base64');
+for(const ph of ['__DATA_GZ__','__FONT_CSS__','__FRAME__','__TILES__','__W__','__H__'])if(!html.includes(ph))throw new Error('template placeholder missing: '+ph);
 const frame={W:F.W,H:F.H,LON0:F.LON0,LON1:F.LON1,LAT0:F.LAT0,LAT1:F.LAT1,MPT:F.MPT};
-html=html.replace('__DATA_GZ__',()=>gz).replace('__FONT_CSS__',()=>fontCss.trim()).replace('__FRAME__',()=>JSON.stringify(frame)).split('__W__').join(String(F.W)).split('__H__').join(String(F.H));
+html=html.replace('__DATA_GZ__',()=>gz).replace('__FONT_CSS__',()=>fontCss.trim()).replace('__FRAME__',()=>JSON.stringify(frame)).replace('__TILES__',()=>JSON.stringify(tiles)).split('__W__').join(String(F.W)).split('__H__').join(String(F.H));
 fs.writeFileSync(outPath,html,'utf8');
 console.log('frame',F.W+'x'+F.H,'| data gzip+base64',gz.length,'| html bytes',Buffer.byteLength(html,'utf8'));

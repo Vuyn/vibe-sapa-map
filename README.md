@@ -17,8 +17,8 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 - **Land with height:** the ground is drawn in levels, as in top-down pixel games. Where it steps down towards you there is a cliff face of earth or rock under a lit edge; forests show their levels as bands of shade, the town its retaining walls, and the rice terraces their risers.
 - **Real terrain, drawn softly:** forest, meadow, rock and village ground run into each other along wobbling borders instead of tile squares; rice terraces that follow the contour lines, rivers that widen downstream with rapids where they fall steeply, the true outline of Hồ Sa Pa with its island, the hydropower reservoirs with their dams and power plants, and hill shading from the elevation model.
 - **Town detail:** streets, buildings, hotels, shops and cafés from OpenStreetMap, with street names when you zoom in.
-- **Drawn as pixel art, on one grid:** the map is shown only at zoom levels where every pixel of the art is a whole number of screen pixels, in a palette of 46 colours. Slopes are shaded in flat bands with stippled seams, and houses, people and the landmark buildings have a dark outline, as in a hand-drawn game map.
-- **A close-up view:** zoom in past street level and the map is redrawn at three times the detail: houses with doors and windows, tree crowns, the crop on each terrace, washing lines and indigo cloth drying in the yards, and people small enough to blend in but clear enough to tell a guide from a farmer. Every landmark has its own picture there: the stone church with its spire, the cable car station, the monastery, the market hall, the water wheel at Cát Cát.
+- **Drawn as pixel art, from a hand-drawn tileset:** up close the houses, trees, crops, people and animals are tiles from Kenney's Tiny Town, Tiny Farm, Tiny Dungeon and Tiny Ski packs, and the whole map is painted in their palette. The map is shown only at zoom levels where every pixel of the art is a whole number of screen pixels.
+- **A close-up view:** zoom in past street level and the map becomes a small pixel-art world, 64 pixels to a tile: houses with tiled, slate and shingle roofs, a forest of pines, garden beds with the crop of the month, the rice terraces following their contours, washing lines and indigo cloth drying in the yards, market stalls with their produce, and people, buffalo, pigs and chickens. The town's landmark buildings are built from the same tiles: the stone church with its tower, the cable car station, the monastery, the market hall.
 - **Homestays:** named homestays near the valley villages, as mapped in OpenStreetMap.
 - **Peaks, waterfalls and viewpoints** with their names and heights.
 
@@ -84,9 +84,10 @@ The tools need Node 20 or later. [tools/README.md](tools/README.md) describes th
 - **Roads, rivers, lakes, buildings, shops, places to stay and most places:** © OpenStreetMap contributors, Open Database License.
 - **Monthly temperature and rainfall:** Sa Pa averages from climatestotravel.com.
 - **Fonts:** Press Start 2P and IBM Plex Sans, SIL Open Font License.
+- **Pixel art tiles:** the close-up art uses the [Tiny Town](https://kenney.nl/assets/tiny-town), [Tiny Farm](https://kenney.nl/assets/tiny-farm), [Tiny Dungeon](https://kenney.nl/assets/tiny-dungeon) and [Tiny Ski](https://kenney.nl/assets/tiny-ski) packs, created by **Kenney** ([www.kenney.nl](https://www.kenney.nl)) and released into the public domain (Creative Commons Zero, CC0). The sheets are in `tools/data/tiles`, unchanged, each with its licence file. A few tiles are recoloured by the page, and a handful of sprites the packs lack (a pig, a dog, a duck, a motorbike, a coach, market stalls) were drawn for this map in the same style.
 
 Place descriptions and travel tips are written for this map. Check opening times, prices and trail conditions locally before you travel.
 
 ## Licence
 
-The code is under the MIT licence, see [LICENSE](LICENSE). The map data keeps the licences of its sources listed above.
+The code is under the MIT licence, see [LICENSE](LICENSE). The map data and the tile art keep the licences of their sources listed above.
