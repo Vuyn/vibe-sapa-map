@@ -221,7 +221,6 @@ canvas#mini{position:static;display:block;width:100%;height:auto;aspect-ratio:__
    lat 22.240-22.405, about 38.6 m per tile, drawn as 8 px tiles with a 2 px art grid.
    All data is one container, gzipped and base64-encoded once: [uint32 length][JSON][binary parts]
      elev     SRTM via AWS Terrarium z12 at every second tile, 1 m precision, as predictor residuals
-     detail   SRTM z14 at 2x2 samples per tile for the town box: metres = 1100 + v*3.5
      lc       Sentinel-2 10 m land cover class per tile (Esri / Impact Observatory)
      JSON     roads, streets, rivers, water, railways, cable car, hotels, waterfalls, viewpoints, peaks,
               land-cover polygons, buildings and shops (OpenStreetMap)
@@ -453,12 +452,11 @@ function buildTerrain(U,P,HP){
   const cr=(a,b,c,d,t)=>0.5*(2*b+(c-a)*t+(2*a-5*b+4*c-d)*t*t+(3*b-a-3*c+d)*t*t*t);
   for(let y=0;y<H;y++){const fy=(y+.5)/es-.5,y0=Math.floor(fy),ty=fy-y0;for(let x=0;x<W;x++){const fx=(x+.5)/es-.5,x0=Math.floor(fx),tx=fx-x0;
    elev[y*W+x]=cr(cr(L(x0-1,y0-1),L(x0,y0-1),L(x0+1,y0-1),L(x0+2,y0-1),tx),cr(L(x0-1,y0),L(x0,y0),L(x0+1,y0),L(x0+2,y0),tx),cr(L(x0-1,y0+1),L(x0,y0+1),L(x0+1,y0+1),L(x0+2,y0+1),tx),cr(L(x0-1,y0+2),L(x0,y0+2),L(x0+1,y0+2),L(x0+2,y0+2),tx),ty);}}}
- const DB=P.detail,DBS=DB.size,DF=DB.factor,DN=DBS*DF,dbytes=U.part('detail'),detail=new Float32Array(DN*DN);for(let i=0;i<DN*DN;i++)detail[i]=1100+dbytes[i]*3.5;
  /* Sentinel-2 land cover per tile: 0 none 1 water 2 trees 3 flooded 4 crops 5 built 6 bare 7 snow 8 cloud 9 rangeland */
  const lcGrid=U.part('lc');
  const eAt=(x,y)=>elev[Math.min(H-1,Math.max(0,y))*W+Math.min(W-1,Math.max(0,x))];
  /* the shading of the slopes and the shadows the mountains cast are not worked out here: they follow the sun, so the
-    page draws them as a layer of its own from elev and detail (section 5) */
+    page works them out from elev as the sun moves (section 5) */
  const colMax=new Float32Array(W);for(let x=0;x<W;x++){let m=0;for(let y=0;y<H;y++)m=Math.max(m,elev[y*W+x]);colMax[x]=m;}
 
  const kind=new Uint8Array(N),flags=new Uint8Array(N),snow=new Uint8Array(N),quad=new Uint16Array(N);
@@ -562,7 +560,7 @@ function buildTerrain(U,P,HP){
   else if(td<TOWN_R+8*K&&lc===5&&!bNear[i]&&dStreet[i]<3*K&&v<0.55){k='town';gen=1;}
   else if(hotelCnt[i]&&e<2400){k='village';gen=1;} /* homestays out in the valley */
   /* built-up land outside town is a village: houses gather where a smooth noise field is high, the rest is garden */
-  else if(lc===5&&td>=TOWN_R){const c=nz(x/(2.2*K)+7,y/(2.2*K)+3)*0.75+v*0.25;if(sl<50&&c>0.42){k='village';gen=c>0.62?3:c>0.52?2:1;}else k='garden';}
+  else if(lc===5&&td>=TOWN_R){const c=nz(x/(2.2*K)+7,y/(2.2*K)+3)*0.75+v*0.25;if(sl<50&&c>0.42){k='village';gen=c>0.68?3:c>0.56?2:1;}else k='garden';} /* three houses a tile only in the very middle of a hamlet: the rest is one or two, with yards between */
   else if(villages.some(l=>Math.abs(cx-l.x-l.w/2)<3.5*K&&Math.abs(cy-l.y-l.w/2)<3.5*K)&&v<0.2&&sl<35){k='village';gen=1;}
   else if(cv0===6&&dStreet[i]<2*K&&v<0.5){k='town';gen=1;}
   /* satellite water that passed the test above. Not in town, where OpenStreetMap has the lake's true outline and a
@@ -630,11 +628,11 @@ function buildTerrain(U,P,HP){
  /* waterfalls, viewpoints and peaks: fill in a height from the grid where OSM has none */
  const feat=(OSM.feat||[]).filter(f=>f.x>=0&&f.y>=0&&f.x<W&&f.y<H).map(f=>({k:f.k,n:f.n||'',ne:f.ne||'',x:f.x,y:f.y,e:f.e||Math.round(elev[Math.floor(f.y)*W+Math.floor(f.x)])}));
  const u16=a=>Uint16Array.from(a);
- const out={elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles:u16(water),windowTiles:u16(windows),stTiles:u16(sts),lampPts:u16(lamps),
+ const out={elev,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles:u16(water),windowTiles:u16(windows),stTiles:u16(sts),lampPts:u16(lamps),
   streetLabels,trainLine,cableLine,trekLines,ways,passRoad:longest(/o quy ho|quoc lo 4d/),valleyRoad:longest(/tinh 152|lao chai/),feat,pois:POIS,stays:OSM.stays||[],dams:Object.keys(damM).map(k=>[+k,damM[k]]),
   /* what OpenStreetMap names along the rivers: dams (at the middle of the crest) and power plants; d is 1 for a dam */
   power:(D.dams||[]).filter(d=>d.n).map(d=>{const m=polyAt(unpack(d),0.5);return{n:d.n,x:m[0],y:m[1],d:1};}).concat((D.plants||[]).map(p=>({n:p.n||'',x:p.x,y:p.y,d:0})))};
- out.transfer=[elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
+ out.transfer=[elev,colMax,kind,flags,snow,quad,stMask,railMask,wMask,out.waterTiles,out.windowTiles,out.stTiles,out.lampPts].map(a=>a.buffer);
  return out;
 }
 const {hash,nz}=sharedHelpers();
@@ -654,7 +652,7 @@ function polyAt(pts,t){const n=pts.length;if(n<2)return pts[n-1];const c=polyRun
 /* every kind of ground the terrain build can give a tile ('snow' is never stored: snowy ground is drawn as it by the season) */
 const KINDS=['water','bridge','terrace','grass','scrub','orchard','forest','rock','snow','plaza','park','busyard','market','town','bare','village','garden'];
 const KI={};KINDS.forEach((k,i)=>{KI[k]=i;});
-const SPEC={W,H,T,S,K,CLS,KINDS,detail:FR.detail,church:{x:toX(CH.lon),y:toY(CH.lat)},lm:LM.map(l=>({id:l.id,x:l.x,y:l.y,w:l.w,sp:l.sp})),treks:TREKS.map(t=>({id:t.id,lines:t.lines,re:t.re||null})),square:{x:toX(103.84148),y:toY(22.33528)}};
+const SPEC={W,H,T,S,K,CLS,KINDS,church:{x:toX(CH.lon),y:toY(CH.lat)},lm:LM.map(l=>({id:l.id,x:l.x,y:l.y,w:l.w,sp:l.sp})),treks:TREKS.map(t=>({id:t.id,lines:t.lines,re:t.re||null})),square:{x:toX(103.84148),y:toY(22.33528)}};
 async function getTerrain(){
  const here=async()=>buildTerrain(await unpackData(DATA_GZ),SPEC,sharedHelpers());
  if(HASH.worker==='0'||typeof Worker==='undefined'||typeof Blob==='undefined'||typeof URL==='undefined'||!URL.createObjectURL)return here();
@@ -665,11 +663,9 @@ async function getTerrain(){
  }catch(e){if(e.message==='nogzip')throw e;return here();}
 }
 let R;try{R=await getTerrain();}catch(e){loadingEl.textContent=e.message==='nogzip'?'Bản đồ cần trình duyệt từ 2023 trở lên · This map needs a browser from 2023 or later (Chrome 80+, Firefox 113+, Safari 16.4+).':'Không dựng được bản đồ · Could not build the map: '+e.message;return;}
-const {elev,detail,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles,windowTiles,stTiles,lampPts}=R;
+const {elev,colMax,kind,flags,snow,quad,stMask,railMask,wMask,waterTiles,windowTiles,stTiles,lampPts}=R;
 const POIS=R.pois,STREET_LABELS=R.streetLabels,TRAIN_LINE=R.trainLine,CABLE_LINE=R.cableLine,WAYS=R.ways;
 for(const t of TREKS)t.lines=R.trekLines[t.id]||t.lines;
-const DBX=FR.detail.x,DBY=FR.detail.y,DBS=FR.detail.size,DF=FR.detail.factor,DN=DBS*DF;
-const inDetail=(x,y)=>x>=DBX&&x<DBX+DBS&&y>=DBY&&y<DBY+DBS;
 const eAt=(x,y)=>elev[Math.min(H-1,Math.max(0,y))*W+Math.min(W-1,Math.max(0,x))];
 const slopeAt=(x,y)=>Math.max(Math.abs(eAt(x+K,y)-eAt(x-K,y)),Math.abs(eAt(x,y+K)-eAt(x,y-K)))/2;
 /* height at any point, blended between the four nearest tile centres: the terraces are drawn from this */
@@ -708,30 +704,27 @@ const FEAT=R.feat.filter(f=>!LM.some(l=>Math.hypot(f.x-l.x-l.w/2,f.y-l.y-l.w/2)<
    animals sit in the landscape at the same scale as the houses.
    ===================================================================== */
 /* ---- THE PALETTE ----
-   Every colour the map is painted in comes from these ramps. A ramp runs from dark to light, and its hue turns as it
+   Every colour the map is painted in comes from these ramps, forty-six colours in all. A ramp runs from dark to light, and its hue turns as it
    goes: the dark end leans to blue, the light end to yellow, which is what makes shade look cool and sunlit ground warm
    without any colour being grey. Colours in the code are written as before; when one is first used it is replaced by
-   the nearest palette colour (pal, palRGB), once, so this costs nothing while drawing. Shadows, glows and other
-   see-through overlays are mixed on top and are not snapped.
+   the nearest palette colour (pal, palRGB), once, so this costs nothing while drawing. A see-through colour painted
+   into the land (a shadow, the foot of a cliff) is mixed with what is under it and the result snapped as well (blendC);
+   what is drawn over the land each frame (shade and light, night, weather, glows) is not.
    Each ramp: hue at the dark end, hue at the light end, saturation at both ends, lightness at both ends, steps. */
 const RAMPS=[
- [118,74,40,46,18,82,16],   /* leaf: grass, gardens, young rice */
- [138,118,50,44,10,48,12],  /* pine: forest */
- [80,54,22,34,24,76,9],     /* olive: dry grass, winter fields */
- [18,34,34,46,12,58,9],     /* timber: planks, posts, thatch */
- [38,52,60,82,30,86,11],    /* gold: ripe rice, straw, lamplight yellow */
- [20,44,26,34,14,90,13],    /* earth: wood, tracks, sand, plaster */
- [70,52,6,12,20,90,10],     /* stone: rock, concrete, warm greys */
- [238,214,12,16,14,84,10],  /* slate: asphalt, slate roofs, cool greys */
- [228,204,62,84,24,94,11],  /* water */
- [352,16,56,72,20,72,9],    /* brick: tiled roofs, reds */
- [14,42,82,88,38,68,5],     /* ember: orange awnings, flames */
- [332,346,58,78,42,94,7],   /* rose: blossom */
- [242,224,50,58,16,58,7],   /* indigo: dyed cloth, deep shade */
- [178,158,36,38,22,62,6],   /* teal: painted roofs */
- [216,208,34,22,72,97,5],   /* ice: snow */
- [44,52,30,10,74,97,5]];    /* cream: whitewash, awning stripes */
-const PALETTE=[[28,26,38],[240,200,160],[224,176,138]]; /* ink, and two skin tones */
+ [150,80,50,54,13,73,7],    /* leaf: from the shade under the forest up to sunlit grass */
+ [72,54,30,42,38,66,2],     /* olive: dry grass, winter fields */
+ [36,50,64,82,36,80,4],     /* gold: ripe rice, straw, lamplight */
+ [16,40,34,36,13,82,6],     /* earth: timber, tracks, sand, plaster */
+ [64,52,7,10,30,82,4],      /* stone: rock, concrete */
+ [236,216,14,16,20,66,3],   /* slate: asphalt, slate roofs */
+ [226,204,64,82,28,88,4],   /* water */
+ [354,16,58,70,26,60,3],    /* brick: tiled roofs, reds */
+ [340,344,62,76,58,86,2],   /* rose: blossom */
+ [240,226,50,56,20,44,2],   /* indigo: dyed cloth */
+ [172,160,36,38,32,54,2],   /* teal: painted roofs */
+ [214,210,30,22,80,95,2]];  /* ice: snow */
+const PALETTE=[[28,26,38],[240,200,160],[224,176,138],[244,244,240],[224,123,42]]; /* ink, two skin tones, white, orange */
 {const hsl=(h,s,l)=>{h=((h%360)+360)%360;s/=100;l/=100;const a=s*Math.min(l,1-l),f=q=>{const k=(q+h/30)%12;return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))));};return[f(0),f(8),f(4)];};
  for(const [h0,h1,s0,s1,l0,l1,st] of RAMPS)for(let q=0;q<st;q++){const t=q/(st-1);PALETTE.push(hsl(h0+(h1-h0)*t,s0+(s1-s0)*t,l0+(l1-l0)*t));}}
 /* the nearest palette colour to an r,g,b, by a distance that weighs the channels roughly as the eye does */
@@ -815,11 +808,26 @@ const FIG={
  mPower:['VVVVVVVVVVVVVVVVVVVVVV','.VVVVVVVVVVVVVVVVVVVV.','.XXXXXXXXXXXXXXXXXXXX.','.XLLXXLLXXLLXXXXXXLLX.','.XLLXXLLXXLLXXDDDXLLX.','.XXXXXXXXXXXXXDDDXXXX.','.XXXXXXXXXXXXXDDDXXXX.','.QQQQQQQQQQQQQQQQQQQQ.'],
 };
 const figCache=new Map();
-function fig(name,cols){const key=name+(cols?'|'+cols.b+'|'+cols.h+'|'+cols.a:'');let c=figCache.get(key);if(c)return c;const rows=FIG[name];c=mkCanvas(rows[0].length,rows.length);const g=c.getContext('2d');
- for(let r=0;r<rows.length;r++)for(let q=0;q<rows[r].length;q++){const ch=rows[r][q];if(ch==='.')continue;g.fillStyle=pal(ch==='b'?cols.b:ch==='h'?cols.h:ch==='a'?cols.a:PAL[ch]);g.fillRect(q,r,1,1);}
- c.sh=!/^(bird|m[A-Z]|basket|umbrella|gondola|pole|duck)/.test(name);figCache.set(key,c);return c;}
+/* ---- OUTLINES ----
+   Everything that stands on the land and is not land itself (people, animals, vehicles, stalls, houses, the buildings
+   of the places) has a dark line one close-up pixel wide round it, which is what lets a small picture be read against
+   busy ground. inkEdge adds it to a finished picture: every empty pixel beside a coloured one turns dark. Pixels that
+   are dark already (legs, a buffalo) get no line, or they would swell into a blob; the pale blue ground shadows count
+   as empty, other see-through pixels (smoke, the shade under an awning) are left alone. The picture must have a spare
+   pixel all round for the line to go in. */
+const INK='#1c1a26';
+function inkEdge(c){const w=c.width,h=c.height,g=c.getContext('2d'),im=g.getImageData(0,0,w,h),d=im.data,s=d.slice();
+ const lit=(x,y)=>{if(x<0||y<0||x>=w||y>=h)return false;const j=(y*w+x)*4;return s[j+3]>200&&s[j]+s[j+1]+s[j+2]>150;};
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const j=(y*w+x)*4,a=s[j+3];if(a>200||(a>20&&!(s[j]<40&&s[j+2]>s[j]+15)))continue;
+  if(lit(x-1,y)||lit(x+1,y)||lit(x,y-1)||lit(x,y+1)){d[j]=28;d[j+1]=26;d[j+2]=38;d[j+3]=255;}}
+ g.putImageData(im,0,0);return c;}
+function fig(name,cols){const key=name+(cols?'|'+cols.b+'|'+cols.h+'|'+cols.a:'');let c=figCache.get(key);if(c)return c;const rows=FIG[name],ol=/^(bird|basket|umbrella|pole)/.test(name)?0:1;c=mkCanvas(rows[0].length+2*ol,rows.length+2*ol);const g=c.getContext('2d');
+ for(let r=0;r<rows.length;r++)for(let q=0;q<rows[r].length;q++){const ch=rows[r][q];if(ch==='.')continue;g.fillStyle=pal(ch==='b'?cols.b:ch==='h'?cols.h:ch==='a'?cols.a:PAL[ch]);g.fillRect(q+ol,r+ol,1,1);}
+ if(ol)inkEdge(c);c.ol=ol;c.sh=!/^(bird|m[A-Z]|basket|umbrella|gondola|pole|duck)/.test(name);figCache.set(key,c);return c;}
 /* stamp a figure with the middle of its feet at world x,y; dy lifts it (a basket, an umbrella) */
-function putFig(c,x,y,flip,dy){const w=c.width/HD,h=c.height/HD;if(c.sh&&!dy){/* a figure's own small shadow, so it stands on the ground */ctx.fillStyle='rgba(12,16,48,.22)';ctx.fillRect(x-w*0.4+1/HD,y-1/HD,w*0.8,2/HD);}y-=dy||0;if(flip){ctx.save();ctx.translate(x,y);ctx.scale(-1,1);ctx.drawImage(c,-w/2,-h,w,h);ctx.restore();}else ctx.drawImage(c,x-w/2,y-h,w,h);}
+function putFig(c,x,y,flip,dy){const w=c.width/HD,h=c.height/HD,half=Math.ceil(c.width/2)/HD;x=Math.round(x*HD)/HD;y=Math.round((y-(dy||0))*HD+c.ol)/HD; /* always on the close-up's pixel grid */
+ if(c.sh&&!dy){/* a figure's own small shadow, so it stands on the ground */ctx.fillStyle='rgba(12,16,48,.26)';ctx.fillRect(x-half+2/HD,y,w-1/HD,1/HD);}
+ if(flip){ctx.save();ctx.translate(x,y);ctx.scale(-1,1);ctx.drawImage(c,-half,-h,w,h);ctx.restore();}else ctx.drawImage(c,x-half,y-h,w,h);}
 const sprHiC=new Map();
 /* ---- LANDMARKS DRAWN FOR THE CLOSE-UP ----
    Each place has its own picture here, three times the pixels of its small sprite and drawn rectangle by rectangle:
@@ -974,8 +982,12 @@ const HLIT={church:[[17,24,2,6],[23,24,2,6],[29,24,2,6],[7,21,2,2],[6,13,4,5]],s
    of the picture below it, and the pixel under that) */
 function sprHi(name,snow){const key=snow?name+'|snow':name;let c=sprHiC.get(key);if(c)return c;const s0=SPR[name]||SPR.house,r=(x,y,w,h,col)=>{g.fillStyle=pal(col);g.fillRect(x,y,w,h);};c=mkCanvas(s0[0].length*3,s0.length*3);const g=c.getContext('2d');const kit=hiKit(r);kit.cut=(x,y,w,h)=>g.clearRect(x,y,w,h); /* cut: take pixels away again, to break a straight outline */HSPR[name](r,kit);
  if(snow){const w=c.width,h=c.height,im=g.getImageData(0,0,w,h),d=im.data,op=(x,y)=>y>=0&&y<h&&d[(y*w+x)*4+3]>200;for(let x=0;x<w;x++)for(let y=0;y<h-2;y++)if(op(x,y)&&!op(x,y-1)&&op(x,y+1)&&op(x,y+2)){d.set([238,243,248,255],(y*w+x)*4);d.set([207,217,230,255],((y+1)*w+x)*4);}g.putImageData(im,0,0);}
+ /* the picture is kept at twice its size with a spare pixel round it, one of its pixels being two of the close-up's, so
+    that the outline of a building is as thin as the outline of a house or a person. Pictures of land (a hill, a
+    waterfall, a lake) get no outline: they are part of the ground. */
+ {const b=mkCanvas(c.width*2+2,c.height*2+2),bg=b.getContext('2d');bg.imageSmoothingEnabled=false;bg.drawImage(c,1,1,c.width*2,c.height*2);if(!/^(peak|isle|tarn|hill|falls|pass|glass|mill)$/.test(name))inkEdge(b);c=b;}
  sprHiC.set(key,c);return c;}
-function drawSpr(c,name,px,py,snow){if(hiTier&&c===ctx){const im=sprHi(name,snow);c.drawImage(im,px,py,im.width*S/3,im.height*S/3);}else drawSprite(c,name,px,py,S);}
+function drawSpr(c,name,px,py,snow){if(hiTier&&c===ctx){const im=sprHi(name,snow);c.drawImage(im,px-1/HD,py-1/HD,im.width/HD,im.height/HD);}else drawSprite(c,name,px,py,S);}
 function drawLandmark(c,l){drawSpr(c,(hiTier&&c===ctx&&SP_HI[l.id])||l.sp,l.x*T,l.y*T,winterSnow()&&snowAt(at(l.x,l.y+l.w-1)));}
 /* people, animals and vehicles: a handful of art pixels each. x,y is where their feet touch the ground. */
 function drawPerson(c,x,y,body,head,step,hat){if(hiTier&&c===ctx){putFig(fig((hat?'f':'p')+(step?'B':'A'),{b:body,h:head}),x,y);return;}c.fillStyle=head;c.fillRect(x-1,y-6,2,2);c.fillStyle=body;c.fillRect(x-1,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(step?x-1:x,y-2,1,2);c.fillRect(step?x:x-1,y-2,1,1);}
@@ -985,7 +997,7 @@ function drawMoto(c,x,y,flip){if(hiTier&&c===ctx){putFig(fig('moto',{b:'#c2412b'
 function drawBus(c,x,y,flip){if(hiTier&&c===ctx){putFig(fig('bus'),x,y,flip);return;}c.fillStyle='#f4f4f0';c.fillRect(x-4,y-5,8,2);c.fillStyle='#c2412b';c.fillRect(x-4,y-3,8,2);c.fillStyle='#3a4a5a';c.fillRect(x-3,y-4,2,1);c.fillRect(x,y-4,2,1);c.fillStyle='#1b1b1b';c.fillRect(x-3,y-1,2,1);c.fillRect(x+1,y-1,2,1);}
 function drawUmbrella(c,x,y,col){if(hiTier&&c===ctx){putFig(fig('umbrella',{a:col}),x,y,false,3.6);return;}c.fillStyle=col;c.fillRect(x-3,y-8,6,1);c.fillRect(x-2,y-9,4,1);c.fillStyle='#1b1b1b';c.fillRect(x,y-7,1,1);}
 function drawTrain(c,x,y){if(hiTier&&c===ctx){const im=fig('car');putFig(im,x-2.4,y);putFig(im,x+2.4,y);return;}c.fillStyle='#c2412b';c.fillRect(x-6,y-5,12,4);c.fillStyle='#f4f4f0';c.fillRect(x-4,y-4,2,2);c.fillRect(x-1,y-4,2,2);c.fillRect(x+2,y-4,2,2);c.fillStyle='#1b1b1b';c.fillRect(x-5,y-1,2,1);c.fillRect(x+3,y-1,2,1);}
-function drawGondola(c,x,y){if(hiTier&&c===ctx){const im=fig('gondola');c.drawImage(im,x+0.5-im.width/HD/2,y,im.width/HD,im.height/HD);return;}c.fillStyle='#1b1b1b';c.fillRect(x,y,1,2);c.fillStyle='#c2412b';c.fillRect(x-1,y+2,3,3);c.fillStyle='#f4f4f0';c.fillRect(x,y+3,1,1);}
+function drawGondola(c,x,y){if(hiTier&&c===ctx){const im=fig('gondola');c.drawImage(im,x+0.5-im.width/HD/2,y-1/HD,im.width/HD,im.height/HD);return;}c.fillStyle='#1b1b1b';c.fillRect(x,y,1,2);c.fillStyle='#c2412b';c.fillRect(x-1,y+2,3,3);c.fillStyle='#f4f4f0';c.fillRect(x,y+3,1,1);}
 function drawStall(c,x,y,i){if(hiTier&&c===ctx){putFig(fig('stall'+(i%4),{a:i%2?'#e07b2a':'#c2412b'}),x,y);return;}c.fillStyle=i%2?'#e07b2a':'#c2412b';c.fillRect(x-3,y-5,6,2);c.fillStyle='#f4f4f0';c.fillRect(x-2,y-5,1,2);c.fillRect(x+1,y-5,1,2);c.fillStyle='#6d4a2a';c.fillRect(x-3,y-3,1,3);c.fillRect(x+2,y-3,1,3);c.fillStyle='#f1c232';c.fillRect(x-1,y-2,2,1);}
 
 const MONTH_FIELD={1:['#a88a5a','#8a6d40','#bfa070'],2:['#a88a5a','#8a6d40','#bfa070'],3:['#b09660','#8f7345','#c8ab78'],4:['#9fa060','#7f7f45','#b8b878'],5:['#7f9fb0','#5f8090','#9fbfcf'],6:['#8fd060','#5f9a3a','#b0e080'],7:['#7cb342','#558b2f','#9ccc65'],8:['#6faa3a','#4d8028','#8fc050'],9:['#d9b23a','#a7832a','#e9cd6a'],10:['#c9a65a','#9a7a38','#e0c070'],11:['#a88a5a','#8a6d40','#bfa070'],12:['#a08258','#7f6240','#b89a6a']};
@@ -1013,13 +1025,7 @@ const CATCAT=byId('catcat');
 /* the greens of open ground, in the growing months and in the dry ones */
 const GC={grass:['#86b956','#9aa65a'],scrub:['#769f4c','#8c9652'],garden:['#7cb052','#8fa558'],park:['#74aa4a','#74aa4a']};
 const SNOW_COL='#e8eef5',TOWN_COL='#b8a98a',PLAZA_COL='#ddd0b0',YARD_COL='#55555c';
-/* a ground colour a step or two lighter or darker, and cooled towards blue with height; always as #rrggbb */
-const toneHexC=new Map();
-function groundTone(col,lv,cool){if(!lv&&!cool)return col;let row=toneHexC.get(col);if(!row){row=[];toneHexC.set(col,row);}const slot=(lv+4)*4+cool;let v=row[slot];if(v)return v;const k=lv*0.03,m=cool*0.045,CL=[58,98,138];v='#';
- for(let q=0;q<3;q++){let c=parseInt(col.slice(1+q*2,3+q*2),16);c=k>0?c+(255-c)*k:c*(1+k);c=c*(1-m)+CL[q]*m;v+=Math.max(0,Math.min(255,Math.round(c))).toString(16).padStart(2,'0');}
- row[slot]=v;return v;}
-/* The colour is not the same from one end of a meadow or a forest to the other: it drifts in five small steps over a
-   few hundred metres, and cools a little with every 400 m of height. Kept per tile until the month changes. */
+/* kept per tile until the month changes */
 const gcLo=new Array(W*H),gcHi=new Array(W*H);
 function groundCol(x,y,hi){if(x<0||y<0||x>=W||y>=H)return null;const i=y*W+x,cache=hi?gcHi:gcLo;let c=cache[i];if(c!==undefined)return c;
  const t=at(x,y),d=dry()?1:0;let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';c=null;
@@ -1028,7 +1034,6 @@ function groundCol(x,y,hi){if(x<0||y<0||x>=W||y>=H)return null;const i=y*W+x,cac
  switch(k){case 'grass':case 'orchard':c=GC.grass[d];break;case 'scrub':c=GC.scrub[d];break;case 'forest':c=hi?(t.e>2000?'#174d22':'#256b2a'):(t.e>2000?'#1f5e2a':'#2e7d32');break;case 'rock':c='#8d8d7a';break;case 'bare':c='#c2ad84';break;case 'garden':case 'village':c=GC.garden[d];break;case 'park':c=GC.park[d];break;
   case 'snow':cache[i]=SNOW_COL;return SNOW_COL;case 'town':case 'market':cache[i]=TOWN_COL;return TOWN_COL;
   case 'plaza':cache[i]=PLAZA_COL;return PLAZA_COL;case 'busyard':cache[i]=YARD_COL;return YARD_COL;}
- if(c)c=groundTone(c,Math.round((nz(x/13+5,y/13+9)*0.62+nz(x/5+31,y/5+17)*0.38-0.5)*6.5),Math.max(0,Math.min(3,Math.floor((t.e-1300)/400))));
  cache[i]=c;return c;}
 /* ---- HEIGHT ----
    The land is drawn as it is in the top-down games it borrows from: as levels, with a face wherever one level drops to
@@ -1177,8 +1182,9 @@ function yardLine(x,y,qi){const i=y*W+x;let v=yardC[i];if(v===255){v=0;const vil
  return(v>>(qi*2))&3;}
 function houseBox(i,qi){const qx=(qi&1)*2,qy=(qi>>1)*2,m=stMask[i],lane=c=>(m&(1<<(qy*4+qx+c)))||(m&(1<<((qy+1)*4+qx+c))),st=(quad[i]>>(qi*3))&7;
  /* houses do not stand in rank: each is a little off its place, and the small ones differ in width */
- const tx=i%W,ty=(i/W)|0,dy=Math.floor(hash(tx*3+qi,ty*5+qi*7+1)*3),w=st===2||st===3?10:8+Math.floor(hash(tx*5+qi*3+2,ty*7+qi)*3);
- return lane(0)?[qx*6+7,qy*6+dy,5]:lane(1)?[qx*6,qy*6+dy,5]:[qx*6+Math.floor(hash(tx*11+qi,ty*3+qi*5+4)*(13-w)),qy*6+dy,w];}
+ const tx=i%W,ty=(i/W)|0,dy=(qy?0:1)+Math.floor(hash(tx*3+qi,ty*5+qi*7+1)*2),w=st===2||st===3?10:7+Math.floor(hash(tx*5+qi*3+2,ty*7+qi)*4);
+ /* a pixel is kept free all round the house, inside the tile, for its outline */
+ return lane(0)?[qx*6+6,qy*6+dy,5]:lane(1)?[qx*6+1,qy*6+dy,5]:[qx*6+1+Math.floor(hash(tx*11+qi,ty*3+qi*5+4)*(11-w)),qy*6+dy,w];}
 const HWIN={1:[[1,6,2,2],[7,6,2,2]],2:[[1,4,2,2],[4,4,2,2],[7,4,2,2],[1,7,2,2],[7,7,2,2]],3:[[1,5,8,1],[1,8,8,1]],4:[[7,7,2,2]],5:[[7,7,2,2]],6:[[7,7,2,2]]};
 const hiWins=(st,w)=>w<10?(st===3?[[1,5,w-2,1]]:[[w-3,6,2,2]]):HWIN[st];
 function drawTileHi(oc,x,y,t){
@@ -1230,7 +1236,10 @@ function drawTileHi(oc,x,y,t){
  let k=t.k;if((k==='rock'||k==='forest'||k==='grass'||k==='scrub'||k==='orchard')&&snowAt(t))k='snow';
  const g0=groundCol(x,y,1),grassCol=g0||GC.grass[dry()?1:0],gardenCol=grassCol;
  /* a round tree crown, lit from the upper left and shaded below; kept inside the tile unless it is free to stand across an edge */
- const crown=(cx,cy,r,col,lt,dk,drop,free)=>{if(!free){cx=Math.max(r,Math.min(n-1-r,cx));cy=Math.max(r,Math.min(n-1-r,cy));}{const sy=cy+r+(drop||0);R(cx-r+2,sy,2*r,1,SH);R(cx-r+3,sy+1,2*r-2,1,SH);}for(let j=-r;j<=r;j++){const hw=Math.round(Math.sqrt(r*r-j*j+r*0.6));R(cx-hw,cy+j,hw*2+1,1,j>r*0.35?dk:col);}R(cx-r+1,cy-r+1,Math.max(1,r-1),Math.max(1,r-2),lt);};
+ const crown=(cx,cy,r,col,lt,dk,drop,free)=>{const m=r+(drop?1:0);if(!free){cx=Math.max(m,Math.min(n-1-m,cx));cy=Math.max(m,Math.min(n-1-m,cy));}{const sy=cy+r+(drop||0);R(cx-r+2,sy,2*r,1,SH);R(cx-r+3,sy+1,2*r-2,1,SH);}
+  /* a tree that stands on its own (it has a trunk: drop) gets an outline in a deep shade of its own colour; the trees of a forest run into one another and have none */
+  if(drop){const ol=tone(dk,-0.45),h0=Math.round(Math.sqrt(r*0.6));R(cx-h0,cy-r-1,h0*2+1,1,ol);R(cx-h0,cy+r+1,h0*2+1,1,ol);for(let j=-r;j<=r;j++){const hw=Math.round(Math.sqrt(r*r-j*j+r*0.6));R(cx-hw-1,cy+j,hw*2+3,1,ol);}}
+  for(let j=-r;j<=r;j++){const hw=Math.round(Math.sqrt(r*r-j*j+r*0.6));R(cx-hw,cy+j,hw*2+1,1,j>r*0.35?dk:col);}R(cx-r+1,cy-r+1,Math.max(1,r-1),Math.max(1,r-2),lt);};
  /* a fir: tiers of branches, light on the left */
  const fir=(cx,cy,col,lt,dk,free)=>{if(!free){cx=Math.max(4,Math.min(n-5,cx));cy=Math.max(4,Math.min(n-7,cy));}R(cx-2,cy+5,6,1,SH);R(cx,cy+4,1,2,'#4a3524');const wv=[1,3,3,5,5,7,7];for(let j=0;j<7;j++){const w=wv[j];R(cx-(w>>1),cy-3+j,w,1,j%2?dk:col);}R(cx-1,cy-2,1,2,lt);R(cx-2,cy,1,2,lt);R(cx-3,cy+2,1,2,lt);};
  const TV=[-0.07,0,0.08];
@@ -1297,10 +1306,16 @@ function drawTileHi(oc,x,y,t){
     if(t.k==='forest')for(let q=0;q<2;q++){const cx=6+q*11+Math.round(hq(q+10)*3),cy=7+Math.round(hq(q+12)*8);R(cx,cy+5,1,2,'#5d4037');R(cx-3,cy+3,7,2,'#2e5e32');R(cx-2,cy+1,5,2,'#2e5e32');R(cx-1,cy-1,3,2,'#f4f8fb');R(cx-2,cy+1,3,1,'#f4f8fb');}break;
   case 'bare':R(0,0,n,n,g0);for(let q=0;q<6;q++){const a=1+Math.floor(hq(q)*21),b=1+Math.floor(hq(q+6)*21);R(a,b,2,1,q%2?'#a8936a':'#d4c29c');}break;
   /* garden: two vegetable beds in rows, a fruit tree, pink with blossom in February */
-  case 'garden':{R(0,0,n,n,gardenCol);const soil=dry()?'#8a7450':'#7a6444',leaf=dry()?'#7a8f4a':'#4f8a2e';
-    for(let q=0;q<2;q++){const a=1+q*12+Math.floor(hq(q)*2),b=(v<0.5?2:13)+Math.floor(hq(q+2)*2);R(a,b,9,8,soil);for(let r=0;r<8;r+=2)for(let c=0;c<9;c+=2)R(a+c,b+r,1,1,(c+r)%4?leaf:tone(leaf,0.25));}
-    {const cx=v>0.45?6+Math.floor(hq(5)*12):-9,cy=v<0.5?17:6;if(cx>0){R(cx,cy+3,1,3,'#5d4037');crown(cx,cy,3,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',3);}}
-    if(v<0.18){R(18,v<0.09?4:16,4,3,'#d9b23a');R(19,v<0.09?3:15,2,1,'#e9cd6a');} /* a haystack */
+  case 'garden':{R(0,0,n,n,gardenCol);const soil=dry()?'#8a7450':'#7a6444',leaf=dry()?'#7a8f4a':'#4f8a2e',lay=Math.floor(hq(31)*5),o1=Math.floor(hq(32)*3),o2=Math.floor(hq(33)*3);
+    /* No two gardens alike, or a village turns into a lattice of brown squares: one of five plans a tile (a long bed
+       across, two beds of different size, a long bed down one side, fallow grass, a bed and a small plot), each a
+       little off its place, with a fruit tree and now and then a haystack on the ground left over. */
+    const bed=(a,b,w,h)=>{R(a,b,w,h,soil);R(a,b+h-1,w,1,tone(soil,-0.2));for(let r=1;r<h-1;r+=2)for(let c=1;c<w-1;c+=2)R(a+c,b+r,1,1,(c+r)%4?leaf:tone(leaf,0.25));};
+    let tx=6+Math.floor(hq(5)*5),ty=17,hx=16,hy=16;
+    if(lay===0)bed(1+o1,2+o2,20,7);else if(lay===1){bed(1+o1,2,9,9);bed(13,3+o2,9,6);}else if(lay===2){bed(2+o1,1+o2,8,20);tx=17;ty=6+o1*2;hx=15;hy=17;}
+    else if(lay===3){tufts(4,'#689f38','#a5d660');tx=6+Math.floor(hq(5)*12);ty=7+o2*3;hx=4+o1*6;hy=18;}else{bed(1+o1,13,13,9);bed(15,2+o2,7,7);tx=6;ty=4+o1;hx=-9;}
+    if(v>0.45||lay===3){R(tx,ty+3,1,4,'#5d4037');crown(tx,ty,3,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',3);}
+    if(v<0.18&&hx>0){R(hx+1,hy+3,5,1,SH);R(hx,hy,4,3,'#d9b23a');R(hx+1,hy-1,2,1,'#e9cd6a');R(hx,hy+2,4,1,'#b8902a');} /* a haystack */
     break;}
   case 'plaza':R(0,0,n,n,PLAZA_COL);for(let r=0;r<4;r++){R(0,r*6,n,1,'#cdbf9f');for(let c=0;c<4;c++)R(c*6+(r%2?3:0),r*6,1,6,'#cdbf9f');}
     if(v<0.1){R(11,15,2,4,'#5d4037');crown(12,10,4,blossom()?'#f2a0b8':'#3b8a3f',blossom()?'#f8e0e8':'#58a65c',blossom()?'#d77f9c':'#2a6b30',5);}else if(v>0.93){R(6,10,10,2,'#8a6238');R(6,12,1,2,'#5d4037');R(15,12,1,2,'#5d4037');}break;
@@ -1336,15 +1351,19 @@ function drawTileHi(oc,x,y,t){
        else if(yl===2){R(a+1,b+10,2,1,SH);R(a+10,b+10,2,1,SH);R(a+1,b+4,1,6,'#8a6238');R(a+10,b+4,1,6,'#8a6238');R(a+2,b+4,8,1,'#6b6b5b');}}
       continue;}
      if(vil&&hv>0.55){/* a fence along two sides of the yard */for(let c=0;c<12;c+=2)R(qx*6+c,qy*6+11,1,1,'#8a6238');for(let r=1;r<12;r+=2)R(qx*6,qy*6+r,1,1,'#8a6238');}
-     const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],wins=hiWins(st,w),gab=st!==2&&st!==3&&hash(x*7+qi*3+5,y*3+qi)<0.3,hw2=w>>1;R(X+1,Y+10,w,1,SH);R(X+w,Y+(gab?6:2),1,gab?4:8,SH);
+     const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],wins=hiWins(st,w),gab=st!==2&&st!==3&&hash(x*7+qi*3+5,y*3+qi)<0.3,hw2=w>>1;R(X+1,Y+11,w+1,1,SH);R(X+w+1,Y+(gab?6:2),1,gab?5:9,SH);
+     /* the outline (see OUTLINES): a dark shape one pixel larger than the house, behind it */
+     if(gab){for(let j=0;j<6;j++){const hw=Math.min(hw2,1+j);R(X+hw2-hw-1,Y+j-1,hw*2+2,2,INK);}R(X-1,Y+5,w+2,6,INK);}else R(X-1,Y-1,w+2,12,INK);
      /* some houses show their gable end: the roof is a triangle with the ridge running away from you */
      const gable=roof=>{for(let j=0;j<6;j++){const hw=Math.min(hw2,1+j);R(X+hw2-hw,Y+j,hw*2,1,roof);R(X+hw2,Y+j,hw,1,tone(roof,-0.2));}R(X+hw2-1,Y,1,6,tone(roof,0.25));};
-     if(st===2){R(X,Y,w,3,'#4a5566');R(X,Y,w,1,'#6a7890');R(X,Y+3,w,7,'#dcd6c8');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#5aa0ec');R(X+(w>>1)-1,Y+8,2,2,'#4a4a42');}
-     else if(st===3){R(X,Y,w,4,'#7d7d85');R(X,Y,w,1,'#9a9aa2');R(X+1,Y+2,2,1,'#55555c');R(X,Y+4,w,6,'#c9c4b6');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}
+     /* a wall: darker under the eaves and down its right-hand side, away from the light */
+     const wall=(yy,h,col)=>{R(X,yy,w,h,col);R(X,yy,w,1,tone(col,-0.2));R(X+w-1,yy,1,h,tone(col,-0.2));};
+     if(st===2){R(X,Y,w,3,'#4a5566');R(X,Y,w,1,'#6a7890');wall(Y+3,7,'#dcd6c8');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#5aa0ec');R(X+(w>>1)-1,Y+8,2,2,'#4a4a42');}
+     else if(st===3){R(X,Y,w,4,'#7d7d85');R(X,Y,w,1,'#9a9aa2');R(X+1,Y+2,2,1,'#55555c');wall(Y+4,6,'#c9c4b6');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}
      else if(st>=4){const set=ROOFS[st],roof=set[Math.floor(hv*set.length)];if(gab)gable(roof);else{R(X,Y,w,6,roof);
       if(st===4){R(X,Y+1,w,1,tone(roof,0.2));R(X,Y+3,w,1,tone(roof,-0.25));R(X,Y+5,w,1,tone(roof,-0.35));}else{for(let c=0;c<w;c+=2)R(X+c,Y,1,6,tone(roof,0.22));R(X,Y+5,w,1,tone(roof,-0.3));}}
-      R(X,Y+6,w,4,st===4?'#8a6238':'#b59a72');for(let c=2;c<w;c+=3)R(X+c,Y+6,1,4,'rgba(0,0,0,.14)');R(X+(w>5?3:1),Y+7,2,3,'#3a2a1a');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}
-     else{const set=ROOFS[1],roof=set[Math.floor(hv*set.length)];if(gab){gable(roof);R(X,Y+6,w,4,'#e8dcc0');}else{R(X,Y,w,5,roof);R(X,Y+1,w,1,tone(roof,0.22));R(X,Y+4,w,1,tone(roof,-0.3));R(X,Y+5,w,5,'#e8dcc0');}R(X+(w>5?4:1),Y+7,2,3,'#5a4028');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}}
+      wall(Y+6,4,st===4?'#8a6238':'#b59a72');R(X+(w>5?3:1),Y+7,2,3,'#3a2a1a');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}
+     else{const set=ROOFS[1],roof=set[Math.floor(hv*set.length)];if(gab){gable(roof);wall(Y+6,4,'#e8dcc0');}else{R(X,Y,w,5,roof);R(X,Y+1,w,1,tone(roof,0.22));R(X,Y+4,w,1,tone(roof,-0.3));wall(Y+5,5,'#e8dcc0');}R(X+(w>5?4:1),Y+7,2,3,'#5a4028');for(const q of wins)R(X+q[0],Y+q[1],q[2],q[3],'#4a4a42');}}
     if(g0===SNOW_COL)for(let qi=0;qi<4;qi++){if(!q4[qi])continue;const hb=houseBox(i,qi),X=hb[0],Y=hb[1],w=hb[2],hw2=w>>1; /* snow lying on the roof */
      if(q4[qi]!==2&&q4[qi]!==3&&hash(x*7+qi*3+5,y*3+qi)<0.3){for(let j=0;j<3;j++){const hw=Math.min(hw2,1+j);R(X+hw2-hw,Y+j,hw*2,1,'#eef3f8');}}else{R(X,Y,w,2,'#eef3f8');R(X+1,Y+2,w-2,1,'#cfd9e6');}}
     const ps=poiAt.get(i);if(ps&&k==='town'){const qi=q4.findIndex(st=>st);if(qi>=0){const hb=houseBox(i,qi);R(hb[0]+(hb[2]>5?3:0),hb[1]+5,4,2,POI_COL[ps[0].k]||'#2a9d8f');}}
@@ -1392,13 +1411,15 @@ function colOf(s){let v=colC.get(s);if(v!==undefined)return v;let r,g,b,a=255;
  else{const m=s.match(/[\d.]+/g);r=+m[0];g=+m[1];b=+m[2];if(m.length>3)a=Math.round(parseFloat(m[3])*255);}
  if(a===255){const p=palRGB(r,g,b);r=p[0];g=p[1];b=p[2];} /* solid colours are snapped to the palette; see-through ones are mixed as they are */
  v=((a<<24)|(b<<16)|(g<<8)|r)>>>0;colC.set(s,v);return v;}
-const paintBufs=new Map();
+const paintBufs=new Map(),blendC=new Map();
 function painter(w,h,ox,oy){let buf=paintBufs.get(w*65536+h);if(buf)buf.fill(0);else{buf=new Uint32Array(w*h);paintBufs.set(w*65536+h,buf);}
  let col=0xFF000000,al=255;
  return{set fillStyle(s){col=colOf(s);al=col>>>24;},
   fillRect(x,y,rw,rh){x=(x-ox)|0;y=(y-oy)|0;let x1=x+(rw|0),y1=y+(rh|0);if(x<0)x=0;if(y<0)y=0;if(x1>w)x1=w;if(y1>h)y1=h;if(x>=x1||y>=y1)return;
    if(al===255){if(x1-x>12)for(let j=y;j<y1;j++)buf.fill(col,j*w+x,j*w+x1);else for(let j=y;j<y1;j++)for(let o=j*w+x,e=j*w+x1;o<e;o++)buf[o]=col;}
-   else{const a=al/255,ia=1-a,r=(col&255)*a,g=((col>>8)&255)*a,b=((col>>16)&255)*a;for(let j=y;j<y1;j++)for(let o=j*w+x,e=j*w+x1;o<e;o++){const p=buf[o];buf[o]=(0xFF000000|(((p>>16&255)*ia+b)<<16)|(((p>>8&255)*ia+g)<<8)|((p&255)*ia+r))>>>0;}}},
+   else{/* a see-through colour (a shadow) is mixed with what is under it and the mix snapped to the palette, once for each pair of colours */
+    let bm=blendC.get(col);if(!bm){bm=new Map();blendC.set(col,bm);}const a=al/255,ia=1-a,r=(col&255)*a,g=((col>>8)&255)*a,b=((col>>16)&255)*a;
+    for(let j=y;j<y1;j++)for(let o=j*w+x,e=j*w+x1;o<e;o++){const p=buf[o];let v=bm.get(p);if(v===undefined){const q=palRGB((p&255)*ia+r,((p>>8)&255)*ia+g,((p>>16)&255)*ia+b);v=(0xFF000000|(q[2]<<16)|(q[1]<<8)|q[0])>>>0;bm.set(p,v);}buf[o]=v;}}},
   canvas(){const c=mkCanvas(w,h),g=c.getContext('2d'),img=g.createImageData(w,h);img.data.set(new Uint8ClampedArray(buf.buffer,0,w*h*4));g.putImageData(img,0,0);return c;}};}
 function buildChunk(cx,cy){const n=CH_T*T,p=painter(n,n,cx*n,cy*n);for(let y=0;y<CH_T;y++)for(let x=0;x<CH_T;x++){const gx=cx*CH_T+x,gy=cy*CH_T+y;if(gx>=W||gy>=H)continue;drawTile(p,gx,gy,at(gx,gy));}return p.canvas();}
 /* the close-up cache: chunks of 4 x 4 tiles at 24 px a tile, small so that painting one never holds a frame up */
@@ -1446,7 +1467,7 @@ function sunAt(h,m){const dec=23.44*Math.PI/180*Math.sin(2*Math.PI*(284+MID_DAY[
  const alt=Math.asin(Math.sin(LAT_R)*Math.sin(dec)+Math.cos(LAT_R)*Math.cos(dec)*Math.cos(w));
  /* bearing clockwise from north: 90 east, 180 south, 270 west */
  return{alt,az:Math.atan2(Math.sin(w),Math.cos(w)*Math.sin(LAT_R)-Math.tan(dec)*Math.cos(LAT_R))+Math.PI};}
-const lightMain=mkCanvas(W,H),lightDet=mkCanvas(DN,DN),shadowTop=new Float32Array(W*H),shadowDepth=new Float32Array(W*H);
+const lightMain=mkCanvas(W*MINI_F,H*MINI_F),shadowTop=new Float32Array(W*H),shadowDepth=new Float32Array(W*H);
 let lightKey='';
 /* how far the terrain towards the sun stands above each tile, in metres (0 where the sun reaches the ground) */
 function castShadows(sx,sy,tanAlt){const lx=-sx,ly=-sy,hs=shadowTop,out=shadowDepth;
@@ -1459,54 +1480,68 @@ function castShadows(sx,sy,tanAlt){const lx=-sx,ly=-sy,hs=shadowTop,out=shadowDe
     if(yp>=0&&yp<H){const xf=x-sl,x0=Math.floor(xf),t=xf-x0,a=Math.min(W-1,Math.max(0,x0)),b=Math.min(W-1,Math.max(0,x0+1));h=hs[yp*W+a]*(1-t)+hs[yp*W+b]*t-drop;}
     hs[i]=h>e?h:e;out[i]=h>e?h-e:0;}}}
  return out;}
-const dAt=(i,j)=>detail[Math.min(DN-1,Math.max(0,j))*DN+Math.min(DN-1,Math.max(0,i))];
 const LIGHT_WEAK=new Uint8Array(KINDS.length);LIGHT_WEAK[KI.water]=LIGHT_WEAK[KI.bridge]=LIGHT_WEAK[KI.plaza]=LIGHT_WEAK[KI.busyard]=1;
 /* the two pictures for one position of the sun, as plain pixel data. It reads only the grids and the few numbers named
    in lightWorker below, so the same text runs in a background worker. The colours follow the painter's rule that light
    is warm and shade is cool: lit slopes lean to yellow, shaded slopes and cast shadows to blue. */
 function lightCore(P){const sx=P.sx,sy=P.sy,wS=P.wS,wN=P.wN,cast=P.cast,depth=cast>0?castShadows(sx,sy,P.tanAlt):null;
- const d=new Uint8ClampedArray(W*H*4),dd=new Uint8ClampedArray(DN*DN*4);
- const put=(d,j,sh,str,a)=>{/* a: shadow strength 0-1 */
-  sh*=str;if(a>0.02){d[j]=10;d[j+1]=16;d[j+2]=44;d[j+3]=Math.round(255*(a+(sh<0?0.28*-sh*(1-a):0)));}
-  else if(sh>0.02){d[j]=255;d[j+1]=240;d[j+2]=204;d[j+3]=Math.round(255*0.24*sh);}
-  else if(sh<-0.02){d[j]=12;d[j+1]=16;d[j+2]=48;d[j+3]=Math.round(255*0.3*-sh);}
-  else d[j+3]=0;};
+ const tone=new Int8Array(W*H); /* tone: -127 deepest shade to +127 fullest light, a number a tile */
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x,gx=(eAt(x+1,y)-eAt(x-1,y))/2,gy=(eAt(x,y+1)-eAt(x,y-1))/2;
-  /* inside the town box the finer relief below takes over, but not at a line: over four tiles in from the edge of the
-     box this coarse relief fades out and the fine one fades in */
-  const fade=inDetail(x,y)?1-Math.min(1,Math.min(x-DBX,DBX+DBS-1-x,y-DBY,DBY+DBS-1-y)/4):1;
-  const sh=fade*Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/(55/K)));
-  put(d,i*4,sh,LIGHT_WEAK[kind[i]]?0.35:1,depth?cast*0.3*Math.min(1,depth[i]/12):0);}
- /* the town box: the same relief from the finer elevation there; its shadows are already in the main layer */
- for(let j=0;j<DN;j++)for(let i=0;i<DN;i++){const gx=(dAt(i+1,j)-dAt(i-1,j))/2,gy=(dAt(i,j+1)-dAt(i,j-1))/2,k=kind[(DBY+Math.floor(j/DF))*W+DBX+Math.floor(i/DF)];
-  put(dd,(j*DN+i)*4,Math.min(1,Math.min(i,DN-1-i,j,DN-1-j)/(4*DF))*Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/14)),LIGHT_WEAK[k]?0.35:1,0);}
- return{key:P.key,main:d,det:dd};}
+  const raw=Math.max(-1,Math.min(1,(wN*(gx+gy)-wS*(gx*sx+gy*sy)*1.4142)/(55/K))),str=LIGHT_WEAK[kind[i]]?0.35:1,cs=depth?cast*Math.min(1,depth[i]/12):0;
+  {const dark=cs*0.75+Math.max(0,-raw*str)*0.6;tone[i]=dark>0.02?-Math.round(Math.min(1,dark)*127):Math.round(Math.max(0,raw*str)*127);}}
+ /* the picture for the far view, at the far view's two pixels a tile: the same tones dithered into three strengths of
+    shade and two of light (see SHADING ON THE PIXEL GRID), so the mountains are modelled in flat bands with stippled
+    seams, not with a soft gradient */
+ const mw=W*MINI_F,mh=H*MINI_F,u=new Uint32Array(mw*mh),tA=(x,y)=>tone[(y<0?0:y>=H?H-1:y)*W+(x<0?0:x>=W?W-1:x)];
+ for(let my=0;my<mh;my++){const fy=(my+.5)/MINI_F-.5,y0=Math.floor(fy),wy=fy-y0;for(let mx=0;mx<mw;mx++){const fx=(mx+.5)/MINI_F-.5,x0=Math.floor(fx),wx=fx-x0;
+   const v=(tA(x0,y0)*(1-wx)+tA(x0+1,y0)*wx)*(1-wy)+(tA(x0,y0+1)*(1-wx)+tA(x0+1,y0+1)*wx)*wy;if(v>-7&&v<10)continue;const b=.25+(BAYER[(my&3)*4+(mx&3)]+.5)/32;
+   if(v<0){const l=Math.floor(-v/127*5.2+b);if(l>0)u[my*mw+mx]=SHADE_LV[l>4?4:l];}else{const l=Math.floor(v/127*3.4+b);if(l>0)u[my*mw+mx]=LIT_LV[l>3?3:l];}}}
+ return{key:P.key,main:new Uint8ClampedArray(u.buffer),tone};}
 function lightParams(){const s=sunAt(hour,month),deg=s.alt*180/Math.PI,sk=skyNow(),up=Math.max(0,Math.min(1,deg/8)),wS=0.75*up*Math.cos(s.alt);
  /* sx,sy: the way to the sun on the map, x east and y south; wS, wN: how much of the relief the sun models, and how much the north-west glow */
  return{key:(deg>-3?Math.round(hour*5):'night')+'|'+month+'|'+sk,sx:Math.sin(s.az),sy:-Math.cos(s.az),wS,wN:1-wS,cast:Math.max(0,Math.min(1,(deg-2)/8))*(sk===1?1:sk===2?0.3:0),tanAlt:Math.tan(Math.max(0.035,s.alt))};}
-function lightShow(r){LIGHT.main=lightMain;LIGHT.det=lightDet;const mcx=lightMain.getContext('2d'),img=mcx.createImageData(W,H);img.data.set(r.main);mcx.putImageData(img,0,0);
- const dcx=lightDet.getContext('2d'),dim=dcx.createImageData(DN,DN);dim.data.set(r.det);dcx.putImageData(dim,0,0);}
+function lightShow(r){LIGHT.main=lightMain;LIGHT.tone=r.tone;const mcx=lightMain.getContext('2d'),img=mcx.createImageData(W*MINI_F,H*MINI_F);img.data.set(r.main);mcx.putImageData(img,0,0);}
 /* Working the light out takes 40 to 100 ms, which used to stop the page for that long every second and a half while
    the clock ran. It is now done in a worker; the map keeps the light it has until the new one arrives, a frame or two
    later. Without a worker (old browsers, the test, shot.ps1) it is worked out here as before. */
 let lightW=null,lightWTried=false,lightBusy=false;
 function lightWorker(){if(lightWTried)return lightW;lightWTried=true;
  if(HASH.worker==='0'||typeof Worker==='undefined'||typeof Blob==='undefined'||typeof URL==='undefined'||!URL.createObjectURL)return null;
- try{const src='let W,H,DN,DF,DBX,DBY,DBS,MPT,K,elev,detail,kind,LIGHT_WEAK,shadowTop,shadowDepth;const eAt='+eAt.toString()+';const dAt='+dAt.toString()+';const inDetail='+inDetail.toString()+';'+castShadows.toString()+';'+lightCore.toString()+';onmessage=e=>{const d=e.data;if(d.init){({W,H,DN,DF,DBX,DBY,DBS,MPT,K,elev,detail,kind,LIGHT_WEAK}=d.init);shadowTop=new Float32Array(W*H);shadowDepth=new Float32Array(W*H);return;}const r=lightCore(d);if(self.createImageBitmap&&typeof ImageData!==\'undefined\'){Promise.all([createImageBitmap(new ImageData(r.main,W,H)),createImageBitmap(new ImageData(r.det,DN,DN))]).then(b=>postMessage({key:r.key,bm:b[0],bd:b[1]},[b[0],b[1]]),()=>postMessage(r,[r.main.buffer,r.det.buffer]));}else postMessage(r,[r.main.buffer,r.det.buffer]);};';
+ try{const src='let W,H,MPT,K,MINI_F,elev,kind,LIGHT_WEAK,BAYER,SHADE_LV,LIT_LV,shadowTop,shadowDepth;const eAt='+eAt.toString()+';'+castShadows.toString()+';'+lightCore.toString()+';onmessage=e=>{const d=e.data;if(d.init){({W,H,MPT,K,MINI_F,elev,kind,LIGHT_WEAK,BAYER,SHADE_LV,LIT_LV}=d.init);shadowTop=new Float32Array(W*H);shadowDepth=new Float32Array(W*H);return;}const r=lightCore(d);if(self.createImageBitmap&&typeof ImageData!==\'undefined\'){createImageBitmap(new ImageData(r.main,W*MINI_F,H*MINI_F)).then(b=>postMessage({key:r.key,bm:b,tone:r.tone},[b,r.tone.buffer]),()=>postMessage(r,[r.main.buffer,r.tone.buffer]));}else postMessage(r,[r.main.buffer,r.tone.buffer]);};';
   const w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
-  /* the worker hands back finished pictures where the browser can make them there, so showing them costs nothing here */
-  w.onmessage=e=>{const r=e.data;lightBusy=false;lightKey=r.key;if(r.bm){for(const k of ['main','det'])if(LIGHT[k]!==lightMain&&LIGHT[k]!==lightDet&&LIGHT[k].close)LIGHT[k].close();LIGHT.main=r.bm;LIGHT.det=r.bd;}else lightShow(r);};
+  /* the worker hands back a finished picture where the browser can make it there, so showing it costs nothing here */
+  w.onmessage=e=>{const r=e.data;lightBusy=false;lightKey=r.key;if(r.bm){if(LIGHT.main!==lightMain&&LIGHT.main.close)LIGHT.main.close();LIGHT.main=r.bm;LIGHT.tone=r.tone;}else lightShow(r);};
   w.onerror=()=>{lightW=null;lightBusy=false;};
-  w.postMessage({init:{W,H,DN,DF,DBX,DBY,DBS,MPT,K,elev,detail,kind,LIGHT_WEAK}});lightW=w;}catch(e){lightW=null;}
+  w.postMessage({init:{W,H,MPT,K,MINI_F,elev,kind,LIGHT_WEAK,BAYER,SHADE_LV,LIT_LV}});lightW=w;}catch(e){lightW=null;}
  return lightW;}
 function lightLayers(){const P=lightParams();if(P.key===lightKey)return LIGHT;
  const w=lightKey?lightWorker():null; /* the very first light is worked out here, so the map never opens without it */
  if(!w){lightKey=P.key;lightShow(lightCore(P));return LIGHT;}
  if(!lightBusy){lightBusy=true;w.postMessage(P);}
  return LIGHT;}
-const LIGHT={main:lightMain,det:lightDet};
+const LIGHT={main:lightMain,tone:null};
 /* drawn over the terrain in map pixels, by the main view and by the overview (scale 1 there) */
-function drawLight(c,tile){const L=lightLayers(),soft=c===ctx; /* on the map the light is always blended from tile to tile; the overview draws it one to one */if(soft)c.imageSmoothingEnabled=true;c.drawImage(L.main,0,0,W*tile,H*tile);c.drawImage(L.det,DBX*tile,DBY*tile,DBS*tile,DBS*tile);if(soft)c.imageSmoothingEnabled=false;}
+/* ---- SHADING ON THE PIXEL GRID ----
+   Near the ground the light is not laid over the land as a soft picture: it is dithered. For every pixel of a chunk the
+   tone of the land (from the four tiles round it) is turned into one of four strengths of shade or three of light. Each
+   strength is a flat band; only in the half of a band nearest the next one is it stippled into it, by an ordered
+   pattern (the 4x4 Bayer matrix, anchored to the map so it never crawls), so a slope is flat tones with stippled seams
+   and not stipple all over. The result is kept as a second small picture for that chunk, made again when the light
+   has changed, a few chunks a frame; until then the old one stays. Slight tones are left out, so flat ground is clean.
+   The far view has the same thing as one picture of the whole map, made with the light (see lightCore). */
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5],SHADE_LV=[0,0.1,0.19,0.28,0.36].map(a=>((Math.round(a*255)<<24)|(48<<16)|(16<<8)|12)>>>0),LIT_LV=[0,0.08,0.15,0.21].map(a=>((Math.round(a*255)<<24)|(204<<16)|(240<<8)|255)>>>0);
+const shades=[new Map(),new Map()];
+function buildShade(hi,cx,cy){const tn=LIGHT.tone;if(!tn)return null;const ct=hi?CH_HI:CH_T,A=hi?HT:T/S,n=ct*A /* one sample for every pixel of the art: 24 a tile up close, 4 a tile in the middle view */,c=mkCanvas(n,n),g=c.getContext('2d'),img=g.createImageData(n,n),u=new Uint32Array(img.data.buffer);
+ const tAt=(x,y)=>tn[(y<0?0:y>=H?H-1:y)*W+(x<0?0:x>=W?W-1:x)];
+ for(let ty=0;ty<ct;ty++)for(let tx=0;tx<ct;tx++){const gx=cx*ct+tx,gy=cy*ct+ty;if(gx>=W||gy>=H)continue;
+  /* the nine tones round the tile; nothing to do where all are slight */
+  let big=0;const v9=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const v=tAt(gx+dx,gy+dy);v9.push(v);if(v<=-7||v>=10)big=1;}if(!big)continue;
+  for(let py=0;py<A;py++){const fy=(py+.5)/A-.5,r0=fy<0?0:1,wy=fy<0?fy+1:fy;for(let px=0;px<A;px++){const fx=(px+.5)/A-.5,c0=fx<0?0:1,wx=fx<0?fx+1:fx;
+    const v=(v9[r0*3+c0]*(1-wx)+v9[r0*3+c0+1]*wx)*(1-wy)+(v9[r0*3+3+c0]*(1-wx)+v9[r0*3+4+c0]*wx)*wy,b=.25+(BAYER[((gy*A+py)&3)*4+((gx*A+px)&3)]+.5)/32;
+    if(v<=-7){const l=Math.floor(-v/127*5.2+b);if(l>0)u[(ty*A+py)*n+tx*A+px]=SHADE_LV[l>4?4:l];}
+    else if(v>=10){const l=Math.floor(v/127*3.4+b);if(l>0)u[(ty*A+py)*n+tx*A+px]=LIT_LV[l>3?3:l];}}}}
+ g.putImageData(img,0,0);return c;}
+function drawLight(c,tile,smooth){const L=lightLayers();c.imageSmoothingEnabled=smooth; /* smooth: only where the picture is drawn smaller than it is (the overview, and the whole-map view) */c.drawImage(L.main,0,0,W*tile,H*tile);c.imageSmoothingEnabled=false;}
 /* hoarfrost: a pale block on most open field tiles above 900 m, in three strengths */
 let frostC=null;function frostMask(){if(frostC)return frostC;frostC=mkCanvas(W,H);const fc=frostC.getContext('2d'),img=fc.createImageData(W,H),d=img.data;
  for(let i=0;i<W*H;i++){const k=kind[i];if((k!==KI.terrace&&k!==KI.grass&&k!==KI.garden&&k!==KI.bare)||elev[i]<=900)continue;const h=hash(i%W+3,((i/W)|0)+17);if(h<0.12)continue;d[i*4]=236;d[i*4+1]=244;d[i*4+2]=250;d[i*4+3]=Math.round(255*(0.24+0.14*Math.floor(h*3)));}
@@ -1591,22 +1626,31 @@ if(saved.sky===false||(saved.sky===undefined&&PHONE()))showSky=false;
 let sel=null,hover=null,frame=0,gond=0,follow=true;
 const visited=new Set((saved.visited||[]).filter(id=>byId(id)));
 let saveT=null;function saveState(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('sapa-state-2',JSON.stringify({hx:hero.x,hy:hero.y,z:cam.z,lang,langSet,month,sky:showSky,visited:[...visited]}));}catch(e){}},300);}
-const cam={x:hero.x*T,y:hero.y*T,z:1};let fitScale=1;const ZMAX=48;
+const cam={x:hero.x*T,y:hero.y*T,z:1};let fitScale=1;
+/* ---- ONE PIXEL GRID ----
+   Pixel art is drawn on one grid. The land is painted at 2, 8 or 24 pixels a tile (far view, middle, close-up), so
+   the view may only be as large as makes one painted pixel a whole number of screen pixels: 4 screen pixels a tile
+   for the far view, 8 or 16 for the middle art, 24, 48, 72 or 96 for the close-up. Zoom therefore moves in those
+   steps and nowhere between, the camera sits on whole pixels, and everything drawn over the land is placed on the
+   same grid. The one exception is zoom 1, the whole map fitted to the window, whatever size that makes a tile. */
+const PPT_STEPS=[2,4,8,16,24,48,72,96];
+function zoomLevels(){const fit=fitScale*T,top=(window.devicePixelRatio||1)>=1.5?96:72,o=[1];for(const p of PPT_STEPS)if(p>fit*1.25&&p<=top)o.push(p/fit);return o;}
+function snapZ(z){const lv=zoomLevels();let best=lv[0],bd=1e9;for(const v of lv){const d=Math.abs(Math.log(v/Math.max(1e-6,z)));if(d<bd){bd=d;best=v;}}return best;}
 function viewW(){return cv.width/(fitScale*cam.z);}function viewH(){return cv.height/(fitScale*cam.z);}
-function clampCam(){cam.z=Math.max(1,Math.min(ZMAX,cam.z));const vw=viewW(),vh=viewH();cam.x=Math.max(vw/2,Math.min(W*T-vw/2,cam.x));cam.y=Math.max(vh/2,Math.min(H*T-vh/2,cam.y));if(vw>W*T)cam.x=W*T/2;if(vh>H*T)cam.y=H*T/2;}
+function clampCam(){cam.z=snapZ(cam.z);const vw=viewW(),vh=viewH();cam.x=Math.max(vw/2,Math.min(W*T-vw/2,cam.x));cam.y=Math.max(vh/2,Math.min(H*T-vh/2,cam.y));if(vw>W*T)cam.x=W*T/2;if(vh>H*T)cam.y=H*T/2;}
 /* zoom 1 always fills the canvas, whatever its shape, so a tall phone screen never shows empty bands */
-function resize(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);cv.width=Math.max(1,Math.round(r.width*dpr));cv.height=Math.max(1,Math.round(r.height*dpr));fitScale=Math.max(cv.width/(W*T),cv.height/(H*T));if(showSky){const sr=sky.getBoundingClientRect();sky.width=Math.max(1,Math.round(sr.width*dpr));sky.height=Math.max(1,Math.round(sr.height*dpr));}clampCam();skyDirty=true;
+function resize(){const r=cv.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1),was=cam.z>1.01?fitScale*cam.z:0;cv.width=Math.max(1,Math.round(r.width*dpr));cv.height=Math.max(1,Math.round(r.height*dpr));fitScale=Math.max(cv.width/(W*T),cv.height/(H*T));if(was)cam.z=was/fitScale; /* a new window size keeps the pixels a tile */if(showSky){const sr=sky.getBoundingClientRect();sky.width=Math.max(1,Math.round(sr.width*dpr));sky.height=Math.max(1,Math.round(sr.height*dpr));}clampCam();skyDirty=true;
  /* setting a canvas size clears it, so repaint at once instead of waiting for the next paced frame */
  if(booted){render();renderSky();}}
 let booted=false;
-sky.hidden=!showSky;window.addEventListener('resize',resize);resize();cam.z=saved.z||5;clampCam();
+sky.hidden=!showSky;window.addEventListener('resize',resize);resize();cam.z=saved.z||5.5;clampCam();
 /* view settings from the address (parsed in section 1) */
 if(HASH.h!==undefined){hour=Math.max(0,Math.min(24,parseFloat(HASH.h)||0));autoTime=false;}
 if(HASH.m){const mm=parseInt(HASH.m,10);if(mm>=1&&mm<=12)month=mm;}
 if(HASH.d!==undefined){const dd=parseInt(HASH.d,10);if(dd>=0&&dd<=6)day=dd;}
 if(HASH.lang==='vi'||HASH.lang==='en')lang=HASH.lang;
 if(HASH.sky)skyMode=Math.max(0,Math.min(3,parseInt(HASH.sky,10)||0));
-if(HASH.z)cam.z=parseFloat(HASH.z)||cam.z;
+if(HASH.z){cam.z=parseFloat(HASH.z)||cam.z;clampCam();}
 if(HASH.at){const a=HASH.at.split(',').map(Number);if(isFinite(a[0])&&isFinite(a[1])){cam.x=a[0]*T;cam.y=a[1]*T;follow=false;}}
 clampCam();
 const pxPerTile=()=>fitScale*cam.z*T;
@@ -1782,28 +1826,15 @@ function busAt(i,h){const b=BUSES[i];if(h<b.a||h>b.b+BUS_RUN)return null;
  if(!busTried){busTried=true;const s=nearTarget(byId('bus')),e=nearTarget(byId('trungchai')),p=findPath(e[0],e[1],s[0],s[1]);if(p&&p.length>20){const all=[e].concat(p);BUS_PATH=all.filter((q,j)=>j%3===0||j===all.length-1);}}
  if(!BUS_PATH)return null;const bs=byId('bus');if(h>=b.a+BUS_RUN&&h<b.b)return{x:bs.x+bs.w/2+(i-1)*1.4,y:bs.y+bs.w+0.9,fl:false,parked:true};
  const out=h>=b.b,t=out?1-(h-b.b)/BUS_RUN:(h-b.a)/BUS_RUN,p=polyAt(BUS_PATH,t),q=polyAt(BUS_PATH,Math.min(1,t+0.004));return{x:p[0]+0.5,y:p[1]+0.5,fl:out?q[0]>p[0]:q[0]<p[0]};}
-/* ---- WIND, RAIN ON THE GROUND, MIST ----
-   The wind is one number that rises and falls over a few seconds, and gusts that cross the map as bands from the
-   north-west. Where a gust passes, light runs over the fields and the tree tops, cloth lifts on the lines, the flag on
-   Fansipan streams and smoke leans. All of it is drawn over the painted land each frame, only for the tiles in view. */
+/* ---- WIND AND RAIN ON THE GROUND ----
+   The wind is one number that rises and falls over a few seconds. It moves only things that have pixels of their own:
+   cloth swings on the lines, the flag on Fansipan streams, smoke leans. Those are drawn over the painted land each
+   frame, on the pixel grid, only for the tiles in view. */
 let windT=0,wetness=-1; /* seconds of wind so far; how wet the ground is, 0 to 1 (set from the sky on the first frame) */
 const windAmt=()=>Math.max(0,Math.min(1,0.45+0.3*Math.sin(windT/7.3)+0.25*Math.sin(windT/2.9+1.7)));
-const GUST_LUT=new Float32Array(2048),VEG=new Uint8Array(KINDS.length);for(const k of ['terrace','grass','forest','scrub','park','orchard','garden'])VEG[KI[k]]=1;VEG[KI.water]=2; /* what a gust shows on: 1 growing things, 2 open water */
-/* the small picture the gust is painted into each frame, one pixel a cell */
-const GUST_W=256,GUST_H=160,GUST_C=mkCanvas(GUST_W,GUST_H),GUST_G=GUST_C.getContext('2d'),GUST_ID=GUST_G.createImageData(GUST_W,GUST_H),GUST_U=new Uint32Array(GUST_ID.data.buffer);
-/* where on the map the air is moving at all: a coarse patchwork, one value for every 8 x 8 tiles, most of it between 0 and 1 */
-const GUSTY_W=Math.ceil(W/8)+1,GUSTY_H=Math.ceil(H/8)+1,GUSTY=new Float32Array(GUSTY_W*GUSTY_H);for(let q=0;q<GUSTY.length;q++){const v=nz((q%GUSTY_W)/2.1+3,((q/GUSTY_W)|0)/2.1+7);GUSTY[q]=v<0.3?0:Math.min(1,(v-0.3)*2.4);}
-/* read between its four nearest values, so the patches have soft edges and never show as squares */
-const gusty=(x,y)=>{const fx=x/8,fy=y/8,ix=Math.min(GUSTY_W-2,fx|0),iy=Math.min(GUSTY_H-2,fy|0),a=fx-ix,b=fy-iy,j=iy*GUSTY_W+ix;return(GUSTY[j]*(1-a)+GUSTY[j+1]*a)*(1-b)+(GUSTY[j+GUSTY_W]*(1-a)+GUSTY[j+GUSTY_W+1]*a)*b;};
-const CLOTHC=['#22306e','#2c3f8c','#161f4a'].map(pal),WASHC=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'].map(pal),FLYC=['#f4f4f0','#f1c232','#e07b2a','#b9dcff'].map(pal),FLAGC=['#c2412b','#e06a52','#f1c232'].map(pal);
+const CLOTHC=['#22306e','#2c3f8c','#161f4a'].map(pal),WASHC=['#f4f4f0','#c2412b','#5aa0ec','#f1c232','#e8a0c0','#2a3f8a'].map(pal),FLAGC=['#c2412b','#e06a52','#f1c232'].map(pal);
 const FAN=byId('fansipan'),CHURCH=byId('church'),WHEELC=['#6d4a2a','#b59a72','#8a6238','#3a2a1a','#dcecff'].map(pal),BELLC=['#c9a227','#e9cd6a','#3a2a1a'].map(pal);
 let bellUntil=0; /* the church bell swings until then (set on the hour) */
-/* mist over the rivers at dawn: a soft band one or two tiles either side of all water, gone by half past eight */
-let mistC=null;
-function mistMask(){if(mistC)return mistC;mistC=mkCanvas(W,H);const acc=new Uint8Array(W*H);
- for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const j=yy*W+xx,a=acc[j]+(dx||dy?(Math.abs(dx)+Math.abs(dy)>2?12:28):64);acc[j]=a>180?180:a;}}
- const g=mistC.getContext('2d'),img=g.createImageData(W,H),u=new Uint32Array(img.data.buffer);for(let i=0;i<W*H;i++)if(acc[i])u[i]=((acc[i]<<24)|0xF8F4F0)>>>0;g.putImageData(img,0,0);return mistC;}
-const mistAmt=h=>skyNow()===3||h<4.5||h>=8.5?0:Math.min(1,h-4.5,(8.5-h)/1.5);
 /* the night sky as one picture: some four hundred stars, a few of them large, and the Milky Way as a haze of faint
    points along a band from the lower left to the upper right. Painted once, the first clear night. */
 let starC=null;
@@ -1889,10 +1920,6 @@ const STAYS=(()=>{const vs=LM.filter(l=>l.sp==='house'||l.sp==='dao'),by=new Map
 const SUMMIT=(()=>{const a=byId('doquyen'),b=byId('fansipan'),ax=(a.x+a.w/2)*T,ay=(a.y+a.w)*T,bx=(b.x+b.w/2)*T,by=b.y*T+16;return{ax,ay,bx,by,decor:[['tower',ax-22,ay+2],['buddha',ax+12,ay+6],['temple',bx-32,by-18]]};})();
 /* typical weather by month in Sa Pa town, at about 1,500 m: mean temperature in °C and rain in mm */
 const CLIM_T=[9.4,10.8,14.4,17.5,19.4,20.2,20.4,20.2,18.8,16.2,13,10.2],CLIM_R=[65,80,105,215,345,410,465,450,315,215,110,65];
-/* clouds are blocky: each is a small bitmap of cells stored as row runs, so shadows and haze stay on the pixel grid */
-function cloudShape(seed,cw,chh){const runs=[];for(let j=0;j<chh;j++){let start=-1;for(let i=0;i<=cw;i++){const nx=(i+0.5-cw/2)/(cw/2),ny=(j+0.5-chh*0.55)/(chh/2);const on=i<cw&&nx*nx+ny*ny<0.7+0.5*(nz(i/5+seed*3.1,j/5+seed*1.7)-0.5);if(on&&start<0)start=i;if(!on&&start>=0){runs.push([j,start,i-start]);start=-1;}}}return{cw,chh,runs};}
-const CLOUD_CELL=16;
-const clouds=[];for(let i=0;i<18;i++){const r=240+Math.random()*320,cw=Math.round(r*2/CLOUD_CELL);clouds.push({x:Math.random()*W*T,y:Math.random()*H*T,r,cell:CLOUD_CELL,shape:cloudShape(i*17+3,cw,Math.round(cw*0.5)),v:0.5+Math.random()*0.6,p:1.15+Math.random()*0.25});}
 /* stepped disc on the art grid, used for every glow so light stays blocky */
 /* r is in art pixels; in close-up the same disc is cut from pixels a third the size, so glows stay round */
 function pixelDisc(c,cx,cy,r){const u=(hiTier&&c===ctx)?S/HD:S;r=Math.round(r*S/u);const x0=Math.round(cx/u)*u,y0=Math.round(cy/u)*u;for(let dy=-r;dy<=r;dy++){const hw=Math.floor(Math.sqrt(r*r-dy*dy)+0.5);c.fillRect(x0-hw*u,y0+dy*u,(2*hw+1)*u,u);}}
@@ -1930,23 +1957,22 @@ function placeLabel(placed,text,x,y,style,font){if(needsBody(text))font=BODY_LAB
 function areaLabel(placed,text,x0,y0,x1,y1,font){for(const t of [0.5,0.34,0.66,0.2,0.8]){const [sx,sy]=scr((x0+(x1-x0)*t)*T,(y0+(y1-y0)*t)*T);if(sx<60||sx>cv.width-60||sy<8||sy>cv.height-26)continue;if(placeLabel(placed,text,sx,sy,'peak',font))return;}}
 function render(){
  const s=fitScale*cam.z;ctx.imageSmoothingEnabled=false;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#1d2a1d';ctx.fillRect(0,0,cv.width,cv.height);
- const setWorld=()=>ctx.setTransform(s,0,0,s,cv.width/2-cam.x*s,cv.height/2-cam.y*s);setWorld();
+ const setWorld=()=>ctx.setTransform(s,0,0,s,Math.round(cv.width/2-cam.x*s),Math.round(cv.height/2-cam.y*s));setWorld();
  const vx0=cam.x-viewW()/2,vy0=cam.y-viewH()/2,vx1=cam.x+viewW()/2,vy1=cam.y+viewH()/2;
  const seen=(px,py,m)=>px>vx0-m&&px<vx1+m&&py>vy0-m&&py<vy1+m;
  const c0x=Math.max(0,Math.floor(vx0/(CH_T*T))),c1x=Math.min(CHW-1,Math.floor(vx1/(CH_T*T))),c0y=Math.max(0,Math.floor(vy0/(CH_T*T))),c1y=Math.min(CHH-1,Math.floor(vy1/(CH_T*T)));
  /* zoomed out, tile detail is smaller than a screen pixel and turns to noise: draw one flat colour per tile instead */
  const ppt=pxPerTile(),lowZoom=ppt<6;hiTier=ppt>=HI_PPT;
- /* A gust is a band that crosses the map from the north-west at about four tiles a second. Its strength across the
-    band is worked out once a frame into a table; gust(x,y) reads it for any tile in view and thins it by a slow
-    patchwork (GUSTY), so a gust comes as broken patches of moving air and not as one straight bar. */
- const wnd=windAmt(),tsec=windT,gtx0=Math.max(0,Math.floor(vx0/T)),gtx1=Math.min(W,Math.ceil(vx1/T)),gty0=Math.max(0,Math.floor(vy0/T)),gty1=Math.min(H,Math.ceil(vy1/T)),gp0=gtx0*0.176+gty0*0.132,gl=GUST_LUT,gn=Math.min(gl.length,Math.ceil(((gtx1-gtx0)*0.176+(gty1-gty0)*0.132)*8)+3);
- for(let q=0;q<gn;q++){const p=gp0+q/8-tsec*0.9,v=Math.sin(p)+0.5*Math.sin(p*0.37+tsec*0.23);gl[q]=v>0.6?Math.min(1,(v-0.6)*2.2)*(0.55+0.45*wnd):0;}
- const gust=(x,y)=>gl[Math.min(gn-1,Math.max(0,((x*0.176+y*0.132-gp0)*8)|0))]*gusty(x,y);
+ const wnd=windAmt(),tsec=windT,gtx0=Math.max(0,Math.floor(vx0/T)),gtx1=Math.min(W,Math.ceil(vx1/T)),gty0=Math.max(0,Math.floor(vy0/T)),gty1=Math.min(H,Math.ceil(vy1/T)); /* the wind now, and the tiles in view */
+ lightLayers(); /* asks for new light when the sun has moved */
  /* Land is painted a few chunks a frame (no new chunk is started after 6 ms, or 3.5 ms for the heavier close-up ones). Until a chunk is ready the coarser picture stands in for it,
     and a chunk that has just been painted fades in over that picture for a fifth of a second, so neither new land
     nor a change of zoom level pops into place. */
  const now=performance.now(),FADE=200;let waiting=0;
  const far=(tx,ty,nt)=>ctx.drawImage(miniImage(),tx*MINI_F,ty*MINI_F,nt*MINI_F,nt*MINI_F,tx*T,ty*T,nt*T,nt*T);
+ let shadeMs=0;const shade=(hi,cx,cy,cap)=>{const m=shades[hi],key=cx+','+cy;let c=m.get(key);if(c&&c.lk===lightKey)return c;
+  if(shadeMs<3){const t0=performance.now(),nc=buildShade(hi,cx,cy);shadeMs+=performance.now()-t0;if(nc){nc.lk=lightKey;m.delete(key);m.set(key,nc);if(m.size>cap)m.delete(m.keys().next().value);c=nc;}}else waiting++;
+  return c||null;};
  const show=(c,x,y,g,under)=>{const age=now-c.born;if(age>=FADE){ctx.drawImage(c,x,y,g,g);return;}waiting++;under();ctx.globalAlpha=Math.max(0,age/FADE);ctx.drawImage(c,x,y,g,g);ctx.globalAlpha=1;};
  if(lowZoom){ctx.imageSmoothingEnabled=ppt<MINI_F;ctx.drawImage(miniImage(),0,0,W*T,H*T);ctx.imageSmoothingEnabled=false;}
  else if(hiTier){
@@ -1955,13 +1981,13 @@ function render(){
    const under=()=>{const mc2=chunks.get(Math.floor(cx*CH_HI/CH_T)+','+Math.floor(cy*CH_HI/CH_T));if(mc2)ctx.drawImage(mc2,(cx*CH_HI%CH_T)*T,(cy*CH_HI%CH_T)*T,G,G,cx*G,cy*G,G,G);else far(cx*CH_HI,cy*CH_HI,CH_HI);};
    if(c){chunksHi.delete(key);chunksHi.set(key,c);}
    else if(performance.now()-now<3.5){c=buildChunkHi(cx,cy);c.born=performance.now();chunksHi.set(key,c);if(chunksHi.size>cap)chunksHi.delete(chunksHi.keys().next().value);}
-   if(c)show(c,cx*G,cy*G,G,under);else{waiting++;under();}}}
+   if(c){show(c,cx*G,cy*G,G,under);const sc=shade(1,cx,cy,cap);if(sc)ctx.drawImage(sc,cx*G,cy*G,G,G);}else{waiting++;under();}}}
  else{const G=CH_T*T,cap=Math.max(MAXC,(c1x-c0x+1)*(c1y-c0y+1)*2);
   for(let cy=c0y;cy<=c1y;cy++)for(let cx=c0x;cx<=c1x;cx++){const key=cx+','+cy;let c=chunks.get(key);
    const under=()=>far(cx*CH_T,cy*CH_T,CH_T);
    if(c){chunks.delete(key);chunks.set(key,c);}
    else if(performance.now()-now<6){c=buildChunk(cx,cy);c.born=performance.now();chunks.set(key,c);if(chunks.size>cap)chunks.delete(chunks.keys().next().value);}
-   if(c)show(c,cx*G,cy*G,G,under);else{waiting++;under();}}}
+   if(c){show(c,cx*G,cy*G,G,under);const sc=shade(0,cx,cy,cap);if(sc)ctx.drawImage(sc,cx*G,cy*G,G,G);}else{waiting++;under();}}}
  /* a change of zoom level: what was painted for the level just left fades out over the new one */
  {const tier=lowZoom?0:hiTier?2:1;if(tier!==tierNow){tierPrev=tierNow;tierNow=tier;tierT0=now;}
   const ta=now-tierT0;if(tierPrev>=0&&ta<FADE){waiting++;ctx.globalAlpha=1-ta/FADE;
@@ -1969,61 +1995,43 @@ function render(){
    else{const G=(tierPrev===2?CH_HI:CH_T)*T,map=tierPrev===2?chunksHi:chunks;for(let cy=Math.max(0,Math.floor(vy0/G));cy<=Math.floor(vy1/G);cy++)for(let cx=Math.max(0,Math.floor(vx0/G));cx<=Math.floor(vx1/G);cx++){const c=map.get(cx+','+cy);if(c)ctx.drawImage(c,cx*G,cy*G,G,G);}}
    ctx.globalAlpha=1;}}
  if(waiting)lastInput=now;
- /* Trees lean in the gust: each forest, park and orchard tile the gust is on is drawn again a pixel or two downwind,
-    then back, from the chunk it was painted in. Close-up only, and before the light goes over the land. */
- if(hiTier){const G=CH_HI*T;for(let cy=Math.floor(gty0/CH_HI);cy*CH_HI<gty1;cy++)for(let cx=Math.floor(gtx0/CH_HI);cx*CH_HI<gtx1;cx++){const c=chunksHi.get(cx+','+cy);if(!c||now-c.born<FADE)continue;
-   for(let dy=0;dy<CH_HI;dy++)for(let dx=0;dx<CH_HI;dx++){const x=cx*CH_HI+dx,y=cy*CH_HI+dy;if(x>=W||y>=H)continue;const k=kind[y*W+x];if(k!==KI.forest&&k!==KI.park&&k!==KI.orchard)continue;const g=gust(x,y);if(g<0.2)continue;
-    const off=Math.round(Math.sin(tsec*4.2+x*0.9+y*0.7)*(0.7+1.3*g));if(off)ctx.drawImage(c,dx*HT,dy*HT,HT,HT,x*T+off/HD,y*T,T,T);}}}
- /* the light of the hour on the slopes, and the shadows of the mountains */
- drawLight(ctx,T);
- ctx.fillStyle='#8fc3ff';if(!lowZoom)for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x,m=wMask[j];if(((x*3+y*5+frame)%9)===0){const c=(x*7+frame)%4,r=(y*3+frame)%4;if(m&(1<<(r*4+c))){if(hiTier)ctx.fillRect(x*T+c*S,y*T+r*S+1,S,1/HD);/* close-up: a glint is a thin stroke, not a block */else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}}
-  /* rapids flicker white */
-  if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(m&(1<<(r*4+c))){ctx.fillStyle='#f4f8ff';if(hiTier){ctx.fillRect(x*T+c*S,y*T+r*S+1/HD,S*2/3,1/HD);ctx.fillRect(x*T+c*S+2/HD,y*T+r*S+1,S*2/3,1/HD);}else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);ctx.fillStyle='#8fc3ff';}}}
- /* ---- what moves over the land ---- */
+ /* The light of the hour: in the far view a soft picture over the whole map; nearer, it is dithered into the pixel
+    grid chunk by chunk (see buildShade) and was drawn with each chunk above. */
+ if(lowZoom)drawLight(ctx,T,ppt<MINI_F);
+ /* rapids flicker white */
+ if(!lowZoom){ctx.fillStyle='#f4f8ff';for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const j=y*W+x;
+   if((flags[j]&4)&&((x+y*2+frame)%2)===0){const c=(x*5+frame)%4,r=(y*7+frame*3)%4;if(wMask[j]&(1<<(r*4+c))){if(hiTier){ctx.fillRect(x*T+c*S,y*T+r*S+1/HD,2/HD,1/HD);ctx.fillRect(x*T+c*S+2/HD,y*T+r*S+1,2/HD,1/HD);}else ctx.fillRect(x*T+c*S,y*T+r*S,S,S);}}}}
+ /* ---- what moves over the land: little, and all of it on the pixel grid ---- */
  if(!lowZoom&&wetness>0.03){/* after rain the roads are dark with wet */ctx.fillStyle='rgba(18,28,64,'+(0.24*wetness).toFixed(3)+')';
   for(let i=0;i<stTiles.length;i+=2){const x=stTiles[i],y=stTiles[i+1];if(x*T<vx0-T||x*T>vx1||y*T<vy0-T||y*T>vy1)continue;const m=stMask[y*W+x];if(m===0xFFFF){ctx.fillRect(x*T,y*T,T,T);continue;}for(let r=0;r<4;r++){const row=(m>>(r*4))&15;if(row===15)ctx.fillRect(x*T,y*T+r*S,T,S);else if(row)for(let q=0;q<4;q++)if(row&(1<<q))ctx.fillRect(x*T+q*S,y*T+r*S,S,S);}}}
- /* The wave itself: where the gust is, fields, grass and tree tops turn a shade lighter and open water a shade
-    darker, with no edge to it at all, fainter the further out the view is (far out it must not read as a beam of light). It is drawn at
-    every zoom, in cells of about sixteen screen pixels (half a tile close up, eight tiles far out; never more than
-    about seventeen thousand a frame). */
- {const cs=ppt>=22?0.5:ppt>=12?1:ppt>=7?2:ppt>=3.5?4:8,cx0=Math.floor(gtx0/cs),cx1=Math.ceil(gtx1/cs),cy0=Math.floor(gty0/cs),cy1=Math.ceil(gty1/cs),ox=cv.width/2-cam.x*s,oy=cv.height/2-cam.y*s,q=cs*T*s;
-  /* one pixel a cell in a small picture, then stretched over the view with its edges blended: no steps, no squares */
-  const cols=Math.min(GUST_W-1,cx1-cx0),rows=Math.min(GUST_H-1,cy1-cy0),u=GUST_U,dpi=cs*0.176*8,last=gn-1,al=255*(ppt>=16?0.15:ppt>=7?0.1:0.06);
-  for(let ry=0;ry<=rows;ry++){const cy=cy0+ry,row=Math.min(H-1,Math.floor(cy*cs))*W,o=ry*GUST_W;let pi=(cx0*cs*0.176+cy*cs*0.132-gp0)*8;
-   for(let rx=0;rx<=cols;rx++,pi+=dpi){let v=0;if(rx<cols&&ry<rows){const tx=Math.min(W-1,Math.floor((cx0+rx)*cs)),vk=VEG[kind[row+tx]];if(vk){let g=gl[pi<0?0:pi>last?last:pi|0];if(g>0.05){g*=gusty((cx0+rx)*cs,cy*cs);if(g>0.04)v=vk===2?(((al*1.2*g)|0)<<24|0x68280e)>>>0:(((al*g)|0)<<24|0xc8f8ec)>>>0;}}}u[o+rx]=v;}}
-  GUST_G.putImageData(GUST_ID,0,0,0,0,cols+1,rows+1);ctx.setTransform(1,0,0,1,0,0);ctx.imageSmoothingEnabled=true;
-  ctx.drawImage(GUST_C,0,0,cols,rows,Math.round(ox+cx0*q),Math.round(oy+cy0*q),Math.round(cols*q),Math.round(rows*q));ctx.imageSmoothingEnabled=false;
-  setWorld();}
- if(ppt>=12){const tx0=gtx0,tx1=gtx1-1,ty0=gty0,ty1=gty1-1,u=hiTier?1/HD:1,sn=v=>hiTier?Math.round(v*HD)/HD:Math.round(v);
-  const dayNow=darkness(hour)<0.2,dry3=skyNow()!==3,raining=!dry3,RINGC=['rgba(220,235,255,0.7)','rgba(220,235,255,0.45)','rgba(220,235,255,0.22)'],fly=hiTier&&month>=5&&month<=9&&dayNow&&dry3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')';
-  for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++){const i=y*W+x,k=kind[i],g=gust(x,y),X=x*T,Y=y*T;
-   /* inside the wave, bright strokes stream across the crop and the leaves */
-   if(g>0.1&&VEG[k]===1){ctx.fillStyle=k===KI.forest?'rgba(215,245,180,0.5)':'rgba(255,255,230,0.6)';const h=hash(x+7,y+3);
-    for(let q=0,nq=hiTier?(g>0.5?6:3):2;q<nq;q++)ctx.fillRect(X+sn((h*97+q*2.3+tsec*9)%7),Y+sn((h*53+q*1.37)%7.6),hiTier?1:S,u);}
-   /* water: short bright ripples run before the gust, and every drop of rain leaves a ring that widens and fades */
-   if(k===KI.water||k===KI.bridge){const wm=wMask[i]||0xFFFF,h=hash(x+3,y+9);
-    if(g>0.1){ctx.fillStyle='rgba(205,228,255,0.55)';for(let q=0,nq=g>0.5?4:2;q<nq;q++){const a=(h*97+q*2.3+tsec*7)%8,b=(h*53+q*1.9)%8;if(wm&(1<<((b>>1)*4+(a>>1))))ctx.fillRect(X+sn(a),Y+sn(b),hiTier?1:S,u);}}
-    if(raining){const ph=(tsec*1.5+h*9)%2.4;if(ph<1){const cq=Math.floor(h*160)%16;if(wm&(1<<cq)){const r=0.4+ph*1.5,rx=X+(cq&3)*S+1,ry=Y+(cq>>2)*S+1;ctx.fillStyle=ph<0.34?RINGC[0]:ph<0.67?RINGC[1]:RINGC[2];
-       ctx.fillRect(sn(rx-r),sn(ry-r*0.6),2*r,u);ctx.fillRect(sn(rx-r),sn(ry+r*0.6),2*r,u);ctx.fillRect(sn(rx-r-u),sn(ry-r*0.6+u),u,r*1.2-u);ctx.fillRect(sn(rx+r),sn(ry-r*0.6+u),u,r*1.2-u);}}}}
-   /* cloth on the rails and the washing lines: the lower half swings */
-   if(hiTier&&(k===KI.village||k===KI.town)){let yv=yardC[i];if(yv===255){yardLine(x,y,0);yv=yardC[i];}
+ if(hiTier){const u=1/HD,raining=skyNow()===3,pud=wetness>0.05,pudC='rgba(96,140,200,'+(0.6*wetness).toFixed(3)+')',pudH='rgba(225,238,255,'+(0.7*wetness).toFixed(3)+')',RINGC=['rgba(220,235,255,0.7)','rgba(220,235,255,0.45)','rgba(220,235,255,0.22)'];
+  for(let y=gty0;y<gty1;y++)for(let x=gtx0;x<gtx1;x++){const i=y*W+x,k=kind[i],X=x*T,Y=y*T;
+   /* every drop of rain leaves a ring on the water that widens and fades */
+   if(raining&&(k===KI.water||k===KI.bridge)){const wm=wMask[i]||0xFFFF,h=hash(x+3,y+9),ph=(tsec*1.5+h*9)%2.4;if(ph<1){const cq=Math.floor(h*160)%16;if(wm&(1<<cq)){const r=Math.round(1+ph*4)*u,rx=X+(cq&3)*S+1,ry=Y+(cq>>2)*S+1,r2=Math.round(r*0.6*HD)*u;ctx.fillStyle=ph<0.34?RINGC[0]:ph<0.67?RINGC[1]:RINGC[2];
+      ctx.fillRect(rx-r,ry-r2,2*r,u);ctx.fillRect(rx-r,ry+r2,2*r,u);ctx.fillRect(rx-r-u,ry-r2+u,u,2*r2-u);ctx.fillRect(rx+r,ry-r2+u,u,2*r2-u);}}}
+   /* cloth on the rails and the washing lines swings a pixel or two, more when the wind is up: the top is pinned,
+      the middle and the bottom swing out further and further */
+   if(k===KI.village||k===KI.town){let yv=yardC[i];if(yv===255){yardLine(x,y,0);yv=yardC[i];}
     if(yv)for(let qi=0;qi<4;qi++){const yl=(yv>>(qi*2))&3;if(!yl)continue;const a=(qi&1)*12,b=(qi>>1)*12;
-     for(let c=0;c<3;c++){const cx=a+2+c*3,sway=Math.sin(tsec*3.1+x*1.7+c*1.3)*(0.9+2.4*g),s1=Math.round(sway*0.5),s2=Math.round(sway),px1=v=>X+v/HD,py1=v=>Y+v/HD;
-      /* top pinned to the rail, the middle and the bottom swung out further and further */
+     for(let c=0;c<3;c++){const cx=a+2+c*3,sway=Math.sin(tsec*3.1+x*1.7+c*1.3)*(0.8+1.8*wnd),s1=Math.round(sway*0.5),s2=Math.round(sway),px1=v=>X+v/HD,py1=v=>Y+v/HD;
       if(yl===1){const len=5+Math.floor(hash(x*7+qi+c,y*5+c)*2);ctx.fillStyle=CLOTHC[0];ctx.fillRect(px1(cx),py1(b+4),2/HD,2/HD);ctx.fillRect(px1(cx+s1),py1(b+6),2/HD,2/HD);ctx.fillRect(px1(cx+s2),py1(b+8),2/HD,(len-4)/HD);
        ctx.fillStyle=CLOTHC[1];ctx.fillRect(px1(cx),py1(b+4),1/HD,2/HD);ctx.fillRect(px1(cx+s1),py1(b+6),1/HD,2/HD);ctx.fillStyle=CLOTHC[2];ctx.fillRect(px1(cx+s2),py1(b+3+len),2/HD,1/HD);}
       else{const len=2+(c===1?1:0);ctx.fillStyle=WASHC[Math.floor(hash(x*3+qi*5+c,y*7+c)*WASHC.length)];ctx.fillRect(px1(cx),py1(b+5),2/HD,1/HD);ctx.fillRect(px1(cx+s1),py1(b+6),2/HD,1/HD);if(len>1)ctx.fillRect(px1(cx+s2),py1(b+7),2/HD,(len-1)/HD);}}}}
-   /* puddles: on the lanes, the squares and bare ground, shrinking as the ground dries */
+   /* puddles on the lanes, the squares and bare ground, fading as the ground dries */
    if(pud){const sm=stMask[i];if(sm||k===KI.plaza||k===KI.busyard||k===KI.bare){const h=hash(x*3+1,y*5+2);if(h<(sm?0.3:0.14)){let cx=2+Math.floor(h*37)%4,cy=2+Math.floor(h*91)%4;
-      if(sm){let bq=Math.floor(h*160)%16;for(let q=0;q<16&&!(sm&(1<<bq));q++)bq=(bq+1)%16;cx=(bq&3)*S+0.33;cy=(bq>>2)*S+0.33;}
-      ctx.fillStyle=pudC;ctx.fillRect(X+cx,Y+cy,1.34,0.34);ctx.fillRect(X+cx-0.33,Y+cy+0.33,2,0.34);ctx.fillRect(X+cx,Y+cy+0.67,1.34,0.33);ctx.fillStyle=pudH;ctx.fillRect(X+cx+0.33,Y+cy+0.33,0.67,0.34);}}}
-   /* butterflies over grass and gardens, May to September */
-   if(fly&&(k===KI.grass||k===KI.park||k===KI.garden)){const h=hash(x+31,y+47);if(h<0.07){const bx=sn(X+4+Math.sin(tsec*0.9+h*500)*3),by=sn(Y+4+Math.cos(tsec*1.3+h*800)*2.4);ctx.fillStyle=FLYC[((h*4000)|0)%FLYC.length];
-     if((frame+((h*1000)|0))%2)ctx.fillRect(bx-u,by,3*u,u);else ctx.fillRect(bx,by-u,u,2*u);}}}}
- if(showRoutes){ctx.lineWidth=hiTier?1:2;ctx.setLineDash(hiTier?[2,3]:[4,4]);ctx.lineDashOffset=-frame;for(const r of TREKS){ctx.strokeStyle=r.col;for(const ln of r.lines){ctx.beginPath();ln.forEach((p,i)=>i?ctx.lineTo(p[0]*T,p[1]*T):ctx.moveTo(p[0]*T,p[1]*T));ctx.stroke();}}ctx.setLineDash([]);}
+      if(sm){let bq=Math.floor(h*160)%16;for(let q=0;q<16&&!(sm&(1<<bq));q++)bq=(bq+1)%16;cx=(bq&3)*S;cy=(bq>>2)*S;}
+      ctx.fillStyle=pudC;ctx.fillRect(X+cx+u,Y+cy+u,4*u,u);ctx.fillRect(X+cx,Y+cy+2*u,6*u,u);ctx.fillRect(X+cx+u,Y+cy+3*u,4*u,u);ctx.fillStyle=pudH;ctx.fillRect(X+cx+2*u,Y+cy+2*u,2*u,u);}}}}}
+ /* the trekking routes: square dots in steps along the line, two on and two off, marching slowly. No smooth strokes:
+    every dot sits on the grid of its own size (an art pixel; a screen pixel in the far view). */
+ if(showRoutes){const d=hiTier?1:lowZoom?Math.max(2,Math.round(1/s)):2,ph=frame>>2;
+  for(const r of TREKS){ctx.fillStyle=r.col;for(const ln of r.lines){let k=0;for(let q=1;q<ln.length;q++){const ax=ln[q-1][0]*T,ay=ln[q-1][1]*T,bx=ln[q][0]*T,by=ln[q][1]*T,nst=Math.hypot(bx-ax,by-ay)/d;
+    if(Math.max(ax,bx)<vx0||Math.min(ax,bx)>vx1||Math.max(ay,by)<vy0||Math.min(ay,by)>vy1){k+=nst;continue;}
+    for(let j=Math.ceil(k)-k;j<nst;j++)if(((Math.round(k+j)-ph)&3)<2)ctx.fillRect(Math.round((ax+(bx-ax)*j/nst)/d)*d,Math.round((ay+(by-ay)*j/nst)/d)*d,d,d);
+    k+=nst;}}}}
  /* cable car: the real line from OSM, pylons and two gondolas */
  const ca=CABLE_LINE[0],cb=CABLE_LINE[CABLE_LINE.length-1],ax=ca[0]*T,ay=ca[1]*T-6,bx=cb[0]*T,by=cb[1]*T-4;
- ctx.strokeStyle='#1b1b1b';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();
+ {/* the rope, stepped pixel by pixel */const d=lowZoom?Math.max(1,Math.round(1/s)):1,nq=Math.ceil(Math.max(Math.abs(bx-ax),Math.abs(by-ay))/d);ctx.fillStyle='#1b1b1b';
+  for(let q=0;q<=nq;q++){const px=ax+(bx-ax)*q/nq,py=ay+(by-ay)*q/nq;if(px>vx0-d&&px<vx1&&py>vy0-d&&py<vy1)ctx.fillRect(Math.round(px/d)*d,Math.round(py/d)*d,d,d);}}
  if(!lowZoom){for(let i=1;i<12;i++){const tx=ax+(bx-ax)*i/12,ty=ay+(by-ay)*i/12;ctx.fillStyle='#4a4a42';ctx.fillRect(Math.round(tx)-1,Math.round(ty)-1,2,10);}
   /* two cars pass each other on the rope in opening hours; after hours one waits at each station */
   if(ridesOpen()){/* a string of ten cabins, every other one coming down */for(let q=0;q<10;q++){const g0=(gond/600+q/10)%1,gt=q%2?1-g0:g0;drawGondola(ctx,Math.round(ax+(bx-ax)*gt),Math.round(ay+(by-ay)*gt));}}
@@ -2045,7 +2053,7 @@ function render(){
  /* places: small sprites on the art grid; the selected or hovered one gets a thin frame */
  for(const l of LMY){if(!seen(l.x*T,l.y*T,60))continue;drawLandmark(ctx,l);const hi=l===sel||l===hover,wp=l.w*T;
   if(hi){ctx.fillStyle=l===sel?YOU_COL:'#f4f4f0';ctx.fillRect(l.x*T-2,l.y*T-2,wp+4,1);ctx.fillRect(l.x*T-2,l.y*T+wp+1,wp+4,1);ctx.fillRect(l.x*T-2,l.y*T-2,1,wp+4);ctx.fillRect(l.x*T+wp+1,l.y*T-2,1,wp+4);}
-  if(visited.has(l.id)){const u=hiTier?0.5:1; /* the mark of a place you have been to: half the size up close */ctx.fillStyle='#2e7d32';ctx.fillRect(l.x*T+wp-2*u,l.y*T-2*u,4*u,4*u);ctx.fillStyle='#f4f4f0';ctx.fillRect(l.x*T+wp-u,l.y*T-u,2*u,2*u);}}
+  if(visited.has(l.id)){const u=hiTier?2/HD:1; /* the mark of a place you have been to: smaller up close */ctx.fillStyle='#2e7d32';ctx.fillRect(l.x*T+wp-2*u,l.y*T-2*u,4*u,4*u);ctx.fillStyle='#f4f4f0';ctx.fillRect(l.x*T+wp-u,l.y*T-u,2*u,2*u);}}
  /* the flag on the summit streams in the wind (close-up; the small sprite has it painted on) */
  if(hiTier&&seen(FAN.x*T,FAN.y*T,60)){const un=S/3,X=FAN.x*T,Y=FAN.y*T,amp=0.4+0.8*wnd;
   for(let c=0;c<8;c++){const dy=Math.round(Math.sin(tsec*7-c*0.9)*amp*c/7),fx=X+(28+c)*un,fy=Y+(2+dy)*un;ctx.fillStyle=FLAGC[0];ctx.fillRect(fx,fy,un,6*un);ctx.fillStyle=FLAGC[1];ctx.fillRect(fx,fy,un,un);
@@ -2061,7 +2069,7 @@ function render(){
  /* the way the walker is about to take, as a dotted line */
  if(hero.path.length&&!hero.riding){const st=lowZoom?Math.max(2,Math.round(3/s)):1,d=lowZoom?Math.max(2,Math.round(1.6/s)):2;for(const pass of [0,1]){ctx.fillStyle=pass?YOU_COL:'#1b1b1b';const e=pass?0:1;for(let i=(hero.path.length-1)%st;i<hero.path.length;i+=st){const p=hero.path[i];if(seen(p[0]*T,p[1]*T,T))ctx.fillRect(p[0]*T+T/2-d/2-e,p[1]*T+T/2-d/2-e,d+2*e,d+2*e);}}}
  /* the walker's footprints in snow and hoarfrost, fading */
- if(!lowZoom&&prints.length){const now=performance.now();for(const p of prints){const age=(now-p.t)/90000;if(age>=1)continue;ctx.fillStyle='rgba(70,90,130,'+(0.6*(1-age)).toFixed(2)+')';ctx.fillRect(p.x*T-0.5,p.y*T,1,1.5);}}
+ if(!lowZoom&&prints.length){const now=performance.now();for(const p of prints){const age=(now-p.t)/90000;if(age>=1)continue;ctx.fillStyle='rgba(70,90,130,'+(0.6*(1-age)).toFixed(2)+')';ctx.fillRect(Math.round(p.x*T)-1,Math.round(p.y*T),1,2);}}
  const dk=darkness(hour),step2=(frame>>2)%2,sk0=skyNow();
  if(!lowZoom){
   /* festival pole and dancers, harvest crews, market stalls and crowd */
@@ -2125,22 +2133,14 @@ function render(){
   if(hero.riding){if(hero.riding.sprite==='train')drawTrain(ctx,hx,hy-2);else drawGondola(ctx,hx,hy-10);}
   else if(!lowZoom){drawPerson(ctx,hx,hy,YOU_COL,'#f4f4f0',hero.moving&&hero.step);if(sk0===3)drawUmbrella(ctx,hx,hy,'#c2412b');}
   /* the marker is half the size up close, where the gold figure is easy to see */
-  const u=hiTier?0.5:1,bob=(frame>>2)%2,my=hy-(lowZoom?6:hiTier?7.5:12)-bob*u;ctx.fillStyle='#1b1b1b';ctx.fillRect(hx-3*u,my-u,6*u,3*u);ctx.fillRect(hx-2*u,my+2*u,4*u,2*u);ctx.fillStyle=YOU_COL;ctx.fillRect(hx-2*u,my,4*u,2*u);ctx.fillRect(hx-u,my+2*u,2*u,u);}
+  const u=hiTier?2/HD:1,bob=(frame>>2)%2,my=hy-(lowZoom?6:hiTier?8:12)-bob*u;ctx.fillStyle='#1b1b1b';ctx.fillRect(hx-3*u,my-u,6*u,3*u);ctx.fillRect(hx-2*u,my+2*u,4*u,2*u);ctx.fillStyle=YOU_COL;ctx.fillRect(hx-2*u,my,4*u,2*u);ctx.fillRect(hx-u,my+2*u,2*u,u);}
  /* where you are going: a small flag on the tile you clicked */
  if(goal){const m=lowZoom?Math.max(1,Math.round(1.6/s)):1,gx=Math.round(goal[0]*T+T/2),gy=Math.round(goal[1]*T+T),bob=(frame>>2)%2;
   ctx.fillStyle='#1b1b1b';ctx.fillRect(gx-m,gy-11*m,3*m,12*m);ctx.fillRect(gx+m,gy-12*m-bob*m,6*m,6*m);
   ctx.fillStyle='#f4f4f0';ctx.fillRect(gx,gy-10*m,m,10*m);ctx.fillStyle='#c2412b';ctx.fillRect(gx+m,gy-11*m-bob*m,4*m,4*m);ctx.fillStyle=YOU_COL;ctx.fillRect(gx+2*m,gy-10*m-bob*m,2*m,2*m);}
- /* cloud shadows: each cloud's shape is kept as a small picture, one pixel a cell, and stretched with its edges
-    blended, so a shadow is a soft patch that slides over the land and not a block that jumps from cell to cell */
- ctx.imageSmoothingEnabled=true;for(const c of clouds){const cell=c.cell,cw=c.shape.cw,chh=c.shape.chh,ox=c.x-cw*cell/2,oy=c.y-chh*cell/2;if(ox>vx1||ox+cw*cell<vx0||oy>vy1||oy+chh*cell<vy0)continue;
-  if(!c.img){c.img=mkCanvas(cw+2,chh+2);const g=c.img.getContext('2d');g.fillStyle='rgba(10,20,14,.15)';for(const [j,i0,len] of c.shape.runs)g.fillRect(i0+1,j+1,len,1);}
-  ctx.drawImage(c.img,ox-cell,oy-cell,(cw+2)*cell,(chh+2)*cell);}
- ctx.imageSmoothingEnabled=false;
  /* hoarfrost on the fields, January mornings (frost, fog and the sea of clouds are one block a tile; up close their edges are blended) */
  if(hiTier)ctx.imageSmoothingEnabled=true;
  {const fr=frostAmt(hour);if(fr>0){ctx.globalAlpha=fr;ctx.drawImage(frostMask(),0,0,W*T,H*T);ctx.globalAlpha=1;}}
- /* mist lying along the rivers at dawn, drifting a little */
- {const ma=mistAmt(hour);if(ma>0){const mm=mistMask(),dx=Math.sin(windT*0.25)*5,dy=Math.cos(windT*0.19)*3;ctx.imageSmoothingEnabled=true;ctx.globalAlpha=0.55*ma;ctx.drawImage(mm,dx,dy,W*T,H*T);ctx.globalAlpha=0.3*ma;ctx.drawImage(mm,-dx*1.6,-dy,W*T,H*T);ctx.globalAlpha=1;ctx.imageSmoothingEnabled=hiTier;}}
  /* valley fog: one flat block per tile, in four density steps */
  const fl=fogLevel(hour);if(fl>1150)ctx.drawImage(fogMask(fl),0,0,W*T,H*T);
  /* the sea of clouds: from above the fog, the same valleys are a white floor with the ridges standing out of it */
@@ -2164,14 +2164,14 @@ function render(){
    ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';}}
  const centerE=eAt(Math.floor(cam.x/T),Math.floor(cam.y/T));const snowing=sk===3&&winterSnow()&&centerE>1800;
  {const fl2=now-flashT0;if(fl2<420&&!CALM){/* a soft double flash */ctx.fillStyle='rgba(222,232,255,'+(fl2<70?0.3:fl2<140?0.08:fl2<210?0.2:0.2*(1-(fl2-210)/210)).toFixed(3)+')';ctx.fillRect(0,0,cv.width,cv.height);lastInput=now;}}
- if(sk===3&&!snowing){ctx.fillStyle='rgba(40,60,90,.18)';ctx.fillRect(0,0,cv.width,cv.height);ctx.strokeStyle='rgba(200,225,255,.6)';ctx.lineWidth=1;ctx.beginPath();for(const r of rain){const x=((r[0]+frame*0.004)%1)*cv.width,y=((r[1]+frame*0.03)%1)*cv.height;ctx.moveTo(x,y);ctx.lineTo(x-3,y+12);}ctx.stroke();}
+ if(sk===3&&!snowing){ctx.fillStyle='rgba(40,60,90,.18)';ctx.fillRect(0,0,cv.width,cv.height);/* rain: short slanted streaks of three stacked blocks, not smooth lines */const p=lowZoom?1:2;ctx.fillStyle='rgba(200,225,255,.55)';for(const r of rain){const x=Math.round(((r[0]+frame*0.004)%1)*cv.width/p)*p,y=Math.round(((r[1]+frame*0.03)%1)*cv.height/p)*p;ctx.fillRect(x,y,p,4*p);ctx.fillRect(x-p,y+4*p,p,4*p);ctx.fillRect(x-2*p,y+8*p,p,3*p);}}
  /* a rainbow for a little while after the rain stops, when the sun is low enough to make one: blocky bands on the side
     of the view away from the sun */
  {const left=rainbowUntil-performance.now();if(left>0&&dk===0&&sk!==3){const sn=sunAt(hour,month);if(sn.alt>0.03&&sn.alt<0.73){const b=Math.max(3,Math.round(cv.height/170)),R=cv.height*0.62,cx=cv.width*(0.5-0.28*Math.sin(sn.az)),cy=cv.height*0.98,cols=['#e0453a','#f08a2a','#f1c232','#58b55a','#4a8ee0','#8a5ad0'];
    ctx.globalAlpha=0.42*Math.min(1,left/4000)*Math.min(1,(RAINBOW_MS-left)/2500+0.2);
    for(let c=0;c<cols.length;c++){ctx.fillStyle=cols[c];const r=R-c*b,n=Math.ceil(r*2.2/b);for(let i=0;i<=n;i++){const a=-Math.PI*0.86+Math.PI*0.72*i/n;ctx.fillRect(Math.round((cx+Math.cos(a)*r)/b)*b,Math.round((cy+Math.sin(a)*r)/b)*b,b,b);}}
    ctx.globalAlpha=1;}}}
- if(snowing){ctx.fillStyle='rgba(200,210,230,.15)';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='rgba(255,255,255,.9)';for(const r of rain){const x=((r[0]+frame*0.0015+Math.sin(frame*0.2+r[1]*20)*0.004)%1)*cv.width,y=((r[1]+frame*0.008)%1)*cv.height;ctx.fillRect(x,y,3,3);}}
+ if(snowing){ctx.fillStyle='rgba(200,210,230,.15)';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='rgba(255,255,255,.9)';for(const r of rain){const x=((r[0]+frame*0.0015+Math.sin(frame*0.2+r[1]*20)*0.004)%1)*cv.width,y=((r[1]+frame*0.008)%1)*cv.height;ctx.fillRect(Math.round(x/3)*3,Math.round(y/3)*3,3,3);}}
  if(dk>0.12){const al=Math.min(1,(dk-0.1)/0.45);setWorld();ctx.globalCompositeOperation='lighter';
   if(lowZoom){/* zoomed out: every settlement shows as a cluster of lights with a soft blocky glow */
    const L=lightsImages();ctx.globalAlpha=al;ctx.drawImage(L.glow,0,0,W*T,H*T);ctx.drawImage(L.dots,0,0,W*T,H*T);ctx.globalAlpha=1;}
@@ -2207,8 +2207,6 @@ function render(){
      for(let k=0,n=hiTier?3:1,u=hiTier?1/HD:1;k<n;k++){const h=hash(x+91+k*37,y+17+k*11);if(h>0.09)continue;const ph=frame+x*13+y*29+k*5;if(ph%16>4)continue;const jx=(ph>>4)%7+k%2*0.5,jy=(ph>>5)%5+k;ctx.fillStyle='rgba(216,240,96,'+(0.3*al)+')';ctx.fillRect(x*T+jx-u,y*T+jy-u,3*u,3*u);ctx.fillStyle='rgba(232,250,130,'+al+')';ctx.fillRect(x*T+jx,y*T+jy,u,u);}}}
    ctx.fillStyle='rgba(255,220,120,'+(0.08*al)+')';for(let i=0;i<waterTiles.length;i+=2){const x=waterTiles[i],y=waterTiles[i+1];if(townDist(x,y)<TOWN_R&&((x+y+frame)%3===0)&&(wMask[y*W+x]&0x60)===0x60)ctx.fillRect(x*T+S,y*T+S,2*S,S);}}
   ctx.globalCompositeOperation='source-over';ctx.setTransform(1,0,0,1,0,0);}
- /* cloud haze above the land: only when zoomed out, fading away as you zoom into town */
- {const hz=Math.max(0,Math.min(1,(4-cam.z)/2));if(hz>0){ctx.fillStyle=sk===2?'rgba(255,255,255,'+(0.2*hz)+')':'rgba(255,255,255,'+((0.09-dk*0.08)*hz)+')';for(const c of clouds){const [sx,sy]=scr(c.x,c.y);const px=cv.width/2+(sx-cv.width/2)*c.p,py=cv.height/2+(sy-cv.height/2)*c.p;const cell=Math.max(1,Math.round(c.cell*s*c.p));const cwp=c.shape.cw*cell,chp=c.shape.chh*cell;const ox=Math.round(px-cwp/2),oy=Math.round(py-chp/2);if(ox>cv.width||ox+cwp<0||oy>cv.height||oy+chp<0)continue;for(const [j,i0,n] of c.shape.runs)ctx.fillRect(ox+i0*cell,oy+j*cell,n*cell,cell);}}}
  const placed=[];const font=(ppt>=5?9:8)+'px "Press Start 2P",monospace';
  if(showLabels){
   const order=[...LM].sort((p,q)=>((q===sel)-(p===sel))||((q===hover)-(p===hover))||((q.major||0)-(p.major||0)));
@@ -2227,7 +2225,7 @@ function render(){
  /* keyboard aim: a cross in the middle of the view, where Enter will walk to */
  if(kbAim){const ax=Math.round(cv.width/2),ay=Math.round(cv.height/2);ctx.fillStyle='#1b1b1b';ctx.fillRect(ax-10,ay-2,20,4);ctx.fillRect(ax-2,ay-10,4,20);ctx.fillStyle=YOU_COL;ctx.fillRect(ax-9,ay-1,6,2);ctx.fillRect(ax+3,ay-1,6,2);ctx.fillRect(ax-1,ay-9,2,6);ctx.fillRect(ax-1,ay+3,2,6);}
  /* overview map in the side panel: whole region, places, lights at night, your position and the current view */
- mc.imageSmoothingEnabled=false;mc.globalCompositeOperation='source-over';miniImage();mc.drawImage(miniSmall,0,0);drawLight(mc,1);
+ mc.imageSmoothingEnabled=false;mc.globalCompositeOperation='source-over';miniImage();mc.drawImage(miniSmall,0,0);drawLight(mc,1,true);
  if(dk>0){mc.fillStyle='rgba(8,12,40,'+dk*0.75+')';mc.fillRect(0,0,W,H);if(dk>0.12){const L=lightsImages();mc.globalCompositeOperation='lighter';mc.drawImage(L.glow,0,0,W,H);mc.drawImage(L.dots,0,0);mc.globalCompositeOperation='source-over';}}
  mc.fillStyle='#f4f4f0';for(const l of LM)mc.fillRect(l.x,l.y,3,3);
  mc.strokeStyle='#f4f4f0';mc.lineWidth=3;mc.strokeRect(Math.max(2,vx0/T),Math.max(2,vy0/T),Math.min(W-4,viewW()/T),Math.min(H-4,viewH()/T));
@@ -2361,7 +2359,7 @@ function startSound(){if(!ac){ac=new (window.AudioContext||window.webkitAudioCon
  const river=chain('lowpass',420,0.7,0,1,[[0.071,70],[0.113,45]]),wind=chain('bandpass',260,0.6,0,0.83,[[0.09,80],[0.031,50]]),chatter=chain('bandpass',1100,1.2,0,1.13),rattle=chain('bandpass',1500,2.5,0,0.94);
  /* the river has a second, brighter voice: water over stones, a share of the main one and never steady */
  const trickle=chain('bandpass',1900,1.4,0,1.31,[[0.17,300],[0.057,220]]);
- /* the wind: its loudness is set in updateMix from the height you stand at and the gusts on the map */
+ /* the wind: its loudness is set in updateMix from the height you stand at and the strength of the wind */
  drift(wind.gain,[[0.13,0.35],[0.047,0.25]]);
  /* cable car: a low two-note hum with a slow wobble */
  const hum=ac.createGain();hum.gain.value=0;hum.connect(master);for(const [f,type,g] of [[92,'sine',1],[184,'triangle',0.35],[276,'sine',0.12]]){const o=ac.createOscillator(),og=ac.createGain();o.type=type;o.frequency.value=f;og.gain.value=g;o.connect(og).connect(hum);o.start();}
@@ -2434,9 +2432,8 @@ cv.addEventListener('keydown',e=>{const d=PAN[e.key];
  if(d){e.preventDefault();follow=false;kbAim=true;cam.x+=d[0]*viewW()/8;cam.y+=d[1]*viewH()/8;clampCam();}
  else if((e.key==='Enter'||e.key===' ')&&kbAim){e.preventDefault();const x=cam.x/T,y=cam.y/T,l=overL(x,y);if(l)travel(l);else walkTo(Math.floor(x),Math.floor(y));}
  if(e.key==='+'||e.key==='=')zoom(1);if(e.key==='-')zoom(-1);});
-const ZL=[1,1.8,3,5,8,12,16,24,32,48];
-function zoomTo(z,px,py){z=Math.max(1,Math.min(ZMAX,z));if(px!==undefined){const [wx,wy]=world(px,py);cam.z=z;const s=fitScale*cam.z;cam.x=wx-(px-cv.width/2)/s;cam.y=wy-(py-cv.height/2)/s;}else cam.z=z;clampCam();saveState();}
-function zoom(dir,px,py){let i=0;for(let k=0;k<ZL.length;k++)if(ZL[k]<=cam.z+0.01)i=k;i=Math.max(0,Math.min(ZL.length-1,i+dir));zoomTo(ZL[i],px,py);}
+function zoomTo(z,px,py){z=snapZ(z);if(px!==undefined){const [wx,wy]=world(px,py);cam.z=z;const s=fitScale*cam.z;cam.x=wx-(px-cv.width/2)/s;cam.y=wy-(py-cv.height/2)/s;}else cam.z=z;clampCam();saveState();}
+function zoom(dir,px,py){const ZL=zoomLevels();let i=0;for(let k=0;k<ZL.length;k++)if(ZL[k]<=cam.z*1.01)i=k;i=Math.max(0,Math.min(ZL.length-1,i+dir));zoomTo(ZL[i],px,py);}
 document.getElementById('zin').addEventListener('click',()=>{zoom(1);cv.focus();});
 document.getElementById('zout').addEventListener('click',()=>{zoom(-1);cv.focus();});
 document.getElementById('zfit').addEventListener('click',()=>{cam.z=1;follow=false;clampCam();cv.focus();});
@@ -2500,7 +2497,7 @@ function loop(ts){requestAnimationFrame(loop);
  autoSkyT+=dt;if(autoSkyT>180000){autoSkyT=0;pickAutoSky();}
  if(skyNow()===3&&month>=5&&month<=9){if(!boltNext)boltNext=ts+4000+Math.random()*9000;else if(ts>boltNext){boltNext=ts+8000+Math.random()*15000;flashT0=performance.now();lastInput=ts;thunder(600+Math.random()*2200);}}else boltNext=0;
  windT+=dt/1000;{const rn=skyNow()===3;wetness=wetness<0?(rn?1:0):Math.max(0,Math.min(1,wetness+(rn?dt/15000:-dt/80000)));} /* wet in a quarter of a minute of rain, dry again in a minute and a half */
- for(const c of clouds){c.x+=c.v*dt/16;if(c.x>W*T+c.r)c.x=-c.r;}
+ 
  {const s=skyNow();if(lastSkyR===3&&s!==3&&darkness(hour)===0){rainbowUntil=ts+RAINBOW_MS;const sn=sunAt(hour,month);if(sn.alt>0.03&&sn.alt<0.73)say(U().toast.rainbow);}lastSkyR=s;if(HASH.rainbow)rainbowUntil=performance.now()+RAINBOW_MS/2;}
  tick(dt);tickAmb(dt);tickFlocks(dt);tickShoppers(dt);render();
  statusAcc+=dt;if(statusAcc>250){statusAcc=0;updateStatus();}

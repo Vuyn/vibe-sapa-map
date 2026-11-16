@@ -15,8 +15,9 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 - **The area:** 32.4 by 18.3 km around Sa Pa town, as 840 by 472 tiles of about 39 m. It runs from Fansipan (3,147 m) and the Ô Quy Hồ pass down the Mường Hoa valley to Bản Hồ.
 - **33 places with a card each:** the stone church, the lake, the markets, Fansipan, waterfalls, the villages of the valley, and Hồ Séo Mý Tỷ, the reservoir high on the Hoàng Liên range. Each card has a short description, a travel tip, walking and riding times, and a small picture built from the real skyline behind that place.
 - **Land with height:** the ground is drawn in levels, as in top-down pixel games. Where it steps down towards you there is a cliff face of earth or rock under a lit edge; forests show their levels as bands of shade, the town its retaining walls, and the rice terraces their risers.
-- **Real terrain, drawn softly:** forest, meadow, rock and village ground run into each other along wobbling borders instead of tile squares, and their colour drifts gently across the map; rice terraces that follow the contour lines, rivers that widen downstream with rapids where they fall steeply, the true outline of Hồ Sa Pa with its island, the hydropower reservoirs with their dams and power plants, and hill shading from the elevation model.
+- **Real terrain, drawn softly:** forest, meadow, rock and village ground run into each other along wobbling borders instead of tile squares; rice terraces that follow the contour lines, rivers that widen downstream with rapids where they fall steeply, the true outline of Hồ Sa Pa with its island, the hydropower reservoirs with their dams and power plants, and hill shading from the elevation model.
 - **Town detail:** streets, buildings, hotels, shops and cafés from OpenStreetMap, with street names when you zoom in.
+- **Drawn as pixel art, on one grid:** the map is shown only at zoom levels where every pixel of the art is a whole number of screen pixels, in a palette of 46 colours. Slopes are shaded in flat bands with stippled seams, and houses, people and the landmark buildings have a dark outline, as in a hand-drawn game map.
 - **A close-up view:** zoom in past street level and the map is redrawn at three times the detail: houses with doors and windows, tree crowns, the crop on each terrace, washing lines and indigo cloth drying in the yards, and people small enough to blend in but clear enough to tell a guide from a farmer. Every landmark has its own picture there: the stone church with its spire, the cable car station, the monastery, the market hall, the water wheel at Cát Cát.
 - **Homestays:** named homestays near the valley villages, as mapped in OpenStreetMap.
 - **Peaks, waterfalls and viewpoints** with their names and heights.
@@ -26,11 +27,11 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 - **Walk:** click or tap anywhere and the walker finds a way there along roads and trails. A flag marks the destination and dots show the path. A click on water or a cliff goes to the nearest spot that can be reached.
 - **Ride:** trips between town and the cable car base take the Mường Hoa mountain train, and the cable car goes up to Fansipan. Both keep their real opening hours; after the last car the walker goes on foot.
 - **Change the month:** the terraces flood in May, turn green in summer and gold in September. February brings peach blossom and the Hmong Gầu Tào festival, April brings buffalo ploughing, May and June people bent over the seedlings, September and October harvest crews, and January and February snow on the high ridge. From June to August the rivers run wider and whiter.
-- **Feel the weather:** wind runs over the fields in gusts, bends the trees, ruffles the lakes, lifts the cloth on the lines and streams the flag on Fansipan; summer storms bring lightning and thunder, and raindrops ring the water; rain leaves wet roads and puddles that dry out; mist lies along the rivers at dawn; in January and February there is snow on the roofs up high. After the harvest, rice dries on mats in the yards and stubble burns in the fields.
+- **Feel the weather:** the wind lifts the cloth on the lines, streams the flag on Fansipan and bends the kitchen smoke; summer storms bring lightning and thunder, and raindrops ring the water; rain leaves wet roads and puddles that dry out; in January and February there is snow on the roofs up high. After the harvest, rice dries on mats in the yards and stubble burns in the fields.
 - **See the light change:** golden hour before sunset and after sunrise, a blue hour at dusk, and on clear nights the stars and the Milky Way over the dark valleys. The water wheel at Cát Cát turns and the church bell swings on the hour.
 - **Change the time and the sky:** the sun crosses the sky as it does at Sa Pa's latitude, so the mountains throw long shadows in the morning and evening and almost none at noon. Night brings lit windows and street lamps; there is morning valley fog, a sea of clouds seen from Fansipan and the pass, rain with a rainbow after it, and hoarfrost on the fields on January mornings.
 - **Visit on market day:** Sapa Market fills up on Sunday morning, the night market sets up on Friday, Saturday and Sunday evenings, and the love market fills the church square on Saturday evening.
-- **Watch village life:** kitchen smoke at breakfast and supper time, chickens, dogs and pigs in the yards, buffalo in the fields, birds over the valley. Children walk to school on weekdays, villagers walk to market on Sunday, trekking groups follow their guide down the valley in the morning, sleeper buses arrive before dawn, and on September Fridays and Saturdays the mountain marathon is on. Children play ball and skip rope in the yards out of school hours. Street vendors carry shoulder poles, porters climb the Fansipan trail, visitors stop at the viewpoints. Ducks paddle in the flooded paddies in May and butterflies fly over the meadows in summer. Fireflies come out over the terraces on summer nights. The animals notice the walker.
+- **Watch village life:** kitchen smoke at breakfast and supper time, chickens, dogs and pigs in the yards, buffalo in the fields, birds over the valley. Children walk to school on weekdays, villagers walk to market on Sunday, trekking groups follow their guide down the valley in the morning, sleeper buses arrive before dawn, and on September Fridays and Saturdays the mountain marathon is on. Children play ball and skip rope in the yards out of school hours. Street vendors carry shoulder poles, porters climb the Fansipan trail, visitors stop at the viewpoints. Ducks paddle in the flooded paddies in May. Fireflies come out over the terraces on summer nights. The animals notice the walker.
 - **Keep a journal:** places you have walked to are ticked off. Your position and journal are saved in the browser.
 - **Read the weather:** the status bar shows the typical temperature and rainfall for the chosen month, adjusted to the height where the walker stands.
 - **Listen:** optional sound of river, wind, birds, market chatter, the train and the cable car, with roosters at dawn, the church bell on the hour, the monastery bell at dusk, rain, frogs and crickets on summer nights. The river and the wind never repeat, and the birds have several calls.
@@ -42,7 +43,7 @@ It needs a browser from 2023 or later (Chrome 80, Firefox 113, Safari 16.4). It 
 | --- | --- |
 | Click or tap | Walk to that spot, or to a place |
 | Drag | Move the view |
-| Scroll, pinch, `+` and `-` | Zoom |
+| Scroll, pinch, `+` and `-` | Zoom, one step at a time (the map keeps to sizes where its pixels stay square and sharp) |
 | Double tap (phone) | Zoom in at that spot |
 | Arrow keys | Move the view |
 | `Enter` | Walk to the cross in the middle of the view |
@@ -58,7 +59,7 @@ The address can carry a view, which makes a shareable link. For example, `index.
 | `h` | Hour, 0 to 24 |
 | `m` | Month, 1 to 12 |
 | `d` | Weekday, 0 Sunday to 6 Saturday |
-| `z` | Zoom, 1 to 48 |
+| `z` | Zoom, as a multiple of the whole-map view; it snaps to the nearest step |
 | `at` | Centre of the view as tile `x,y` (the church is at 406,199) |
 | `sel` | Place to open, for example `laochai` |
 | `lang` | `vi` or `en` |

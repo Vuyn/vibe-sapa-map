@@ -5,7 +5,7 @@
 const fs=require('fs'),path=require('path');
 const F=JSON.parse(fs.readFileSync(path.join(__dirname,'frame.json'),'utf8'));
 const force=process.argv.includes('--force');
-const raw=path.join(__dirname,'raw');for(const d of ['elev12','elev14','fonts'])fs.mkdirSync(path.join(raw,d),{recursive:true});
+const raw=path.join(__dirname,'raw');for(const d of ['elev12','fonts'])fs.mkdirSync(path.join(raw,d),{recursive:true});
 const lon2x=(lon,z)=>Math.floor((lon+180)/360*2**z);
 const lat2y=(lat,z)=>{const r=lat*Math.PI/180;return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*2**z);};
 async function get(url,file,opts){if(!force&&fs.existsSync(file)&&fs.statSync(file).size>0)return 'cached';const r=await fetch(url,opts);if(!r.ok)throw new Error(r.status+' '+url);fs.writeFileSync(file,Buffer.from(await r.arrayBuffer()));return 'ok';}
@@ -21,10 +21,8 @@ async function overpass(parts,file){if(!force&&fs.existsSync(file)&&fs.statSync(
  const seen=new Map(),elements=[];for(const [label,q] of parts){for(const el of await overpassOne(q,label)){const k=el.type+el.id+(el.geometry||el.center?'g':'');const at=seen.get(k);if(at===undefined){seen.set(k,elements.length);elements.push(el);}else if(el.tags&&!elements[at].tags)elements[at]=el;}}
  fs.writeFileSync(file,JSON.stringify({elements}));console.log(path.basename(file),elements.length,'elements');}
 (async()=>{
- // elevation: zoom 12 for the whole frame, zoom 14 for the town detail box
+ // elevation: zoom 12 for the whole frame
  await tiles(12,F.LON0,F.LON1,F.LAT0,F.LAT1,'elev12');
- const d=F.detail,dl0=F.LON0+d.x/F.W*(F.LON1-F.LON0),dl1=F.LON0+(d.x+d.size)/F.W*(F.LON1-F.LON0),da1=F.LAT1-d.y/F.H*(F.LAT1-F.LAT0),da0=F.LAT1-(d.y+d.size)/F.H*(F.LAT1-F.LAT0);
- await tiles(14,dl0,dl1,da0,da1,'elev14');
  // OpenStreetMap
  const bb=[F.LAT0,F.LON0,F.LAT1,F.LON1].join(','),tb=F.town.poiBox.join(',');
  const body=inner=>`[out:json][timeout:120];(${inner});out body;>;out skel qt;`;

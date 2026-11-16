@@ -1,6 +1,5 @@
 // Turns the PNGs in ./raw into the grids the page embeds, in ./data. Pure Node, no packages.
 //   elev.bin + elev.json  elevation at every elevStep-th tile, 1 m precision, as predictor residuals (low-byte plane, high-byte plane)
-//   detail.bin            town box at `factor` samples per tile, 8-bit, metres = 1100 + v*3.5
 //   lc.bin                W x H land-cover class per tile: 0 none 1 water 2 trees 3 flooded 4 crops 5 built 6 bare 7 snow 8 cloud 9 rangeland
 // Usage: node resample.js
 const fs=require('fs'),path=require('path'),zlib=require('zlib');
@@ -32,10 +31,6 @@ const lonOf=gx=>F.LON0+gx/F.W*(F.LON1-F.LON0),latOf=gy=>F.LAT1-gy/F.H*(F.LAT1-F.
  for(let y=0;y<eh;y++)for(let x=0;x<ew;x++){let e=0;for(const [ox,oy] of offs)e+=s(lonOf(x*step+ox),latOf(y*step+oy));e=Math.round(e/offs.length);min=Math.min(min,e);max=Math.max(max,e);q[y*ew+x]=e;}
  for(let y=0;y<eh;y++)for(let x=0;x<ew;x++){const i=y*ew+x,l=x?q[i-1]:0,u=y?q[i-ew]:0,ul=(x&&y)?q[i-ew-1]:0,r=(q[i]-(l+u-ul))&0xffff;lo[i]=r&255;hi[i]=r>>8;}
  fs.writeFileSync(path.join(data,'elev.bin'),Buffer.concat([lo,hi]));fs.writeFileSync(path.join(data,'elev.json'),JSON.stringify({w:ew,h:eh,step}));console.log('elev',ew+'x'+eh,'step',step,'min',min,'max',max);}
-// town detail
-{const d=F.detail,s=sampler(loadTiles(path.join(raw,'elev14')),14),n=d.size*d.factor,out=Buffer.alloc(n*n);let min=1e9,max=-1e9;
- for(let j=0;j<n;j++)for(let i=0;i<n;i++){const e=s(lonOf(d.x+(i+.5)/d.factor),latOf(d.y+(j+.5)/d.factor));min=Math.min(min,e);max=Math.max(max,e);out[j*n+i]=Math.max(0,Math.min(255,Math.round((e-1100)/3.5)));}
- fs.writeFileSync(path.join(data,'detail.bin'),out);console.log('detail',n+'x'+n,'min',Math.round(min),'max',Math.round(max));}
 // land cover: nearest class colour per pixel, majority per tile
 {const img=readPng(path.join(raw,'landcover.png')),sx=img.w/F.W,sy=img.h/F.H;
  const CL=[[1,0x1A,0x5B,0xAB],[2,0x35,0x82,0x21],[3,0x87,0xD1,0x9E],[4,0xFF,0xDB,0x5C],[5,0xED,0x02,0x2A],[6,0xED,0xE9,0xE4],[7,0xF2,0xFA,0xFF],[8,0xC8,0xC8,0xC8],[9,0xC6,0xAD,0x8D],[9,0xEF,0xCF,0xA8]];
